@@ -15,7 +15,7 @@ const Hero = () => {
     return (
         <header className="relative h-screen flex items-center justify-center overflow-hidden bg-zinc-900">
             <div className="absolute inset-0 z-0">
-                 <img src="https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?q=80&w=2070&auto=format&fit=crop"
+                 <img src="images/utilities/hero.jpg"
                  alt="Luxury Suit Man"
                  className="w-full h-full object-cover opacity-40" />
             </div>
@@ -89,7 +89,7 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
     // flex-row-reverse -> Start is Left -> Image on Left
     return (
         <section id={id} className={`flex flex-col md:flex-row h-auto md:h-[600px] overflow-hidden scroll-mt-24 ${reverse ? 'md:flex-row-reverse' : ''}`}>
-            <div className="w-full md:w-1/2 relative h-[400px] md:h-auto group overflow-hidden">
+            <div className="w-full md:w-1/2 relative h-[400px] md:h-[600px] group overflow-hidden">
                 <img 
                     src={image} 
                     alt={title} 
@@ -212,7 +212,7 @@ const HomePage: React.FC = () => {
             {/* 1. Suits Section - Image RIGHT (reverse=false) */}
             <IntroSection 
                 id="suits"
-                image="https://images.unsplash.com/photo-1593030761757-71bd90dbe3e4?q=80&w=2000"
+                image="images/suit/midnight.jpg"
                 subtitle="آتلیه کت و شلوار"
                 title="کمال در دوخت و طراحی"
                 description="کت و شلوارهای ما با بهره‌گیری از بهترین پارچه‌های پشمی و دوخت‌های مدرن، وقار و اعتماد به نفس را برای شما به ارمغان می‌آورند. هر دوخت داستانی از اصالت را روایت می‌کند."
@@ -220,7 +220,7 @@ const HomePage: React.FC = () => {
                 linkTo="/catalog?category=suits"
                 reverse={false}
             />
-            <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
+            <section className="py-12 bg-lux-body dark:bg-zinc-700 border-b border-gray-100 dark:border-zinc-700">
                 <div className="container max-w-7xl mx-auto px-4">
                     <h3 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
@@ -234,7 +234,7 @@ const HomePage: React.FC = () => {
             {/* 2. Shirts Section - Image LEFT (reverse=true) */}
             <IntroSection 
                 id="shirts"
-                image="https://images.unsplash.com/photo-1620799140408-ed5341cd2431?q=80&w=2000"
+                image="images/shirts/s6.jpg"
                 subtitle="کلکسیون پیراهن"
                 title="لطافت و کیفیت بی‌نظیر"
                 description="پیراهن‌های ما با پارچه‌های صد در صد پنبه و دوخت‌های ظریف، راحتی و استایل را در هم آمیخته‌اند. انتخابی ایده‌آل برای تکمیل استایل رسمی شما در هر موقعیت."
@@ -256,7 +256,7 @@ const HomePage: React.FC = () => {
             {/* 3. Blazer Section - Image RIGHT (reverse=false) */}
             <IntroSection 
                 id="blazer"
-                image="https://images.unsplash.com/photo-1507679799987-c73779587ccf?q=80&w=2000"
+                image="images/blazer/s_b4.webp"
                 subtitle="کلکسیون بلیزر"
                 title="استایل نیمه‌رسمی متمایز"
                 description="با بلیزرهای تک‌دوخت ما، در هر جمعی متمایز باشید. ترکیبی از راحتی و جذابیت برای موقعیت‌های کژوال و نیمه‌رسمی که شخصیت شما را برجسته می‌کند."
@@ -278,7 +278,7 @@ const HomePage: React.FC = () => {
             {/* 4. Accessories Section - Image LEFT (reverse=true) */}
             <IntroSection 
                 id="accessories"
-                image="https://images.unsplash.com/photo-1600091106781-a8f09d8d6560?q=80&w=2000"
+                image="images/accessories/brooch.avif"
                 subtitle="اکسسوری"
                 title="جزئیات تعیین‌کننده"
                 description="اکسسوری‌های دست‌ساز ما، از کراوات‌های ابریشمی تا دکمه‌سردست‌های خاص، امضای نهایی استایل منحصر به فرد شما هستند. زیبایی در جزئیات است."
@@ -300,7 +300,7 @@ const HomePage: React.FC = () => {
              {/* 5. Bespoke Section - Image RIGHT (reverse=false) */}
              <IntroSection 
                 id="bespoke"
-                image="https://images.unsplash.com/photo-1593032465175-481ac7f401a0?q=80&w=2080&auto=format&fit=crop"
+                image="images/utilities/bespoke.webp"
                 subtitle="آتلیه دوخت"
                 title="ظرافت و زیبایی در پوشش"
                 description="خدمات سفارشی ما نهایت زیبایی و ظرافت در پوشش است. با مشاوره خصوصی و انتخاب پارچه‌ها، لباسی کاملاً اختصاصی برای شما طراحی می‌شود."
