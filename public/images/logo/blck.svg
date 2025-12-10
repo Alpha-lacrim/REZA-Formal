@@ -1,0 +1,13 @@
+<svg width="100" height="100" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg" aria-label="REZA Formal Logo">
+    <rect x="2" y="2" width="96" height="96" stroke="#1A1A1A" stroke-width="2.5"/>
+    
+    <line x1="2" y1="50" x2="98" y2="50" stroke="#1A1A1A" stroke-width="2"/>
+    <line x1="50" y1="2" x2="50" y2="98" stroke="#1A1A1A" stroke-width="2"/>
+    
+    <g fill="#1A1A1A" font-family="'Times New Roman', Georgia, serif" font-weight="bold" font-size="38" text-anchor="middle" dominant-baseline="central">
+        <text x="26" y="35">R</text>
+        <text x="74" y="35">E</text>
+        <text x="26" y="83">Z</text>
+        <text x="74" y="83">A</text>
+    </g>
+</svg>
