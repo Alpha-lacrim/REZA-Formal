@@ -6,8 +6,7 @@ export const products: Product[] = [
     name: "کت‌ و شلوار سه تکه چهارخانه",
     price: 16800000,
     currency: "Toman",
-    // Matched with: suit-charcoal-check
-    image: "Images/suit/charcoal-check.jpg",
+    image: "https://images.unsplash.com/photo-1594938298603-c8148c47e356?auto=format&fit=crop&q=80&w=800",
     short: "پارچه پشم مرینو چهارخانه",
     description: "کت‌ و شلوار سه تکه چهارخانه با بافت ظریف و رنگ ذغالی، انتخابی بی‌نظیر برای جلسات کاری مهم و مراسم رسمی. دوخت اسلیم‌فیت و جلیقه کلاسیک، استایلی مقتدر و جذاب می‌سازد.",
     category: "suits",
@@ -18,8 +17,7 @@ export const products: Product[] = [
     name: "کت‌ و شلوار سرمه‌ای رویال",
     price: 15500000,
     currency: "Toman",
-    // Matched with: midnighttux (Closest match for dark formal/royal style)
-    image: "Images/suit/midnight.jpg",
+    image: "https://images.unsplash.com/photo-1593030761757-71bd90dbe3e4?auto=format&fit=crop&q=80&w=800",
     short: "سرمه‌ای کلاسیک",
     description: "کت‌ و شلوار سرمه‌ای رویال، نماد قدرت و اعتماد به نفس. با برش مدرن و پارچه ضدچروک، مناسب استفاده روزمره مدیران و رویدادهای شبانه. به همراه کراوات قرمز برای تضاد رنگی جذاب.",
     category: "suits",
@@ -30,7 +28,6 @@ export const products: Product[] = [
     name: "کت‌ و شلوار قهوه‌ای وینتیج",
     price: 17200000,
     currency: "Toman",
-    // No match found in second JSON. Kept original to avoid broken image.
     image: "https://images.unsplash.com/photo-1507679799987-c73779587ccf?auto=format&fit=crop&q=80&w=800",
     short: "سه تکه قهوه‌ای سوخته",
     description: "این ست سه تکه با رنگ قهوه‌ای خاص و بافت غنی، استایلی متفاوت و گرم برای فصول سرد سال ارائه می‌دهد. مناسب آقایانی که به دنبال تمایز و وقار کلاسیک هستند.",
@@ -42,8 +39,7 @@ export const products: Product[] = [
     name: "کت‌ و شلوار طوسی رسمی",
     price: 16500000,
     currency: "Toman",
-    // Matched with: suit-michaelgrey
-    image: "Images/suit/sp_michaelgrey.jpg",
+    image: "https://images.unsplash.com/photo-1617137968427-85924c800a22?auto=format&fit=crop&q=80&w=800",
     short: "طوسی مات سه تکه",
     description: "کت و شلوار ذغالی مات با طراحی مینیمال و برش دقیق. به همراه جلیقه هم‌رنگ و کراوات مشکی طرح‌دار، گزینه‌ای همیشگی و شیک برای محیط‌های اداری و قرارهای رسمی.",
     category: "suits",
@@ -54,8 +50,7 @@ export const products: Product[] = [
     name: "کت‌ و شلوار زرشکی سیگنیچر",
     price: 18000000,
     currency: "Toman",
-    // Matched with: suit-redsignature
-    image: "Images/suit/sp_red_suit.jpg",
+    image: "https://images.unsplash.com/photo-1552374196-c4e7ffc6e126?auto=format&fit=crop&q=80&w=800",
     short: "زرشکی مجلسی",
     description: "رنگ زرشکی عمیق این کت‌وشلوار سه تکه، آن را به گزینه‌ای ایده‌آل برای دامادها و مراسم جشن تبدیل کرده است. ترکیبی از جسارت رنگی و اصالت دوخت.",
     category: "suits",
@@ -66,8 +61,7 @@ export const products: Product[] = [
     name: "کت‌ و شلوار طوسی روشن",
     price: 14900000,
     currency: "Toman",
-    // Matched with: suit-whiteelegance (Closest match for light/summer suit)
-    image: "Images/suit/sp_white_suit.jpg",
+    image: "https://images.unsplash.com/photo-1497339100210-9e87df79c218?auto=format&fit=crop&q=80&w=800",
     short: "طوسی روشن با کراوات قهوه‌ای",
     description: "رنگ طوسی روشن و پارچه سبک این مدل، آن را برای مراسم روز و فصول گرم سال مناسب می‌سازد. ترکیب آن با اکسسوری‌های قهوه‌ای، استایلی فرش و جوان‌پسند می‌سازد.",
     category: "suits",
@@ -78,7 +72,7 @@ export const products: Product[] = [
     name: "بج سینه رسمی دست‌ساز",
     price: 650000,
     currency: "Toman",
-    image: "Images/accessories/brooch.avif",
+    image: "https://picsum.photos/id/1060/400/500",
     short: "بج دست‌ساز لوکس",
     description: "بج سینه رسمی با طراحی کلاسیک و ساخت دست‌ساز، تکمیل‌کننده‌ ظاهری شیک و مجلسی برای پیراهن و کت‌وشلوار مردانه است.",
     category: "accessories"
@@ -88,7 +82,7 @@ export const products: Product[] = [
     name: "پیراهن لاکچری مردانه",
     price: 4200000,
     currency: "Toman",
-    image: "Images/shirts/s6.jpg",
+    image: "https://picsum.photos/id/1059/400/500",
     short: "پیراهن با بافت خاص پریمیوم",
     description: "پیراهن لاکچری مردانه تهیه‌شده از بهترین الیاف با طراحی انحصاری، مناسب برای استایل‌های رسمی و مجلسی. بافت خاص این پیراهن، جلوه‌ای اصیل و فاخر به پوشش شما می‌بخشد.",
     category: "shirts"
@@ -98,7 +92,7 @@ export const products: Product[] = [
     name: "کت پریمیوم درز تک",
     price: 14800000,
     currency: "Toman",
-    image: "Images/blazer/s_b3.jpg",
+    image: "https://picsum.photos/id/338/400/500",
     short: "کت پریمیوم کلاسیک مردانه",
     description: "کت پریمیوم درز تک با دوختی دقیق و پارچه‌ای باکیفیت، انتخابی لوکس برای مردانی است که در رویدادهای رسمی و مهم به دنبال ظاهری شیک، موقر و حرفه‌ای هستند.",
     category: "blazers"
@@ -108,7 +102,7 @@ export const products: Product[] = [
     name: "کراوات ابریشمی فاخر مردانه",
     price: 1800000,
     currency: "Toman",
-    image: "Images/accessories/Sa2951bd2090242d38f070bdc930085eaA.webp",
+    image: "https://picsum.photos/id/823/400/500",
     short: "کراوات ابریشمی لوکس",
     description: "کراوات ابریشمی فاخر با بافتی باکیفیت و رنگ‌های جذاب، مناسب برای استایل رسمی و ظاهری شیک و حرفه‌ای.",
     category: "accessories"
@@ -118,7 +112,7 @@ export const products: Product[] = [
     "name": "کت رسمی MS-63",
     "price": 17500000,
     "currency": "Toman",
-    "image": "Images/suit/MS-63.webp",
+    "image": "https://picsum.photos/id/175/400/500",
     "short": "دوخت سفارشی ممتاز",
     "description": "کت رسمی MS-63 با دوخت سفارشی و پارچه ممتاز، انتخابی لوکس برای افرادی است که به دنبال تلفیق زیبایی سنتی و طراحی مدرن هستند. مناسب استفاده در مراسم و محیط‌های کاری سطح‌بالا.",
     "category": "blazers"
@@ -128,7 +122,7 @@ export const products: Product[] = [
     "name": "پیراهن کلاسیک سفید مردانه",
     "price": 2850000,
     "currency": "Toman",
-    "image": "Images/shirts/s0.jpg",
+    "image": "https://picsum.photos/id/1/400/500",
     "short": "پیراهن سفید رسمی",
     "description": "پیراهن کلاسیک سفید با بافت ریز و پارچه‌ای درجه‌یک، مناسب برای انواع کت و شلوار رسمی. این مدل همواره انتخابی مطمئن، حرفه‌ای و شیک برای استایل مردانه است.",
     "category": "shirts"
@@ -138,7 +132,7 @@ export const products: Product[] = [
     "name": "پیراهن سرمه‌ای مردانه",
     "price": 3100000,
     "currency": "Toman",
-    "image": "Images/shirts/s1.jpg",
+    "image": "https://picsum.photos/id/2/400/500",
     "short": "پیراهن ابریشمی مخلوط",
     "description": "پیراهن سرمه‌ای با طراحی معاصر و بافتی باکیفیت، مناسب استایل رسمی، جلسات مهم و مراسم مجلسی. این رنگ همیشه ظاهری جدی، شیک و قدرتمند ایجاد می‌کند.",
     "category": "shirts"
@@ -148,7 +142,7 @@ export const products: Product[] = [
     "name": "دستمال جیب رسمی ابریشمی",
     "price": 450000,
     "currency": "Toman",
-    "image": "Images/accessories/Understanding_pocket_squares_03396d68-5ee7-45cd-aaae-7f72913caa43_600x600.webp",
+    "image": "https://picsum.photos/id/3/400/500",
     "short": "دستمال جیبی ابریشمی",
     "description": "دستمال جیب رسمی با پارچه ابریشمی و نقوش ظریف، یک اکسسوری شیک برای تکمیل استایل رسمی و افزودن جذابیت بصری به کت‌وشلوار است.",
     "category": "accessories"
