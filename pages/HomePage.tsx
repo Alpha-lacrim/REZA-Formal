@@ -15,7 +15,7 @@ const Hero = () => {
     return (
         <header className="relative h-screen flex items-center justify-center overflow-hidden bg-zinc-900">
             <div className="absolute inset-0 z-0">
-                 <img src="images/utilities/hero.jpg"
+                 <img src="/images/utilities/hero.jpg"
                  alt="Luxury Suit Man"
                  className="w-full h-full object-cover opacity-40" />
             </div>
@@ -212,7 +212,7 @@ const HomePage: React.FC = () => {
             {/* 1. Suits Section - Image RIGHT (reverse=false) */}
             <IntroSection 
                 id="suits"
-                image="images/suit/midnight.jpg"
+                image="/images/suit/midnight.jpg"
                 subtitle="آتلیه کت و شلوار"
                 title="کمال در دوخت و طراحی"
                 description="کت و شلوارهای ما با بهره‌گیری از بهترین پارچه‌های پشمی و دوخت‌های مدرن، وقار و اعتماد به نفس را برای شما به ارمغان می‌آورند. هر دوخت داستانی از اصالت را روایت می‌کند."
@@ -234,7 +234,7 @@ const HomePage: React.FC = () => {
             {/* 2. Shirts Section - Image LEFT (reverse=true) */}
             <IntroSection 
                 id="shirts"
-                image="images/shirts/s6.jpg"
+                image="/images/shirts/s6.jpg"
                 subtitle="کلکسیون پیراهن"
                 title="لطافت و کیفیت بی‌نظیر"
                 description="پیراهن‌های ما با پارچه‌های صد در صد پنبه و دوخت‌های ظریف، راحتی و استایل را در هم آمیخته‌اند. انتخابی ایده‌آل برای تکمیل استایل رسمی شما در هر موقعیت."
@@ -256,7 +256,7 @@ const HomePage: React.FC = () => {
             {/* 3. Blazer Section - Image RIGHT (reverse=false) */}
             <IntroSection 
                 id="blazer"
-                image="images/blazer/s_b4.webp"
+                image="/images/blazer/s_b4.webp"
                 subtitle="کلکسیون بلیزر"
                 title="استایل نیمه‌رسمی متمایز"
                 description="با بلیزرهای تک‌دوخت ما، در هر جمعی متمایز باشید. ترکیبی از راحتی و جذابیت برای موقعیت‌های کژوال و نیمه‌رسمی که شخصیت شما را برجسته می‌کند."
@@ -278,7 +278,7 @@ const HomePage: React.FC = () => {
             {/* 4. Accessories Section - Image LEFT (reverse=true) */}
             <IntroSection 
                 id="accessories"
-                image="images/accessories/brooch.avif"
+                image="/images/accessories/brooch.avif"
                 subtitle="اکسسوری"
                 title="جزئیات تعیین‌کننده"
                 description="اکسسوری‌های دست‌ساز ما، از کراوات‌های ابریشمی تا دکمه‌سردست‌های خاص، امضای نهایی استایل منحصر به فرد شما هستند. زیبایی در جزئیات است."
@@ -300,7 +300,7 @@ const HomePage: React.FC = () => {
              {/* 5. Bespoke Section - Image RIGHT (reverse=false) */}
              <IntroSection 
                 id="bespoke"
-                image="images/utilities/bespoke.webp"
+                image="/images/utilities/bespoke.webp"
                 subtitle="آتلیه دوخت"
                 title="ظرافت و زیبایی در پوشش"
                 description="خدمات سفارشی ما نهایت زیبایی و ظرافت در پوشش است. با مشاوره خصوصی و انتخاب پارچه‌ها، لباسی کاملاً اختصاصی برای شما طراحی می‌شود."
