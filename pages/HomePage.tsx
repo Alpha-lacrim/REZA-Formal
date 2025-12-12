@@ -215,7 +215,7 @@ const HomePage: React.FC = () => {
                 linkTo="/catalog?category=suits"
                 reverse={false}
             />
-            <section className="py-12 bg-lux-gray dark:bg-zinc-800 border-b border-gray-100 dark:border-zinc-700">
+            <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
                     <h3 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
@@ -237,7 +237,7 @@ const HomePage: React.FC = () => {
                 buttonText="مشاهده پیراهن‌ها"
                 linkTo="/catalog?category=shirts"
             />
-            <section className="py-12 bg-lux-gray dark:bg-zinc-800 border-b border-gray-100 dark:border-zinc-700">
+            <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
                     <h3 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
@@ -281,7 +281,7 @@ const HomePage: React.FC = () => {
                 buttonText="مشاهده اکسسوری‌ها"
                 linkTo="/catalog?category=accessories"
             />
-            <section className="py-12 bg-lux-gray dark:bg-zinc-800 border-b border-gray-100 dark:border-zinc-700">
+            <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
                      <h3 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
