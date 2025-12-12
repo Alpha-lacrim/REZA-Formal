@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
 import { db } from '../services/db';
 import { Product, Order } from '../types';
@@ -186,7 +187,9 @@ const AdminPanel: React.FC = () => {
                                         {products.map(p => (
                                             <tr key={p.id} className="hover:bg-lux-gray dark:hover:bg-zinc-700/30 transition-colors">
                                                 <td className="px-6 py-4">
-                                                    <img src={p.image} alt="" className="w-10 h-10 rounded object-cover" />
+                                                    <div className="w-10 h-10 rounded overflow-hidden">
+                                                        <ImageLoader src={p.image} alt="" className="w-10 h-10" loading="lazy" />
+                                                    </div>
                                                 </td>
                                                 <td className="px-6 py-4 font-medium text-lux-black dark:text-white">{p.name}</td>
                                                 <td className="px-6 py-4 text-gray-500 dark:text-gray-400">{p.category}</td>

@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
+import ImageLoader from './ImageLoader';
 import { Menu, X, ShoppingBag, User, Moon, Sun, Search, ArrowRight, ChevronLeft, LogOut, Settings, LayoutDashboard } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
 import { toPersianDigits, formatPrice } from '../utils';
@@ -112,7 +113,7 @@ const Navbar: React.FC = () => {
 
                         {/* Desktop Icons */}
                         <div className="hidden md:flex items-center gap-6 text-lux-black dark:text-white">
-                            <button onClick={() => setIsSearchOpen(true)} className="hover:text-lux-gold transition-colors">
+                            <button onClick={() => setIsSearchOpen(true)} className="hover:text-lux-gold transition-colors interactive focus-ring" aria-label="جستجو">
                                 <Search size={20} />
                             </button>
                             <button onClick={toggleTheme} className="hover:text-lux-gold transition-colors">
@@ -123,7 +124,7 @@ const Navbar: React.FC = () => {
                             <div className="relative" ref={userMenuRef}>
                                 <button 
                                     onClick={() => user ? setIsUserDropdownOpen(!isUserDropdownOpen) : setAuthModalOpen(true)} 
-                                    className="flex items-center gap-2 px-3 py-1 text-sm border border-transparent hover:border-lux-gold rounded transition-colors hover:text-lux-gold"
+                                    className="flex items-center gap-2 px-3 py-1 text-sm border border-transparent hover:border-lux-gold rounded transition-colors hover:text-lux-gold interactive focus-ring"
                                 >
                                     <User size={20} />
                                     <span className="whitespace-nowrap max-w-[100px] truncate">{user ? user.name : 'ورود / ثبت‌نام'}</span>
@@ -272,7 +273,7 @@ const Navbar: React.FC = () => {
                                         className="flex items-center gap-4 p-3 hover:bg-gray-100 dark:hover:bg-zinc-800 rounded-lg transition-colors group"
                                     >
                                         <div className="w-16 h-20 bg-gray-200 rounded overflow-hidden flex-shrink-0">
-                                            <img src={product.image} alt={product.name} className="w-full h-full object-cover" />
+                                            <ImageLoader src={product.image} alt={product.name} className="w-full h-full" loading="lazy" />
                                         </div>
                                         <div className="flex-1">
                                             <h4 className="font-serif text-lux-black dark:text-white group-hover:text-lux-gold transition-colors">{product.name}</h4>

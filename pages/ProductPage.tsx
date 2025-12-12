@@ -1,5 +1,6 @@
 
 import React, { useEffect } from 'react';
+import ImageLoader from '../components/ImageLoader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft } from 'lucide-react';
 import { products } from '../data';
@@ -44,7 +45,7 @@ const ProductPage: React.FC = () => {
             <main className="container max-w-6xl mx-auto px-4 py-12">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16">
                     <div className="relative rounded-lg overflow-hidden h-[400px] md:h-[600px] bg-gray-100 dark:bg-zinc-800">
-                        <img src={product.image} alt={product.name} className="w-full h-full object-cover hover:scale-105 transition-transform duration-700" />
+                        <ImageLoader src={product.image} alt={product.name} className="w-full h-full" loading="eager" />
                     </div>
                     
                     <div className="flex flex-col justify-center">
@@ -59,7 +60,7 @@ const ProductPage: React.FC = () => {
 
                         <button 
                             onClick={() => addToCart(product.id)}
-                            className="w-full md:w-auto px-8 py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg hover:opacity-90 transition-opacity"
+                            className="w-full md:w-auto px-8 py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg hover:opacity-90 transition-opacity btn-ripple interactive focus-ring"
                         >
                             افزودن به سبد خرید
                         </button>

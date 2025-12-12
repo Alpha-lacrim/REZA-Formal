@@ -1,4 +1,5 @@
 import React from 'react';
+import ImageLoader from './ImageLoader';
 import { X, Plus, Minus, Trash2 } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
 import { products } from '../data';
@@ -34,9 +35,11 @@ const MiniCart: React.FC = () => {
                     <div className="divide-y divide-gray-100 dark:divide-zinc-800">
                         {cartItems.map((item) => (
                             <div key={item.id} className="p-3 flex gap-3">
-                                <img src={item.image} alt={item.name} className="w-14 h-18 object-cover rounded bg-gray-100" />
+                                <div className="w-14 h-18 rounded overflow-hidden bg-gray-100">
+                                    <ImageLoader src={item.image} alt={item.name} className="w-full h-full" loading="lazy" />
+                                </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-sm truncate dark:text-gray-200">{item.name}</h4>
+                                    <h4 className="font-semibold text-sm truncate dark:text-gray-200 interactive">{item.name}</h4>
                                     <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{formatPrice(item.price)}</div>
                                     <div className="flex items-center gap-2">
                                         <button onClick={() => updateQty(item.id, -1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white"><Minus size={12} /></button>
@@ -61,7 +64,7 @@ const MiniCart: React.FC = () => {
                 <Link 
                     to="/cart" 
                     onClick={() => toggleCart(false)}
-                    className="block w-full text-center py-2 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black rounded-lg font-semibold hover:opacity-90 transition-opacity"
+                    className="block w-full text-center py-2 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black rounded-lg font-semibold hover:opacity-90 transition-opacity btn-ripple interactive focus-ring"
                 >
                     تسویه حساب
                 </Link>

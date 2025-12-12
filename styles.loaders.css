@@ -1,0 +1,58 @@
+/* Loaders and image skeleton styles (separate file so we don't overwrite styles.css) */
+.image-skeleton {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, rgba(197,160,89,0.08) 0%, rgba(197,160,89,0.12) 20%, rgba(255,255,255,0.02) 50%, rgba(197,160,89,0.08) 80%, rgba(197,160,89,0.06) 100%);
+    background-size: 200% 100%;
+    animation: skeleton-loading 1.6s linear infinite;
+}
+
+.image-fade-in {
+    animation: image-fade-in 600ms ease forwards;
+    opacity: 0;
+}
+
+@keyframes skeleton-loading {
+    0% { background-position: 200% 0; }
+    100% { background-position: -200% 0; }
+}
+
+@keyframes image-fade-in {
+    0% { opacity: 0; transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+}
+
+.page-loader-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(28,25,23,0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 99999;
+    backdrop-filter: blur(6px);
+}
+
+.loader-spin {
+    width: 64px;
+    height: 64px;
+    border-radius: 9999px;
+    border: 6px solid rgba(255,255,255,0.08);
+    border-top-color: #C5A059;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.loader-text {
+    margin-top: 12px;
+    color: #fff;
+    font-weight: 500;
+    font-size: 14px;
+    text-align: center;
+}
+
+.skeleton-box { background: linear-gradient(90deg, rgba(0,0,0,0.04) 0%, rgba(0,0,0,0.06) 50%, rgba(0,0,0,0.04) 100%); animation: skeleton-loading 1.4s linear infinite; }

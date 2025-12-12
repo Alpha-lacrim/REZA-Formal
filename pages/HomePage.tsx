@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import ImageLoader from '../components/ImageLoader';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Ruler, Globe, Truck, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
@@ -15,9 +16,7 @@ const Hero = () => {
     return (
         <header className="relative h-screen flex items-center justify-center overflow-hidden bg-zinc-900">
             <div className="absolute inset-0 z-0">
-                 <img src="/images/utilities/hero.jpg"
-                 alt="Luxury Suit Man"
-                 className="w-full h-full object-cover opacity-40" />
+                 <ImageLoader src="/images/utilities/hero.jpg" alt="Luxury Suit Man" className="w-full h-full object-cover opacity-40" dataUtility />
             </div>
             <div className="relative z-10 text-center px-4 max-w-4xl mx-auto animate-in fade-in duration-1000">
                 <p className="text-lux-gold text-sm md:text-base tracking-[0.3em] uppercase mb-4">از ۱۹۸۴ تا امروز • تهران</p>
@@ -27,16 +26,16 @@ const Hero = () => {
                 <p className="text-gray-300 text-lg md:text-xl mb-10 max-w-2xl mx-auto font-light">
                      در رضا فرمال، وقار و ظرافت هنر دوخت ایتالیا و ترکیه را تجربه کنید.
                 </p>
-                <div className="flex flex-col md:flex-row gap-4 justify-center">
+                    <div className="flex flex-col md:flex-row gap-4 justify-center">
                     <button 
                         onClick={() => scrollToSection('suits')} 
-                        className="bg-lux-gold text-white px-10 py-4 text-sm uppercase tracking-widest hover:bg-white hover:text-lux-black transition-all duration-300 border border-lux-gold"
+                        className="bg-lux-gold text-white px-10 py-4 text-sm uppercase tracking-widest hover:bg-white hover:text-lux-black transition-all duration-300 border border-lux-gold btn-ripple interactive focus-ring"
                     >
                         مشاهده کلکسیون
                     </button>
                     <button 
                         onClick={() => scrollToSection('bespoke')} 
-                        className="bg-transparent text-white px-10 py-4 text-sm uppercase tracking-widest border border-white hover:bg-white hover:text-lux-black transition-all duration-300"
+                        className="bg-transparent text-white px-10 py-4 text-sm uppercase tracking-widest border border-white hover:bg-white hover:text-lux-black transition-all duration-300 btn-ripple interactive focus-ring"
                     >
                         رزرو وقت مشاوره
                     </button>
@@ -90,11 +89,7 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
     return (
         <section id={id} className={`flex flex-col md:flex-row h-auto md:h-[600px] overflow-hidden scroll-mt-24 ${reverse ? 'md:flex-row-reverse' : ''}`}>
             <div className="w-full md:w-1/2 relative h-[400px] md:h-[600px] group overflow-hidden">
-                <img 
-                    src={image} 
-                    alt={title} 
-                    className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
-                />
+                <ImageLoader src={image} alt={title} className="w-full h-full transition-transform duration-1000 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500"></div>
             </div>
             <div className="w-full md:w-1/2 bg-lux-black text-white flex items-center justify-center p-12 lg:p-24 relative">
@@ -220,7 +215,7 @@ const HomePage: React.FC = () => {
                 linkTo="/catalog?category=suits"
                 reverse={false}
             />
-            <section className="py-12 bg-lux-body dark:bg-zinc-700 border-b border-gray-100 dark:border-zinc-700">
+            <section className="py-12 bg-lux-gray dark:bg-zinc-800 border-b border-gray-100 dark:border-zinc-700">
                 <div className="container max-w-7xl mx-auto px-4">
                     <h3 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">

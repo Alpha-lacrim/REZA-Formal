@@ -1,5 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
+import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
 import { db } from '../services/db';
 import { Order } from '../types';
@@ -145,7 +146,9 @@ const UserPanel: React.FC = () => {
                                                     {order.items.map((item, idx) => (
                                                         <li key={idx} className="flex justify-between items-center text-sm">
                                                             <div className="flex items-center gap-3">
-                                                                <img src={item.image} alt="" className="w-10 h-10 rounded object-cover bg-gray-100" />
+                                                                <div className="w-10 h-10 rounded overflow-hidden bg-gray-100">
+                                                                    <ImageLoader src={item.image} alt="" className="w-10 h-10" loading="lazy" />
+                                                                </div>
                                                                 <span className="text-lux-black dark:text-white">{item.name} <span className="text-gray-400">x{toPersianDigits(item.qty)}</span></span>
                                                             </div>
                                                             <span className="font-bold dark:text-white">{formatPrice(item.price * item.qty)}</span>

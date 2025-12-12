@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { GlobalProvider, useGlobal } from './contexts/GlobalContext';
 import Navbar from './components/Navbar';
@@ -12,6 +12,7 @@ import ProductPage from './pages/ProductPage';
 import CartPage from './pages/CartPage';
 import AdminPanel from './pages/AdminPanel';
 import UserPanel from './pages/UserPanel';
+import PageLoader from './components/PageLoader';
 
 const Toast = () => {
     const { toastMessage } = useGlobal();
@@ -46,8 +47,34 @@ const AppContent = () => {
 };
 
 const App = () => {
+    const [isBooting, setIsBooting] = useState(true);
+
+    useEffect(() => {
+        // Wait for utility images marked with data-utility-image to load.
+        const imgs = Array.from(document.querySelectorAll('img[data-utility-image]')) as HTMLImageElement[];
+
+        if (imgs.length === 0) {
+            // give a small fade-in if none are present
+            const t = setTimeout(() => setIsBooting(false), 350);
+            return () => clearTimeout(t);
+        }
+
+        const loaders = imgs.map(img => new Promise<void>((resolve) => {
+            if (img.complete) return resolve();
+            const onLoad = () => { resolve(); img.removeEventListener('load', onLoad); };
+            const onErr = () => { resolve(); img.removeEventListener('error', onErr); };
+            img.addEventListener('load', onLoad);
+            img.addEventListener('error', onErr);
+            // fallback timeout
+            setTimeout(() => resolve(), 3000);
+        }));
+
+        Promise.all(loaders).then(() => setIsBooting(false));
+    }, []);
+
     return (
         <GlobalProvider>
+            <PageLoader isVisible={isBooting} />
             <AppContent />
         </GlobalProvider>
     );

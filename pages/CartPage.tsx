@@ -1,5 +1,6 @@
 
 import React, { useState } from 'react';
+import ImageLoader from '../components/ImageLoader';
 import { ArrowLeft, Trash2, Plus, Minus, CreditCard, MapPin } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGlobal } from '../contexts/GlobalContext';
@@ -83,7 +84,9 @@ const CartPage: React.FC = () => {
                             <div className="divide-y divide-gray-100 dark:divide-zinc-700">
                                 {cartItems.map((item) => (
                                     <div key={item.id} className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
-                                        <img src={item.image} alt={item.name} className="w-24 h-32 object-cover rounded bg-gray-100" />
+                                        <div className="w-24 h-32 rounded overflow-hidden bg-gray-100">
+                                            <ImageLoader src={item.image} alt={item.name} className="w-full h-full" loading="lazy" />
+                                        </div>
                                         
                                         <div className="flex-1">
                                             <h3 className="font-serif text-lg font-bold text-lux-black dark:text-white mb-1">{item.name}</h3>
@@ -142,7 +145,7 @@ const CartPage: React.FC = () => {
                                 <button 
                                     onClick={handleCheckout}
                                     disabled={loading}
-                                    className="w-full py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg hover:opacity-90 transition-opacity flex justify-center items-center gap-2 disabled:opacity-50"
+                                    className="w-full py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg hover:opacity-90 transition-opacity flex justify-center items-center gap-2 disabled:opacity-50 btn-ripple interactive focus-ring"
                                 >
                                     <CreditCard size={20} />
                                     {loading ? 'در حال پردازش...' : 'پرداخت و تکمیل خرید'}
