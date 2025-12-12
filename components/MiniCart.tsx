@@ -8,12 +8,13 @@ import { Link } from 'react-router-dom';
 import { CartItem } from '../types';
 
 const MiniCart: React.FC = () => {
-    const { isCartOpen, toggleCart, cart, updateQty, removeFromCart } = useGlobal();
+    const { isCartOpen, toggleCart, cart, updateQty, removeFromCart, products: dbProducts } = useGlobal();
 
     if (!isCartOpen) return null;
 
     const cartItems = Object.entries(cart).map(([id, qty]) => {
-        const product = products.find(p => p.id === id);
+        // Fallback to local data if DB products not loaded or found
+        const product = dbProducts.find(p => p.id === id) || products.find(p => p.id === id);
         return product ? { ...product, qty } : null;
     }).filter((item): item is CartItem => item !== null);
 

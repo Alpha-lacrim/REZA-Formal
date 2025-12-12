@@ -4,7 +4,7 @@ interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
   src: string;
   alt?: string;
   className?: string;
-  dataUtility?: boolean; // when true, adds data-utility-image attribute so App can detect it
+  dataUtility?: boolean;
 }
 
 const ImageLoader: React.FC<Props> = ({ src, alt = '', className = '', dataUtility = false, ...rest }) => {
@@ -16,8 +16,6 @@ const ImageLoader: React.FC<Props> = ({ src, alt = '', className = '', dataUtili
     setHasError(false);
   }, [src]);
 
-  // Use the passed className for both the wrapper and the image so callers can
-  // provide transition/group-hover classes and sizing.
   const wrapperClass = `relative overflow-hidden ${className}`.trim();
   const imgClass = `${className} w-full h-full object-cover ${isLoaded ? 'image-fade-in' : 'opacity-0'} transition-transform duration-700 group-hover:scale-105`.trim();
 

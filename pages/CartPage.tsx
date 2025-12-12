@@ -1,23 +1,23 @@
-
 import React, { useState } from 'react';
 import ImageLoader from '../components/ImageLoader';
-import { ArrowLeft, Trash2, Plus, Minus, CreditCard, MapPin } from 'lucide-react';
+import { ArrowLeft, Trash2, Plus, Minus, CreditCard, MapPin, Banknote, AlertCircle } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useGlobal } from '../contexts/GlobalContext';
 import { formatPrice, toPersianDigits } from '../utils';
 import { CartItem } from '../types';
 import { db } from '../services/db';
-import { products } from '../data'; // Fallback
+import { products as fallbackProducts } from '../data';
 
 const CartPage: React.FC = () => {
-    const { cart, updateQty, removeFromCart, user, setAuthModalOpen, clearCart, showToast, products: contextProducts } = useGlobal();
+    const { cart, updateQty, removeFromCart, user, setAuthModalOpen, clearCart, showToast, products: contextProducts, refreshProducts } = useGlobal();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(false);
     const [address, setAddress] = useState(user?.address || '');
+    const [paymentMethod, setPaymentMethod] = useState<'online' | 'cod'>('online');
+    const [error, setError] = useState('');
 
-    // Resolve products from Context (DB) first, fallback to data.ts
     const resolveProduct = (id: string) => {
-        return contextProducts.find(p => p.id === id) || products.find(p => p.id === id);
+        return contextProducts.find(p => p.id === id) || fallbackProducts.find(p => p.id === id);
     };
 
     const cartItems = Object.entries(cart).map(([id, qty]) => {
@@ -28,6 +28,8 @@ const CartPage: React.FC = () => {
     const total = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
     const handleCheckout = async () => {
+        setError('');
+        
         if (!user) {
             setAuthModalOpen(true);
             showToast('برای ثبت سفارش لطفاً وارد شوید');
@@ -35,18 +37,20 @@ const CartPage: React.FC = () => {
         }
 
         if (!address) {
-            showToast('لطفاً آدرس ارسال را وارد کنید');
+            setError('لطفاً آدرس ارسال را وارد کنید');
             return;
         }
 
         setLoading(true);
         try {
             await db.createOrder(user.id, cartItems, total, address);
+            await refreshProducts(); // Update stock in global state
             clearCart();
             showToast('سفارش با موفقیت ثبت شد');
             navigate('/profile');
-        } catch (error) {
-            showToast('خطا در ثبت سفارش');
+        } catch (error: any) {
+            setError(error.message || 'خطا در ثبت سفارش');
+            showToast(error.message || 'خطا در ثبت سفارش');
         } finally {
             setLoading(false);
         }
@@ -79,37 +83,70 @@ const CartPage: React.FC = () => {
                     </div>
                 ) : (
                     <div className="flex flex-col lg:flex-row gap-8">
-                        {/* Items List */}
-                        <div className="flex-1 bg-white dark:bg-zinc-800 rounded-lg shadow overflow-hidden border border-gray-100 dark:border-zinc-700">
-                            <div className="divide-y divide-gray-100 dark:divide-zinc-700">
-                                {cartItems.map((item) => (
-                                    <div key={item.id} className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
-                                        <div className="w-24 h-32 rounded overflow-hidden bg-gray-100">
-                                            <ImageLoader src={item.image} alt={item.name} className="w-full h-full" loading="lazy" />
-                                        </div>
-                                        
-                                        <div className="flex-1">
-                                            <h3 className="font-serif text-lg font-bold text-lux-black dark:text-white mb-1">{item.name}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{item.short}</p>
-                                            <div className="font-semibold text-lux-gold">{formatPrice(item.price)}</div>
-                                        </div>
-
-                                        <div className="flex items-center justify-between sm:justify-end gap-6 mt-2 sm:mt-0">
-                                            <div className="flex items-center gap-3 bg-gray-50 dark:bg-zinc-900 rounded-lg p-1 border border-gray-200 dark:border-zinc-700">
-                                                <button onClick={() => updateQty(item.id, -1)} className="p-1 hover:text-lux-gold dark:text-white"><Minus size={16} /></button>
-                                                <span className="w-8 text-center font-bold dark:text-white">{toPersianDigits(item.qty)}</span>
-                                                <button onClick={() => updateQty(item.id, 1)} className="p-1 hover:text-lux-gold dark:text-white"><Plus size={16} /></button>
+                        <div className="flex-1">
+                            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow overflow-hidden border border-gray-100 dark:border-zinc-700 mb-6">
+                                <div className="divide-y divide-gray-100 dark:divide-zinc-700">
+                                    {cartItems.map((item) => (
+                                        <div key={item.id} className="p-4 sm:p-6 flex flex-col sm:flex-row gap-4 sm:items-center">
+                                            <div className="w-24 h-32 rounded overflow-hidden bg-gray-100">
+                                                <ImageLoader src={item.image} alt={item.name} className="w-full h-full" loading="lazy" />
                                             </div>
-                                            <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
-                                                <Trash2 size={20} />
-                                            </button>
+                                            
+                                            <div className="flex-1">
+                                                <h3 className="font-serif text-lg font-bold text-lux-black dark:text-white mb-1">{item.name}</h3>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">{item.short}</p>
+                                                <div className="font-semibold text-lux-gold">{formatPrice(item.price)}</div>
+                                                {((item.stock || 0) < 5) && (
+                                                    <div className="text-xs text-orange-500 mt-1">
+                                                        تنها {toPersianDigits(item.stock)} عدد باقی مانده
+                                                    </div>
+                                                )}
+                                            </div>
+
+                                            <div className="flex items-center justify-between sm:justify-end gap-6 mt-2 sm:mt-0">
+                                                <div className="flex items-center gap-3 bg-gray-50 dark:bg-zinc-900 rounded-lg p-1 border border-gray-200 dark:border-zinc-700">
+                                                    <button onClick={() => updateQty(item.id, -1)} className="p-1 hover:text-lux-gold dark:text-white"><Minus size={16} /></button>
+                                                    <span className="w-8 text-center font-bold dark:text-white">{toPersianDigits(item.qty)}</span>
+                                                    <button onClick={() => updateQty(item.id, 1)} className="p-1 hover:text-lux-gold dark:text-white"><Plus size={16} /></button>
+                                                </div>
+                                                <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 transition-colors">
+                                                    <Trash2 size={20} />
+                                                </button>
+                                            </div>
                                         </div>
-                                    </div>
-                                ))}
+                                    ))}
+                                </div>
+                            </div>
+
+                            <div className="bg-white dark:bg-zinc-800 rounded-lg shadow p-6 border border-gray-100 dark:border-zinc-700">
+                                <h3 className="font-bold text-lg text-lux-black dark:text-white mb-4 flex items-center gap-2">
+                                    <Banknote size={20}/> روش پرداخت
+                                </h3>
+                                <div className="space-y-3">
+                                    <label className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all ${paymentMethod === 'online' ? 'border-lux-gold bg-lux-gold/5' : 'border-gray-200 dark:border-zinc-600'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="payment" 
+                                            checked={paymentMethod === 'online'} 
+                                            onChange={() => setPaymentMethod('online')}
+                                            className="accent-lux-gold w-4 h-4"
+                                        />
+                                        <span className="text-lux-black dark:text-white font-medium">پرداخت اینترنتی</span>
+                                    </label>
+                                    <label className={`flex items-center gap-3 p-4 border rounded-lg cursor-pointer transition-all ${paymentMethod === 'cod' ? 'border-lux-gold bg-lux-gold/5' : 'border-gray-200 dark:border-zinc-600'}`}>
+                                        <input 
+                                            type="radio" 
+                                            name="payment" 
+                                            checked={paymentMethod === 'cod'} 
+                                            onChange={() => setPaymentMethod('cod')}
+                                            className="accent-lux-gold w-4 h-4"
+                                        />
+                                        <span className="text-lux-black dark:text-white font-medium">پرداخت در محل</span>
+                                    </label>
+                                </div>
                             </div>
                         </div>
 
-                        {/* Checkout Summary */}
                         <div className="w-full lg:w-96">
                             <div className="bg-white dark:bg-zinc-800 p-6 rounded-xl border border-gray-200 dark:border-zinc-700 sticky top-24">
                                 <h3 className="font-bold text-lg text-lux-black dark:text-white mb-6 border-b pb-4 border-gray-200 dark:border-zinc-700">خلاصه سفارش</h3>
@@ -139,6 +176,13 @@ const CartPage: React.FC = () => {
                                 ) : (
                                     <div className="mb-6 p-3 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-200 text-sm rounded">
                                         برای تکمیل خرید باید وارد حساب کاربری شوید.
+                                    </div>
+                                )}
+
+                                {error && (
+                                    <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 text-red-600 dark:text-red-300 text-sm rounded flex items-center gap-2">
+                                        <AlertCircle size={16} className="shrink-0" />
+                                        {error}
                                     </div>
                                 )}
 

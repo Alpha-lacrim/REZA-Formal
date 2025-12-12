@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route } from 'react-router-dom';
 import { GlobalProvider, useGlobal } from './contexts/GlobalContext';
@@ -6,12 +5,16 @@ import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MiniCart from './components/MiniCart';
 import AuthModal from './components/AuthModal';
+import ChatWidget from './components/ChatWidget';
 import HomePage from './pages/HomePage';
 import CatalogPage from './pages/CatalogPage';
 import ProductPage from './pages/ProductPage';
 import CartPage from './pages/CartPage';
 import AdminPanel from './pages/AdminPanel';
 import UserPanel from './pages/UserPanel';
+import WishlistPage from './pages/WishlistPage';
+import AboutPage from './pages/AboutPage';
+import BespokePage from './pages/BespokePage';
 import PageLoader from './components/PageLoader';
 
 const Toast = () => {
@@ -36,9 +39,13 @@ const AppContent = () => {
                     <Route path="/cart" element={<CartPage />} />
                     <Route path="/admin" element={<AdminPanel />} />
                     <Route path="/profile" element={<UserPanel />} />
+                    <Route path="/wishlist" element={<WishlistPage />} />
+                    <Route path="/about" element={<AboutPage />} />
+                    <Route path="/bespoke" element={<BespokePage />} />
                 </Routes>
                 <Footer />
                 <MiniCart />
+                <ChatWidget />
                 <AuthModal />
                 <Toast />
             </div>
@@ -51,10 +58,11 @@ const App = () => {
 
     useEffect(() => {
         // Wait for utility images marked with data-utility-image to load.
+        // Since we are using placeholder images, we can shorten this or rely on a timeout
+        // But keeping logic for robustness.
         const imgs = Array.from(document.querySelectorAll('img[data-utility-image]')) as HTMLImageElement[];
 
         if (imgs.length === 0) {
-            // give a small fade-in if none are present
             const t = setTimeout(() => setIsBooting(false), 350);
             return () => clearTimeout(t);
         }
@@ -65,8 +73,7 @@ const App = () => {
             const onErr = () => { resolve(); img.removeEventListener('error', onErr); };
             img.addEventListener('load', onLoad);
             img.addEventListener('error', onErr);
-            // fallback timeout
-            setTimeout(() => resolve(), 3000);
+            setTimeout(() => resolve(), 3000); // fallback
         }));
 
         Promise.all(loaders).then(() => setIsBooting(false));

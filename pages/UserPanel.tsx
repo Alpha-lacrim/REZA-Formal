@@ -1,20 +1,18 @@
-
 import React, { useState, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
 import { db } from '../services/db';
 import { Order } from '../types';
 import { toPersianDigits, formatPrice } from '../utils';
-import { User, Package, MapPin, Save, LogOut } from 'lucide-react';
+import { User, Package, MapPin, Save, LogOut, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
 const UserPanel: React.FC = () => {
-    const { user, updateUserProfile, logout, showToast } = useGlobal();
+    const { user, updateUserProfile, logout, showToast, cancelUserOrder } = useGlobal();
     const navigate = useNavigate();
     const [orders, setOrders] = useState<Order[]>([]);
     const [loading, setLoading] = useState(false);
     
-    // Edit Profile State
     const [name, setName] = useState('');
     const [address, setAddress] = useState('');
 
@@ -46,6 +44,17 @@ const UserPanel: React.FC = () => {
         }
     };
 
+    const handleCancelOrder = async (orderId: string) => {
+        if (window.confirm('آیا از لغو این سفارش اطمینان دارید؟')) {
+            try {
+                await cancelUserOrder(orderId);
+                loadOrders(); // Refresh list
+            } catch (err: any) {
+                showToast(err.message || 'خطا در لغو سفارش');
+            }
+        }
+    };
+
     const statusColors: Record<string, string> = {
         'pending': 'bg-yellow-100 text-yellow-800',
         'processing': 'bg-blue-100 text-blue-800',
@@ -68,7 +77,6 @@ const UserPanel: React.FC = () => {
                 
                 <div className="flex flex-col md:flex-row gap-8">
                     
-                    {/* Sidebar / Profile Card */}
                     <div className="w-full md:w-1/3">
                         <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700 p-6 sticky top-24">
                             <div className="flex flex-col items-center mb-6">
@@ -114,7 +122,6 @@ const UserPanel: React.FC = () => {
                         </div>
                     </div>
 
-                    {/* Main Content / Orders */}
                     <div className="w-full md:w-2/3">
                         <div className="bg-white dark:bg-zinc-800 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700 p-6">
                             <h3 className="text-xl font-bold text-lux-black dark:text-white mb-6 flex items-center gap-2">
@@ -137,9 +144,21 @@ const UserPanel: React.FC = () => {
                                                     <span>کد: <span className="font-bold text-lux-black dark:text-white">{order.id}</span></span>
                                                     <span>تاریخ: {new Date(order.createdAt).toLocaleDateString('fa-IR')}</span>
                                                 </div>
-                                                <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[order.status]}`}>
-                                                    {statusLabels[order.status]}
-                                                </span>
+                                                <div className="flex items-center gap-3">
+                                                    <span className={`px-3 py-1 rounded-full text-xs font-bold ${statusColors[order.status]}`}>
+                                                        {statusLabels[order.status]}
+                                                    </span>
+                                                    {order.status === 'pending' && (
+                                                        <button 
+                                                            onClick={() => handleCancelOrder(order.id)}
+                                                            className="text-red-500 hover:text-red-700 flex items-center gap-1 text-xs"
+                                                            title="لغو سفارش"
+                                                        >
+                                                            <XCircle size={16} />
+                                                            لغو
+                                                        </button>
+                                                    )}
+                                                </div>
                                             </div>
                                             <div className="p-4">
                                                 <ul className="space-y-3">

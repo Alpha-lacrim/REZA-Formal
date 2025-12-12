@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="فروشگاه پوشاک مردانه رضا فرمال - ارائه دهنده برترین کت و شلوارها، پیراهن‌ها و اکسسوری‌های لوکس مردانه با دوخت سفارشی.">
     <title>REZA Formal | پوشاک مردانه‌</title>
     
     <!-- Google Fonts -->
@@ -21,9 +22,9 @@
                         'lux-gold': '#C5A059',
                         'lux-gold-light': '#E5C585',
                         'lux-gold-dark': '#A07F3D',
-                        'lux-black': '#1C1917', // Stone 900: Softer than pure black
-                        'lux-gray': '#F2F2F0',  // Warm light gray for sections
-                        'lux-body': '#FAFAF9',  // Stone 50: Comfortable warm white for backgrounds
+                        'lux-black': '#1C1917', // Stone 900
+                        'lux-gray': '#F2F2F0',  // Warm light gray
+                        'lux-body': '#FAFAF9',  // Stone 50
                     },
                     fontFamily: {
                         logo: ['"Playfair Display"', 'serif'],
@@ -31,28 +32,101 @@
                         sans: ['"Vazirmatn"', 'sans-serif'],
                     },
                     backgroundImage: {
-                        'hero-pattern': "url('/images/utilities/hero.jpg')",
+                        'hero-pattern': "url('https://picsum.photos/1920/1080?grayscale')",
                     }
                 }
             }
         }
     </script>
+    <style>
+        /* Custom scrollbar */
+        ::-webkit-scrollbar { width: 8px; }
+        ::-webkit-scrollbar-track { background: #f1f1f1; }
+        ::-webkit-scrollbar-thumb { background: #C5A059; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #A07F3D; }
+
+        /* Animations */
+        .hover-underline-animation { display: inline-block; position: relative; }
+        .hover-underline-animation::after {
+            content: ''; position: absolute; width: 100%; transform: scaleX(0);
+            height: 1px; bottom: 0; left: 0; background-color: #C5A059;
+            transform-origin: bottom right; transition: transform 0.25s ease-out;
+        }
+        .hover-underline-animation:hover::after { transform: scaleX(1); transform-origin: bottom left; }
+        html[dir="rtl"] .hover-underline-animation::after { transform-origin: bottom left; right: 0; left: auto; }
+        html[dir="rtl"] .hover-underline-animation:hover::after { transform-origin: bottom right; }
+
+        /* Loader & Skeleton */
+        .image-skeleton {
+            display: block; width: 100%; height: 100%;
+            background: linear-gradient(90deg, rgba(197,160,89,0.08) 0%, rgba(197,160,89,0.12) 20%, rgba(255,255,255,0.02) 50%, rgba(197,160,89,0.08) 80%, rgba(197,160,89,0.06) 100%);
+            background-size: 200% 100%; animation: skeleton-loading 1.6s linear infinite;
+        }
+        .image-fade-in { animation: image-fade-in 600ms ease forwards; opacity: 0; }
+        @keyframes skeleton-loading { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+        @keyframes image-fade-in { 0% { opacity: 0; transform: scale(1.02); } 100% { opacity: 1; transform: scale(1); } }
+
+        .page-loader-overlay {
+            position: fixed; inset: 0; background: rgba(28,25,23,0.85);
+            display: flex; align-items: center; justify-content: center;
+            z-index: 99999; backdrop-filter: blur(6px);
+        }
+        .loader-spin {
+            width: 64px; height: 64px; border-radius: 9999px;
+            border: 6px solid rgba(255,255,255,0.08); border-top-color: #C5A059;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .loader-text { margin-top: 12px; color: #fff; font-weight: 500; font-size: 14px; text-align: center; }
+
+        /* Utilities */
+        .interactive { transition: transform 200ms ease, box-shadow 200ms ease, opacity 150ms ease; }
+        .interactive:hover { transform: translateY(-4px); }
+        .interactive:active { transform: translateY(-1px) scale(0.995); }
+        .card-elevate { box-shadow: 0 6px 18px rgba(28,25,23,0.06); }
+        .card-elevate:hover { box-shadow: 0 14px 34px rgba(28,25,23,0.10); }
+        .btn-ripple { position: relative; overflow: hidden; }
+        .btn-ripple::after {
+            content: ''; position: absolute; left: 50%; top: 50%;
+            width: 10px; height: 10px; background: rgba(255,255,255,0.12);
+            transform: translate(-50%, -50%) scale(1); border-radius: 50%;
+            opacity: 0; transition: transform 400ms ease, opacity 400ms ease;
+        }
+        .btn-ripple:active::after {
+            transform: translate(-50%, -50%) scale(60); opacity: 1;
+            transition: transform 600ms cubic-bezier(.2,.8,.2,1), opacity 600ms;
+        }
+        .focus-ring:focus { outline: none; box-shadow: 0 0 0 3px rgba(197,160,89,0.18); border-radius: 6px; }
+        .focus-ring:focus-visible { outline: none; box-shadow: 0 0 0 3px rgba(197,160,89,0.24); }
+        input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(197,160,89,0.08); border-color: #C5A059; }
+        a.transition-color { transition: color 200ms ease, background-color 200ms ease; }
+        
+        /* Hide scrollbar for chrome/safari/opera */
+        .hide-scroll::-webkit-scrollbar {
+          display: none;
+        }
+        /* Hide scrollbar for IE, Edge and Firefox */
+        .hide-scroll {
+          -ms-overflow-style: none;  /* IE and Edge */
+          scrollbar-width: none;  /* Firefox */
+        }
+    </style>
 <script type="importmap">
 {
   "imports": {
-    "react": "https://aistudiocdn.com/react@^19.2.1",
-    "react-dom/": "https://aistudiocdn.com/react-dom@^19.2.1/",
-    "react/": "https://aistudiocdn.com/react@^19.2.1/",
-    "vite": "https://aistudiocdn.com/vite@^7.2.7",
-    "lucide-react": "https://aistudiocdn.com/lucide-react@^0.557.0",
-    "@vitejs/plugin-react": "https://aistudiocdn.com/@vitejs/plugin-react@^5.1.2",
-    "react-router-dom": "https://aistudiocdn.com/react-router-dom@^7.10.1"
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.561.0",
+    "react-router-dom": "https://esm.sh/react-router-dom@^7.10.1",
+    "otpauth": "https://esm.sh/otpauth@9.2.1"
   }
 }
 </script>
+<link rel="stylesheet" href="/index.css">
 </head>
 <body class="bg-lux-body text-lux-black font-sans antialiased selection:bg-lux-gold selection:text-white">
     <div id="root"></div>
-    <script type="module" src="/index.tsx"></script>
+<script type="module" src="/index.tsx"></script>
 </body>
 </html>

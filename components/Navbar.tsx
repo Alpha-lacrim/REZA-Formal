@@ -1,7 +1,6 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ImageLoader from './ImageLoader';
-import { Menu, X, ShoppingBag, User, Moon, Sun, Search, ArrowRight, ChevronLeft, LogOut, Settings, LayoutDashboard } from 'lucide-react';
+import { Menu, X, ShoppingBag, User, Moon, Sun, Search, ArrowRight, ChevronLeft, LogOut, Settings, LayoutDashboard, Heart } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
 import { toPersianDigits, formatPrice } from '../utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
@@ -11,7 +10,7 @@ const Navbar: React.FC = () => {
         cart, toggleCart, 
         theme, toggleTheme, 
         user, setAuthModalOpen, logout,
-        products 
+        products, wishlist 
     } = useGlobal();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -44,6 +43,11 @@ const Navbar: React.FC = () => {
 
     const handleSectionClick = (sectionId: string) => {
         setIsMobileMenuOpen(false);
+        if (sectionId === 'bespoke') {
+            navigate('/bespoke');
+            return;
+        }
+
         if (location.pathname !== '/') {
             navigate('/', { state: { scrollTo: sectionId } });
         } else {
@@ -116,6 +120,16 @@ const Navbar: React.FC = () => {
                             <button onClick={() => setIsSearchOpen(true)} className="hover:text-lux-gold transition-colors interactive focus-ring" aria-label="جستجو">
                                 <Search size={20} />
                             </button>
+                            
+                            <Link to="/wishlist" className="hover:text-lux-gold transition-colors relative" aria-label="علاقه‌مندی‌ها">
+                                <Heart size={20} />
+                                {wishlist.length > 0 && (
+                                     <span className="absolute -top-1 -right-1 bg-red-500 text-white text-[8px] rounded-full h-3 w-3 flex items-center justify-center">
+                                        {toPersianDigits(wishlist.length)}
+                                    </span>
+                                )}
+                            </Link>
+
                             <button onClick={toggleTheme} className="hover:text-lux-gold transition-colors">
                                 {theme === 'dark' ? <Sun size={20} /> : <Moon size={20} />}
                             </button>
@@ -200,6 +214,9 @@ const Navbar: React.FC = () => {
                             {link.label}
                         </button>
                     ))}
+                    <Link to="/wishlist" onClick={() => setIsMobileMenuOpen(false)} className="block w-full text-right px-3 py-3 text-lg font-medium border-b border-gray-100 dark:border-gray-700 hover:text-lux-gold">
+                        علاقه‌مندی‌ها
+                    </Link>
                     <div className="mt-4 pt-4 border-t border-gray-100 dark:border-gray-700">
                          {user ? (
                              <>

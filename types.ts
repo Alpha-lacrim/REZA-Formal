@@ -1,4 +1,3 @@
-
 export interface Product {
   id: string;
   name: string;
@@ -6,12 +5,14 @@ export interface Product {
   price: number;
   currency: string;
   image: string;
+  images: string[];
   short: string;
   short_fa?: string;
   description: string;
   description_fa?: string;
   category: string;
   fabric?: string;
+  stock?: number;
 }
 
 export interface CartItem extends Product {
@@ -27,8 +28,12 @@ export interface User {
   role: UserRole;
   phone?: string;
   address?: string;
-  password?: string; // In a real app, never store plain text. We will mock hash it.
+  password?: string;
   createdAt: number;
+  twoFactorSecret?: string;
+  lastLogin?: number;
+  avatar?: string;
+  provider?: 'local' | 'google';
 }
 
 export type OrderStatus = 'pending' | 'processing' | 'shipped' | 'delivered' | 'cancelled';
@@ -43,10 +48,25 @@ export interface Order {
   shippingAddress: string;
 }
 
-export interface Translation {
-  [key: string]: string;
+export interface ContactMessage {
+  id: string;
+  name: string;
+  email: string;
+  message: string;
+  createdAt: number;
+  read?: boolean;
 }
 
-export interface Translations {
-  [lang: string]: Translation;
+export interface SiteSettings {
+  aboutTitle: string;
+  aboutDescription: string;
+  aboutImage: string;
+  
+  // Homepage Sections
+  heroImage: string;
+  suitsSectionImage: string;
+  shirtsSectionImage: string;
+  blazersSectionImage: string;
+  accessoriesSectionImage: string;
+  bespokeSectionImage: string;
 }

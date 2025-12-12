@@ -1,6 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { CartItem, Product, User } from '../types';
+import { Product, User, SiteSettings } from '../types';
 import { db } from '../services/db';
 
 interface GlobalContextType {
@@ -12,16 +11,25 @@ interface GlobalContextType {
     isCartOpen: boolean;
     toggleCart: (open?: boolean) => void;
     
-    // Auth & User
+    wishlist: string[];
+    toggleWishlist: (productId: string) => void;
+    isInWishlist: (productId: string) => boolean;
+
     user: User | null;
-    login: (email: string, pass: string) => Promise<void>;
+    login: (email: string, pass: string, code?: string) => Promise<void>;
+    loginWithGoogle: (email?: string) => Promise<void>;
     register: (name: string, email: string, pass: string) => Promise<void>;
     logout: () => void;
     updateUserProfile: (data: Partial<User>) => Promise<void>;
+    cancelUserOrder: (orderId: string) => Promise<void>;
+    sendOtp: (email: string) => Promise<string>;
     
-    // Data
     products: Product[];
     refreshProducts: () => Promise<void>;
+    sendMessage: (name: string, email: string, message: string) => Promise<void>;
+
+    siteSettings: SiteSettings | null;
+    updateSiteSettings: (settings: SiteSettings) => Promise<void>;
 
     theme: 'light' | 'dark';
     toggleTheme: () => void;
@@ -34,25 +42,34 @@ interface GlobalContextType {
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
 
 export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    // --- State ---
     const [cart, setCart] = useState<{ [id: string]: number }>(() => {
         try { return JSON.parse(localStorage.getItem('reza_cart_v1') || '{}'); } catch { return {}; }
     });
+    
+    const [wishlist, setWishlist] = useState<string[]>(() => {
+        try { return JSON.parse(localStorage.getItem('reza_wishlist_v1') || '[]'); } catch { return []; }
+    });
+
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [user, setUser] = useState<User | null>(() => {
         try { return JSON.parse(localStorage.getItem('reza_session_v1') || 'null'); } catch { return null; }
     });
     const [products, setProducts] = useState<Product[]>([]);
+    const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
+
     const [isAuthModalOpen, setAuthModalOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>(() => {
         return (localStorage.getItem('reza_theme_pref') as 'light' | 'dark') || 'light';
     });
     const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-    // --- Effects ---
     useEffect(() => {
         localStorage.setItem('reza_cart_v1', JSON.stringify(cart));
     }, [cart]);
+
+    useEffect(() => {
+        localStorage.setItem('reza_wishlist_v1', JSON.stringify(wishlist));
+    }, [wishlist]);
 
     useEffect(() => {
         if (user) localStorage.setItem('reza_session_v1', JSON.stringify(user));
@@ -66,9 +83,9 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         else html.classList.remove('dark');
     }, [theme]);
 
-    // Load products on mount
     useEffect(() => {
         refreshProducts();
+        loadSettings();
     }, []);
 
     const refreshProducts = async () => {
@@ -76,9 +93,11 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setProducts(data);
     };
 
-    // --- Actions ---
+    const loadSettings = async () => {
+        const settings = await db.getSettings();
+        setSiteSettings(settings);
+    };
 
-    // Cart
     const addToCart = (productId: string, qty = 1) => {
         setCart(prev => ({ ...prev, [productId]: (prev[productId] || 0) + qty }));
         setIsCartOpen(true);
@@ -113,9 +132,34 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         setIsCartOpen(prev => open !== undefined ? open : !prev);
     };
 
-    // Auth
-    const login = async (email: string, pass: string) => {
-        const userData = await db.login(email, pass);
+    const toggleWishlist = (productId: string) => {
+        setWishlist(prev => {
+            if (prev.includes(productId)) {
+                showToast('از علاقه‌مندی‌ها حذف شد');
+                return prev.filter(id => id !== productId);
+            } else {
+                showToast('به علاقه‌مندی‌ها اضافه شد');
+                return [...prev, productId];
+            }
+        });
+    };
+
+    const isInWishlist = (productId: string) => wishlist.includes(productId);
+
+    const login = async (email: string, pass: string, code?: string) => {
+        const userData = await db.login(email, pass, code);
+        setUser(userData);
+        setAuthModalOpen(false);
+        showToast(`خوش آمدید، ${userData.name}`);
+    };
+
+    const loginWithGoogle = async (email?: string) => {
+        // Mock Google data
+        const googleEmail = email && email.includes('@') ? email : 'user_google@gmail.com';
+        const googleName = email ? email.split('@')[0] : 'Google User';
+        const googleAvatar = 'https://lh3.googleusercontent.com/a/ACg8ocK...'; // Mock avatar url
+
+        const userData = await db.loginWithGoogle(googleEmail, googleName, googleAvatar);
         setUser(userData);
         setAuthModalOpen(false);
         showToast(`خوش آمدید، ${userData.name}`);
@@ -140,7 +184,28 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         showToast('اطلاعات با موفقیت بروز شد');
     };
 
-    // UI
+    const cancelUserOrder = async (orderId: string) => {
+        await db.cancelOrder(orderId);
+        await refreshProducts(); 
+        showToast('سفارش لغو شد');
+    };
+
+    const sendMessage = async (name: string, email: string, message: string) => {
+        await db.sendMessage(name, email, message);
+        showToast('پیام شما با موفقیت ارسال شد');
+    };
+
+    const updateSiteSettings = async (settings: SiteSettings) => {
+        await db.saveSettings(settings);
+        setSiteSettings(settings);
+        showToast('تنظیمات سایت ذخیره شد');
+    };
+
+    const sendOtp = async (email: string): Promise<string> => {
+        const token = await db.sendOtp(email);
+        return token;
+    };
+
     const toggleTheme = () => {
         setTheme(prev => prev === 'light' ? 'dark' : 'light');
     };
@@ -153,8 +218,11 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     return (
         <GlobalContext.Provider value={{
             cart, addToCart, removeFromCart, updateQty, clearCart, isCartOpen, toggleCart,
-            user, login, register, logout, updateUserProfile,
+            wishlist, toggleWishlist, isInWishlist,
+            user, login, loginWithGoogle, register, logout, updateUserProfile, cancelUserOrder, sendMessage,
             products, refreshProducts,
+            siteSettings, updateSiteSettings,
+            sendOtp,
             theme, toggleTheme,
             isAuthModalOpen, setAuthModalOpen,
             toastMessage, showToast

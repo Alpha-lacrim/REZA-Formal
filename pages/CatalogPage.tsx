@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import { products } from '../data';
+import SEO from '../components/SEO';
 
 const CatalogPage: React.FC = () => {
     const [searchParams] = useSearchParams();
@@ -34,13 +34,16 @@ const CatalogPage: React.FC = () => {
 
     const pageTitle = categoryTitles[categoryParam] || 'تمامی محصولات';
 
-    // Auto-scroll to top on mount
     useEffect(() => {
         window.scrollTo(0, 0);
     }, []);
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-900 pt-20">
+            <SEO 
+                title={pageTitle} 
+                description={`خرید آنلاین ${pageTitle} با بهترین کیفیت و قیمت. مشاهده جدیدترین مدل‌های ${pageTitle} در فروشگاه رضا فرمال.`} 
+            />
             <header className="relative text-center bg-lux-black text-white py-8 overflow-hidden shadow-md">
                 <div className="relative mx-auto w-full max-w-4xl px-4 z-10">
                     <h1 className="font-serif text-3xl md:text-5xl mb-2">
@@ -48,7 +51,6 @@ const CatalogPage: React.FC = () => {
                     </h1>
                     <p className="text-white/80 text-sm">مجموعه‌ای منتخب از بهترین‌ها</p>
                 </div>
-                {/* Decorative Box */}
                 <div className="absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 w-[120%] h-32"></div>
             </header>
             
@@ -69,7 +71,7 @@ const CatalogPage: React.FC = () => {
                             className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white text-lux-black focus:outline-none focus:border-lux-gold focus:ring-1 focus:ring-lux-gold dark:bg-zinc-700 dark:border-zinc-600 dark:text-white transition-shadow w-full sm:w-auto"
                         >
                             <option value="">همه</option>
-                            {fabrics.map(f => <option key={f} value={f as string}>{f}</option>)}
+                            {fabrics.map(f => <option key={f as string} value={f as string}>{f}</option>)}
                         </select>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">

@@ -4,8 +4,13 @@ import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Ruler, Globe, Truck, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import { products } from '../data';
+import SEO from '../components/SEO';
+import { useGlobal } from '../contexts/GlobalContext';
 
 const Hero = () => {
+    const navigate = useNavigate();
+    const { siteSettings } = useGlobal();
+
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
         if (element) {
@@ -16,7 +21,12 @@ const Hero = () => {
     return (
         <header className="relative h-screen flex items-center justify-center overflow-hidden bg-zinc-900">
             <div className="absolute inset-0 z-0">
-                 <ImageLoader src="/images/utilities/hero.jpg" alt="Luxury Suit Man" className="w-full h-full object-cover opacity-40" dataUtility />
+                 <ImageLoader 
+                    src={siteSettings?.heroImage || "https://picsum.photos/1920/1080?grayscale&random=99"} 
+                    alt="Luxury Suit Man" 
+                    className="w-full h-full object-cover opacity-40" 
+                    dataUtility 
+                />
             </div>
             <div className="relative z-10 text-center px-4 max-w-4xl mx-auto animate-in fade-in duration-1000">
                 <p className="text-lux-gold text-sm md:text-base tracking-[0.3em] uppercase mb-4">از ۱۹۸۴ تا امروز • تهران</p>
@@ -34,7 +44,7 @@ const Hero = () => {
                         مشاهده کلکسیون
                     </button>
                     <button 
-                        onClick={() => scrollToSection('bespoke')} 
+                        onClick={() => navigate('/bespoke')} 
                         className="bg-transparent text-white px-10 py-4 text-sm uppercase tracking-widest border border-white hover:bg-white hover:text-lux-black transition-all duration-300 btn-ripple interactive focus-ring"
                     >
                         رزرو وقت مشاوره
@@ -83,9 +93,6 @@ interface IntroSectionProps {
 const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title, description, reverse = false, buttonText, linkTo }) => {
     const navigate = useNavigate();
     
-    // In RTL mode:
-    // flex-row (default) -> Start is Right -> Image on Right
-    // flex-row-reverse -> Start is Left -> Image on Left
     return (
         <section id={id} className={`flex flex-col md:flex-row h-auto md:h-[600px] overflow-hidden scroll-mt-24 ${reverse ? 'md:flex-row-reverse' : ''}`}>
             <div className="w-full md:w-1/2 relative h-[400px] md:h-[600px] group overflow-hidden">
@@ -93,9 +100,6 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500"></div>
             </div>
             <div className="w-full md:w-1/2 bg-lux-black text-white flex items-center justify-center p-12 lg:p-24 relative">
-                 {/* Decorative background pattern */}
-                 <div className="absolute inset-0 opacity-5 pointer-events-none bg-[url('https://www.transparenttextures.com/patterns/cubes.png')]"></div>
-                 
                  <div className="max-w-md text-center z-10">
                     <h4 className="text-lux-gold uppercase tracking-[0.2em] text-sm mb-4 font-bold">{subtitle}</h4>
                     <h2 className="font-serif text-3xl lg:text-5xl mb-6 leading-tight">{title}</h2>
@@ -135,11 +139,6 @@ const ProductCarousel = ({ category }: { category: string }) => {
 
     return (
         <div className="relative group px-0 md:px-4 py-8">
-             <style>{`
-                .hide-scroll::-webkit-scrollbar {
-                    display: none;
-                }
-            `}</style>
             
             {items.length > 2 && (
                 <>
@@ -162,7 +161,6 @@ const ProductCarousel = ({ category }: { category: string }) => {
             <div 
                 ref={scrollRef}
                 className="flex gap-6 overflow-x-auto snap-x snap-mandatory py-4 px-4 md:px-2 hide-scroll"
-                style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
             >
                 {items.map(p => (
                     <div key={p.id} className="min-w-[85vw] sm:min-w-[45vw] md:min-w-[300px] lg:min-w-[320px] snap-center">
@@ -185,6 +183,7 @@ const ProductCarousel = ({ category }: { category: string }) => {
 
 const HomePage: React.FC = () => {
     const location = useLocation();
+    const { siteSettings } = useGlobal();
 
     useEffect(() => {
         if (location.state && location.state.scrollTo) {
@@ -199,15 +198,38 @@ const HomePage: React.FC = () => {
         }
     }, [location]);
 
+    const schema = {
+        "@context": "https://schema.org",
+        "@type": "MensClothingStore",
+        "name": "REZA Formal",
+        "description": "لوکس‌ترین فروشگاه کت و شلوار و اکسسوری مردانه در تهران.",
+        "image": "https://picsum.photos/1200/800",
+        "telephone": "02122902908",
+        "url": "https://rezaformal.com",
+        "address": {
+            "@type": "PostalAddress",
+            "streetAddress": "خیابان میرداماد، مرکز خرید آریان، طبقه همکف، واحد ۳۵",
+            "addressLocality": "Tehran",
+            "addressCountry": "IR"
+        },
+        "priceRange": "$$$",
+        "openingHours": "Mo-Su 10:00-22:00"
+    };
+
     return (
         <main>
+            <SEO 
+                title="خانه"
+                description="رضا فرمال، ارائه دهنده برترین پوشاک مردانه، کت و شلوار دامادی و اکسسوری‌های لوکس با دوخت سفارشی در تهران."
+                image="https://picsum.photos/1200/630?grayscale"
+                schema={schema}
+            />
             <Hero />
             <FeatureBar />
             
-            {/* 1. Suits Section - Image RIGHT (reverse=false) */}
             <IntroSection 
                 id="suits"
-                image="/images/suit/midnight.jpg"
+                image={siteSettings?.suitsSectionImage || "https://picsum.photos/800/1200?random=100"}
                 subtitle="آتلیه کت و شلوار"
                 title="کمال در دوخت و طراحی"
                 description="کت و شلوارهای ما با بهره‌گیری از بهترین پارچه‌های پشمی و دوخت‌های مدرن، وقار و اعتماد به نفس را برای شما به ارمغان می‌آورند. هر دوخت داستانی از اصالت را روایت می‌کند."
@@ -226,10 +248,9 @@ const HomePage: React.FC = () => {
                 </div>
             </section>
 
-            {/* 2. Shirts Section - Image LEFT (reverse=true) */}
             <IntroSection 
                 id="shirts"
-                image="/images/shirts/s6.jpg"
+                image={siteSettings?.shirtsSectionImage || "https://picsum.photos/800/1200?random=101"}
                 subtitle="کلکسیون پیراهن"
                 title="لطافت و کیفیت بی‌نظیر"
                 description="پیراهن‌های ما با پارچه‌های صد در صد پنبه و دوخت‌های ظریف، راحتی و استایل را در هم آمیخته‌اند. انتخابی ایده‌آل برای تکمیل استایل رسمی شما در هر موقعیت."
@@ -248,10 +269,9 @@ const HomePage: React.FC = () => {
                 </div>
             </section>
 
-            {/* 3. Blazer Section - Image RIGHT (reverse=false) */}
             <IntroSection 
                 id="blazer"
-                image="/images/blazer/s_b4.webp"
+                image={siteSettings?.blazersSectionImage || "https://picsum.photos/800/1200?random=102"}
                 subtitle="کلکسیون بلیزر"
                 title="استایل نیمه‌رسمی متمایز"
                 description="با بلیزرهای تک‌دوخت ما، در هر جمعی متمایز باشید. ترکیبی از راحتی و جذابیت برای موقعیت‌های کژوال و نیمه‌رسمی که شخصیت شما را برجسته می‌کند."
@@ -270,10 +290,9 @@ const HomePage: React.FC = () => {
                 </div>
             </section>
 
-            {/* 4. Accessories Section - Image LEFT (reverse=true) */}
             <IntroSection 
                 id="accessories"
-                image="/images/accessories/brooch.avif"
+                image={siteSettings?.accessoriesSectionImage || "https://picsum.photos/800/1200?random=103"}
                 subtitle="اکسسوری"
                 title="جزئیات تعیین‌کننده"
                 description="اکسسوری‌های دست‌ساز ما، از کراوات‌های ابریشمی تا دکمه‌سردست‌های خاص، امضای نهایی استایل منحصر به فرد شما هستند. زیبایی در جزئیات است."
@@ -292,14 +311,14 @@ const HomePage: React.FC = () => {
                 </div>
             </section>
 
-             {/* 5. Bespoke Section - Image RIGHT (reverse=false) */}
              <IntroSection 
                 id="bespoke"
-                image="/images/utilities/bespoke.webp"
+                image={siteSettings?.bespokeSectionImage || "https://picsum.photos/800/1200?random=104"}
                 subtitle="آتلیه دوخت"
                 title="ظرافت و زیبایی در پوشش"
                 description="خدمات سفارشی ما نهایت زیبایی و ظرافت در پوشش است. با مشاوره خصوصی و انتخاب پارچه‌ها، لباسی کاملاً اختصاصی برای شما طراحی می‌شود."
                 buttonText="درخواست دوخت سفارشی"
+                linkTo="/bespoke"
                 reverse={false}
             />
 
