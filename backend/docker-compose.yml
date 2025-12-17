@@ -2,11 +2,8 @@ version: '3.8'
 services:
   db:
     image: mysql:8.0
-    environment:
-      MYSQL_ROOT_PASSWORD: example
-      MYSQL_DATABASE: reza
-      MYSQL_USER: reza
-      MYSQL_PASSWORD: reza
+    env_file:
+      - ./.env
     ports:
       - "3306:3306"
     volumes:
@@ -20,9 +17,9 @@ services:
     ports:
       - "8000:8000"
     environment:
-      DATABASE_URL: mysql://reza:reza@db:3306/reza
-      DJANGO_SECRET_KEY: change-me
-      DEBUG: 'True'
+      # Environment loaded from .env in this folder (do not commit secrets)
+    env_file:
+      - ./.env
     depends_on:
       - db
 

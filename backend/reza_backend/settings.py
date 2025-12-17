@@ -80,6 +80,7 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
+        'shop.auth.CookieJWTAuthentication',
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
@@ -96,3 +97,5 @@ SIMPLE_JWT = {
 # CORS: allow React dev origin by default
 cors_origins = env('ALLOWED_ORIGINS', default='http://localhost:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',') if o.strip()]
+# Allow cookies to be sent cross-site for auth (required for cookie-based JWT)
+CORS_ALLOW_CREDENTIALS = True
