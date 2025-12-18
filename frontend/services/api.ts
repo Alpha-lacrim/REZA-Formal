@@ -59,6 +59,77 @@ export const api = {
   async adminMarkMessageRead(id: string) { return await request('/api/admin/messages/' + id + '/mark-read/', { method: 'POST' }); },
   async adminGetProducts() { return await request('/api/admin/products/'); },
   async adminSaveProduct(product: any) {
+    // If a FormData instance is provided (contains files), send multipart without forcing JSON headers
+    if (product instanceof FormData) {
+      const id = product.get('id') as string | null;
+      const path = id ? '/api/admin/products/' + id + '/' : '/api/admin/products/';
+      const method = id ? 'PUT' : 'POST';
+
+      const send = async (base: string, methodOverride?: string) => {
+        const useMethod = methodOverride || method;
+        const res = await fetch(base + path, { method: useMethod, body: product, credentials: 'include' });
+        const text = await res.text();
+        let data: any = null;
+        try { data = text ? JSON.parse(text) : null; } catch { data = text; }
+        if (!res.ok) throw { status: res.status, data, statusCode: res.status };
+        return data;
+      };
+
+      // Try primary then fallback to direct backend if needed. If a PUT fails because the id
+      // is local-only (404/400), retry as POST (create) without the id field.
+      const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
+      try {
+        return await send(API_BASE);
+      } catch (e: any) {
+        // If server indicates resource not found or bad request for PUT, retry as POST
+        if (e && (e.statusCode === 404 || e.statusCode === 400 || e.statusCode === 500) && method === 'PUT') {
+          try {
+            // Remove 'id' from FormData for create
+            const fd = new FormData();
+            for (const [k, v] of (product as FormData).entries()) {
+              if (k === 'id') continue;
+              fd.append(k, v as any);
+            }
+            // send POST to collection endpoint
+            const postPath = '/api/admin/products/';
+            const postRes = await fetch(API_BASE + postPath, { method: 'POST', body: fd, credentials: 'include' });
+            const postText = await postRes.text();
+            let postData: any = null;
+            try { postData = postText ? JSON.parse(postText) : null; } catch { postData = postText; }
+            if (!postRes.ok) throw { status: postRes.status, data: postData };
+            return postData;
+          } catch (inner) {
+            // fall through to trying backend direct
+          }
+        }
+
+        try {
+          const backend = 'http://localhost:8000';
+          return await send(backend);
+        } catch (err: any) {
+          // If PUT failed on backend and was due to missing resource, try POST there too
+          if (err && (err.statusCode === 404 || err.statusCode === 400 || err.statusCode === 500) && method === 'PUT') {
+            try {
+              const fd = new FormData();
+              for (const [k, v] of (product as FormData).entries()) {
+                if (k === 'id') continue;
+                fd.append(k, v as any);
+              }
+              const postRes = await fetch(backend + '/api/admin/products/', { method: 'POST', body: fd, credentials: 'include' });
+              const postText = await postRes.text();
+              let postData: any = null;
+              try { postData = postText ? JSON.parse(postText) : null; } catch { postData = postText; }
+              if (!postRes.ok) throw { status: postRes.status, data: postData };
+              return postData;
+            } catch (inner) {
+              throw inner;
+            }
+          }
+          throw err;
+        }
+      }
+    }
+
     if (product.id) return await request('/api/admin/products/' + product.id + '/', { method: 'PUT', body: JSON.stringify(product) });
     return await request('/api/admin/products/', { method: 'POST', body: JSON.stringify(product) });
   },

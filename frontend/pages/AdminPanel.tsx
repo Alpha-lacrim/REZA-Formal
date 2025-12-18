@@ -122,7 +122,52 @@ const AdminPanel: React.FC = () => {
         };
 
         try {
-            await api.adminSaveProduct(productToSave);
+            // If any image is a data URL, convert to Blob and send multipart FormData
+            const images = productToSave.images || [];
+            const hasDataUrl = images.some(img => typeof img === 'string' && img.startsWith('data:image/'));
+
+            if (hasDataUrl) {
+                const form = new FormData();
+                // Append simple fields
+                form.append('id', productToSave.id);
+                form.append('name', productToSave.name);
+                form.append('price', String(productToSave.price));
+                form.append('category', productToSave.category || 'accessories');
+                form.append('description', productToSave.description || '');
+                form.append('currency', productToSave.currency || 'Toman');
+                form.append('short', productToSave.short || '');
+                form.append('fabric', productToSave.fabric || '');
+                form.append('stock', String(productToSave.stock || 0));
+
+                // Collect non-data-url image URLs to preserve them
+                const remoteUrls: string[] = [];
+
+                // Convert data URLs to blobs and append as files. Append under multiple common keys
+                // so the backend can accept whichever field name it expects.
+                for (let i = 0; i < images.length; i++) {
+                    const img = images[i];
+                    if (typeof img === 'string' && img.startsWith('data:image/')) {
+                        try {
+                            const blob = await (await fetch(img)).blob();
+                            const ext = blob.type.split('/')?.[1] || 'png';
+                            // Append as array, singular, and bracketed name variants
+                            form.append('images', blob, `image-${i}.${ext}`);
+                            form.append('image', blob, `image-${i}.${ext}`);
+                            form.append('images[]', blob, `image-${i}.${ext}`);
+                        } catch (convErr) {
+                            console.error('Failed to convert data URL to blob', convErr);
+                        }
+                    } else if (typeof img === 'string') {
+                        remoteUrls.push(img);
+                    }
+                }
+
+                if (remoteUrls.length > 0) form.append('images_urls', JSON.stringify(remoteUrls));
+
+                await api.adminSaveProduct(form);
+            } else {
+                await api.adminSaveProduct(productToSave);
+            }
         } catch (e: any) {
             // If backend returned validation errors, surface them to the admin
             if (e && e.data) {

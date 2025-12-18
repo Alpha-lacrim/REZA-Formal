@@ -59,7 +59,8 @@ class DatabaseService {
                 const stored = JSON.parse(localStorage.getItem(K_PRODUCTS) || '[]');
                 let changed = false;
                 const cleaned = (stored || []).map((p: any) => {
-                    if (!p || !p.images) return p;
+                    if (!p) return p;
+                    // Clean images array
                     const filtered = (p.images || []).filter((img: string) => {
                         if (typeof img === 'string' && img.startsWith('data:image/') && img.length > MAX_DATAURL_LENGTH) {
                             changed = true;
@@ -67,7 +68,13 @@ class DatabaseService {
                         }
                         return true;
                     });
-                    return { ...p, images: filtered, image: filtered[0] || p.image };
+                    // Clean single image field if it's a large data URL
+                    let primary = p.image;
+                    if (typeof primary === 'string' && primary.startsWith('data:image/') && primary.length > MAX_DATAURL_LENGTH) {
+                        primary = filtered[0] || '';
+                        changed = true;
+                    }
+                    return { ...p, images: filtered, image: primary };
                 });
                 if (changed) {
                     localStorage.setItem(K_PRODUCTS, JSON.stringify(cleaned));
@@ -318,7 +325,10 @@ class DatabaseService {
             return img;
         }).filter(Boolean) as string[];
         if (images.length === 0 && product.image && this.isValidUrl(product.image)) {
-            images.push(product.image);
+            // Only add product.image if it's not an overly large data URL
+            if (!(typeof product.image === 'string' && product.image.startsWith('data:image/') && product.image.length > MAX_DATAURL_LENGTH)) {
+                images.push(product.image);
+            }
         }
         // Fallback image if none provided
         if (images.length === 0) {

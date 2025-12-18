@@ -12,13 +12,72 @@ from django.utils import timezone
 import uuid
 from django.conf import settings
 import jwt
+from django.core.files.storage import default_storage
+from django.core.files.base import ContentFile
+import os
+import json
+import uuid
+import logging
 
 User = get_user_model()
+
+logger = logging.getLogger(__name__)
 
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+
+
+def _shallow_request_data(request):
+    """Return a shallow, mutable dict of request.data without deep-copying file-like objects.
+
+    This avoids invoking QueryDict.copy() which attempts a deepcopy and fails
+    when file objects (e.g. _io.BufferedRandom / UploadedFile) are present.
+    """
+    try:
+        out = {}
+        # If request.data supports getlist (QueryDict), preserve multiple values
+        if hasattr(request.data, 'getlist'):
+            for key in request.data:
+                vals = request.data.getlist(key)
+                if len(vals) == 1:
+                    out[key] = vals[0]
+                else:
+                    out[key] = vals
+        else:
+            # Fallback to simple iteration (shouldn't deep-copy file objects)
+            for k, v in getattr(request.data, 'items', lambda: ())():
+                out[k] = v
+        return out
+    except Exception:
+        try:
+            return dict(request.data)
+        except Exception:
+            return request.data
+
+
+def _save_uploaded_file_get_url(fobj, request=None):
+    """Save uploaded file to default storage and return its accessible absolute URL.
+
+    If `request` is provided, use `request.build_absolute_uri()` to produce
+    a full URL accepted by `URLField` validators. Otherwise fall back to
+    `default_storage.url()` or `MEDIA_URL`.
+    """
+    ext = os.path.splitext(getattr(fobj, 'name', ''))[1] or ''
+    name = f"uploads/{uuid.uuid4().hex}{ext}"
+    saved_name = default_storage.save(name, ContentFile(fobj.read()))
+    try:
+        urlpath = default_storage.url(saved_name)
+    except Exception:
+        media_url = getattr(settings, 'MEDIA_URL', '/media/')
+        urlpath = media_url.rstrip('/') + '/' + saved_name.lstrip('/')
+    try:
+        if request is not None:
+            return request.build_absolute_uri(urlpath)
+    except Exception:
+        pass
+    return urlpath
 
 
 @api_view(['POST'])
@@ -155,13 +214,50 @@ def product_detail(request, pk=None):
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     if request.method == 'POST' or request.method == 'PUT':
-        data = request.data.copy()
+        data = _shallow_request_data(request)
+        # If files were uploaded (multipart/form-data), save them and inject URLs
+        files_urls = []
+        # handle multiple files under 'images' or 'images[]'
+        if request.FILES:
+            # single image
+            if 'image' in request.FILES:
+                try:
+                    data['image'] = _save_uploaded_file_get_url(request.FILES['image'])
+                except Exception:
+                    pass
+            # multiple images field
+            imgs = []
+            if 'images' in request.FILES:
+                for f in request.FILES.getlist('images'):
+                    try:
+                        imgs.append(_save_uploaded_file_get_url(f))
+                    except Exception:
+                        continue
+            if 'images[]' in request.FILES:
+                for f in request.FILES.getlist('images[]'):
+                    try:
+                        imgs.append(_save_uploaded_file_get_url(f))
+                    except Exception:
+                        continue
+            if imgs:
+                # merge with any provided images_urls
+                try:
+                    existing = data.get('images') or []
+                    if isinstance(existing, str):
+                        try:
+                            existing = json.loads(existing)
+                        except Exception:
+                            existing = [existing]
+                    data['images'] = list(existing) + imgs
+                except Exception:
+                    data['images'] = imgs
         if request.method == 'POST':
             data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
         serializer = ProductSerializer(data=data)
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
+        logger.warning('Product create/update validation failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
         return Response(serializer.errors, status=400)
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)
@@ -307,12 +403,45 @@ def admin_products(request):
         qs = Product.objects.all()
         return Response(ProductSerializer(qs, many=True).data)
     # POST -> create
-    data = request.data.copy()
+    data = _shallow_request_data(request)
+    # process uploaded files for create as well
+    if request.FILES:
+        if 'image' in request.FILES:
+            try:
+                data['image'] = _save_uploaded_file_get_url(request.FILES['image'])
+            except Exception:
+                pass
+        imgs = []
+        if 'images' in request.FILES:
+            for f in request.FILES.getlist('images'):
+                try:
+                    imgs.append(_save_uploaded_file_get_url(f))
+                except Exception:
+                    continue
+        if 'images[]' in request.FILES:
+            for f in request.FILES.getlist('images[]'):
+                try:
+                    imgs.append(_save_uploaded_file_get_url(f))
+                except Exception:
+                    continue
+        if imgs:
+            try:
+                existing = data.get('images') or []
+                if isinstance(existing, str):
+                    try:
+                        existing = json.loads(existing)
+                    except Exception:
+                        existing = [existing]
+                data['images'] = list(existing) + imgs
+            except Exception:
+                data['images'] = imgs
+
     data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
     serializer = ProductSerializer(data=data)
     if serializer.is_valid():
         serializer.save()
         return Response(serializer.data)
+    logger.warning('Product admin create validation failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
     return Response(serializer.errors, status=400)
 
 
@@ -332,14 +461,47 @@ def admin_product_detail(request, pk=None):
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data)
+            logger.warning('Product admin update validation failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
             return Response(serializer.errors, status=400)
         except Product.DoesNotExist:
-            data = request.data.copy()
+            data = _shallow_request_data(request)
+            if request.FILES:
+                if 'image' in request.FILES:
+                    try:
+                        data['image'] = _save_uploaded_file_get_url(request.FILES['image'])
+                    except Exception:
+                        pass
+                imgs = []
+                if 'images' in request.FILES:
+                    for f in request.FILES.getlist('images'):
+                        try:
+                            imgs.append(_save_uploaded_file_get_url(f))
+                        except Exception:
+                            continue
+                if 'images[]' in request.FILES:
+                    for f in request.FILES.getlist('images[]'):
+                        try:
+                            imgs.append(_save_uploaded_file_get_url(f))
+                        except Exception:
+                            continue
+                if imgs:
+                    try:
+                        existing = data.get('images') or []
+                        if isinstance(existing, str):
+                            try:
+                                existing = json.loads(existing)
+                            except Exception:
+                                existing = [existing]
+                        data['images'] = list(existing) + imgs
+                    except Exception:
+                        data['images'] = imgs
+
             data['id'] = pk
             serializer = ProductSerializer(data=data)
             if serializer.is_valid():
                 serializer.save()
                 return Response(serializer.data, status=201)
+            logger.warning('Product admin upsert (create) failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
             return Response(serializer.errors, status=400)
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)
