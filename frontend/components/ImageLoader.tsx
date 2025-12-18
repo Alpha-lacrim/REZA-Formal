@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 
 interface Props extends React.ImgHTMLAttributes<HTMLImageElement> {
-  src: string;
+  src?: string;
   alt?: string;
   className?: string;
   dataUtility?: boolean;
@@ -24,7 +24,7 @@ const ImageLoader: React.FC<Props> = ({ src, alt = '', className = '', dataUtili
       {!isLoaded && (
         <div aria-hidden className="image-skeleton absolute inset-0" />
       )}
-      {!hasError ? (
+      {!hasError && src ? (
         <img
           {...rest}
           src={src}

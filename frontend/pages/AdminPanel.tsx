@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
 import api from '../services/api';
+import { db } from '../services/db';
 import { Product, Order, ContactMessage, SiteSettings, User } from '../types';
 import { toPersianDigits, formatPrice } from '../utils';
 import { LayoutDashboard, Package, ShoppingBag, Plus, Trash2, Edit2, X, Check, Save, Search, ChevronLeft, ChevronRight, AlertCircle, MessageSquare, Settings as SettingsIcon, Upload, Image as ImageIcon, ArrowUpDown, Eye, Printer, Calendar, User as UserIcon, MapPin, Phone, Filter, Mail, CheckCircle, Clock } from 'lucide-react';
@@ -52,11 +53,14 @@ const AdminPanel: React.FC = () => {
     });
 
     useEffect(() => {
-        if (!user || user.role !== 'admin') {
+        // Only redirect away if we know the user exists and is not an admin.
+        if (user && user.role !== 'admin') {
             navigate('/');
             return;
         }
-        loadData();
+        if (user && user.role === 'admin') {
+            loadData();
+        }
     }, [activeTab, user]);
 
     useEffect(() => {
@@ -117,7 +121,34 @@ const AdminPanel: React.FC = () => {
             stock: editingProduct.stock || 0
         };
 
-        await api.adminSaveProduct(productToSave);
+        try {
+            await api.adminSaveProduct(productToSave);
+        } catch (e: any) {
+            // If backend returned validation errors, surface them to the admin
+            if (e && e.data) {
+                try {
+                    const msg = typeof e.data === 'string' ? e.data : JSON.stringify(e.data);
+                    showToast(`خطا از سرور: ${msg}`);
+                } catch {
+                    showToast('خطا در ذخیره محصول در سرور');
+                }
+            }
+
+            // Fallback to local DB when backend is unreachable or returns validation errors.
+            // Avoid storing overly large data-URL images in localStorage to prevent quota errors.
+            try {
+                const MAX_DATAURL_LENGTH = 100000; // match local DB threshold
+                const filteredImages = (productToSave.images || []).filter(img => {
+                    if (typeof img === 'string' && img.startsWith('data:image/') && img.length > MAX_DATAURL_LENGTH) return false;
+                    return true;
+                });
+                const localProduct = { ...productToSave, images: filteredImages, image: filteredImages[0] || productToSave.image } as Product;
+                await db.saveProduct(localProduct as any);
+            } catch (err) {
+                console.error('Failed to save product locally', err);
+                showToast('خطا در ذخیره محصول محلی — احتمالاً حجم تصویر زیاد است');
+            }
+        }
         await refreshProducts();
         setIsProductModalOpen(false);
         setEditingProduct({});
@@ -131,7 +162,11 @@ const AdminPanel: React.FC = () => {
 
     const confirmDeleteProduct = async () => {
         if (deleteConfirmation.productId) {
-            await api.adminDeleteProduct(deleteConfirmation.productId);
+            try {
+                await api.adminDeleteProduct(deleteConfirmation.productId);
+            } catch (e) {
+                await db.deleteProduct(deleteConfirmation.productId as string);
+            }
             await refreshProducts();
             showToast('محصول حذف شد');
             setDeleteConfirmation({ isOpen: false, productId: null });
@@ -459,6 +494,25 @@ const AdminPanel: React.FC = () => {
                                 >
                                     <Plus size={16} /> <span className="hidden sm:inline">افزودن محصول</span>
                                 </button>
+                                <button
+                                    onClick={async () => {
+                                        try {
+                                            const data = await api.adminGetProducts();
+                                            if (!Array.isArray(data)) {
+                                                console.error('adminGetProducts returned non-array', data);
+                                                showToast('پاسخ سرور نامعتبر است — کنسول را بررسی کنید');
+                                                return;
+                                            }
+                                            localStorage.setItem('reza_db_products_v1', JSON.stringify(data));
+                                            await refreshProducts();
+                                            showToast('محصولات از سرور همگام‌سازی شدند');
+                                        } catch (err: any) {
+                                            console.error('Failed to sync products from server', err);
+                                            showToast(err?.data ? `خطا از سرور: ${JSON.stringify(err.data)}` : 'خطا در تماس با سرور');
+                                        }
+                                    }}
+                                    className="px-4 py-2 bg-gray-100 dark:bg-zinc-700 text-gray-700 dark:text-gray-200 rounded-lg text-sm font-bold hover:bg-gray-200"
+                                >همگام‌سازی از سرور</button>
                             </div>
                         </div>
                         

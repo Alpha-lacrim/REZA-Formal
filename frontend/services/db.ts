@@ -52,6 +52,30 @@ class DatabaseService {
         if (!localStorage.getItem(K_PRODUCTS)) {
             localStorage.setItem(K_PRODUCTS, JSON.stringify(seedProducts));
         }
+        else {
+            // Sanitize existing stored products to avoid oversized data URLs that can exceed quota
+            try {
+                const MAX_DATAURL_LENGTH = 100000;
+                const stored = JSON.parse(localStorage.getItem(K_PRODUCTS) || '[]');
+                let changed = false;
+                const cleaned = (stored || []).map((p: any) => {
+                    if (!p || !p.images) return p;
+                    const filtered = (p.images || []).filter((img: string) => {
+                        if (typeof img === 'string' && img.startsWith('data:image/') && img.length > MAX_DATAURL_LENGTH) {
+                            changed = true;
+                            return false;
+                        }
+                        return true;
+                    });
+                    return { ...p, images: filtered, image: filtered[0] || p.image };
+                });
+                if (changed) {
+                    localStorage.setItem(K_PRODUCTS, JSON.stringify(cleaned));
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
 
         if (!localStorage.getItem(K_ORDERS)) {
             localStorage.setItem(K_ORDERS, JSON.stringify([]));
@@ -285,7 +309,14 @@ class DatabaseService {
     async saveProduct(product: Product): Promise<Product> {
         await delay(400);
         
-        const images = (product.images || []).filter(img => this.isValidUrl(img));
+        const MAX_DATAURL_LENGTH = 100000; // ~100KB per image stored in localStorage
+        const images = (product.images || []).filter(img => this.isValidUrl(img)).map(img => {
+            if (typeof img === 'string' && img.startsWith('data:image/') && img.length > MAX_DATAURL_LENGTH) {
+                // Drop overly large data URLs to avoid localStorage quota issues
+                return null;
+            }
+            return img;
+        }).filter(Boolean) as string[];
         if (images.length === 0 && product.image && this.isValidUrl(product.image)) {
             images.push(product.image);
         }

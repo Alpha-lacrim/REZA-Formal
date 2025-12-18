@@ -2,7 +2,6 @@ import React, { useEffect, useState } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { ArrowLeft, Heart, Star, ShoppingBag, CheckCircle, Info, X, Minus, Plus } from 'lucide-react';
-import { products } from '../data';
 import { useGlobal } from '../contexts/GlobalContext';
 import { formatPrice, toPersianDigits } from '../utils';
 import ProductCard from '../components/ProductCard';
@@ -16,9 +15,10 @@ const ProductPage: React.FC = () => {
     const [quantity, setQuantity] = useState(1);
     const [selectedImage, setSelectedImage] = useState('');
     
-    // Fallback to local data if not found in context (though context should have everything)
+    // Fallback to static seed if not found in context
+    const { products } = useGlobal();
     const product = contextProducts.find(p => p.id === id) || products.find(p => p.id === id);
-    const relatedProducts = contextProducts.filter(p => p.category === product?.category && p.id !== product?.id).slice(0, 4);
+    const relatedProducts = products.filter(p => p.category === product?.category && p.id !== product?.id).slice(0, 4);
 
     const images = product?.images && product.images.length > 0 ? product.images : (product?.image ? [product.image] : []);
 

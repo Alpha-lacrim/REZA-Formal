@@ -13,6 +13,23 @@ class User(AbstractUser):
         return self.role == 'admin' or self.is_staff
 
 
+# Ensure any Django superuser is treated as admin (keeps role/is_staff in sync).
+from django.db.models.signals import post_save
+from django.dispatch import receiver
+
+
+@receiver(post_save, sender=User)
+def _ensure_superuser_admin(sender, instance, **kwargs):
+    try:
+        if instance.is_superuser and instance.role != 'admin':
+            instance.role = 'admin'
+            instance.is_staff = True
+            instance.save(update_fields=['role', 'is_staff'])
+    except Exception:
+        # Don't let signal errors break normal flow; admin sync can be fixed manually
+        pass
+
+
 class Product(models.Model):
     id = models.CharField(max_length=64, primary_key=True)
     name = models.CharField(max_length=255)

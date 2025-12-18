@@ -325,12 +325,22 @@ def admin_product_detail(request, pk=None):
         prod = get_object_or_404(Product, pk=pk)
         return Response(ProductSerializer(prod).data)
     if request.method in ['PUT']:
-        prod = get_object_or_404(Product, pk=pk)
-        serializer = ProductSerializer(prod, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=400)
+        # Upsert: update if exists, otherwise create a new product with the provided id
+        try:
+            prod = Product.objects.get(pk=pk)
+            serializer = ProductSerializer(prod, data=request.data, partial=True)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data)
+            return Response(serializer.errors, status=400)
+        except Product.DoesNotExist:
+            data = request.data.copy()
+            data['id'] = pk
+            serializer = ProductSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response(serializer.data, status=201)
+            return Response(serializer.errors, status=400)
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)
         prod.delete()

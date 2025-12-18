@@ -2,8 +2,23 @@ const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost
 
 async function request(path: string, opts: RequestInit = {}) {
   const headers: Record<string,string> = { 'Content-Type': 'application/json', ...(opts.headers as any || {}) };
-  const res = await fetch(API_BASE + path, { ...opts, headers, credentials: 'include' });
-  const text = await res.text();
+
+  // try primary (relative/proxied) endpoint first
+  let res = await fetch(API_BASE + path, { ...opts, headers, credentials: 'include' });
+  let text = await res.text();
+  // if we got HTML (vite index) or 404, attempt direct backend fallback
+  const contentType = res.headers.get('content-type') || '';
+  const looksLikeHtml = contentType.includes('text/html') || text.trim().startsWith('<!DOCTYPE html');
+  if (res.status === 404 || looksLikeHtml) {
+    try {
+      const backend = 'http://localhost:8000';
+      res = await fetch(backend + path, { ...opts, headers, credentials: 'include' });
+      text = await res.text();
+    } catch (e) {
+      // ignore fallback error, will handle below
+    }
+  }
+
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
   if (!res.ok) throw { status: res.status, data };

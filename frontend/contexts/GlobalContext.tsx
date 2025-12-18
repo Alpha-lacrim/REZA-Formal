@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Product, User, SiteSettings } from '../types';
 import api from '../services/api';
+import { db } from '../services/db';
 
 interface GlobalContextType {
     cart: { [id: string]: number };
@@ -82,7 +83,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     }, [theme]);
 
     useEffect(() => {
-        // Try to populate user from backend cookie-based session
+        // Try to populate user from backend cookie-based session, then load products and settings
         (async () => {
             try {
                 const me = await api.me();
@@ -91,17 +92,43 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             } catch (e) {
                 // not authenticated
             }
+
+            // After attempting to populate user, refresh products and settings.
+            await refreshProducts();
+            await loadSettings();
         })();
-        refreshProducts();
-        loadSettings();
     }, []);
 
     const refreshProducts = async () => {
         try {
-            const data = await api.getProducts();
-            setProducts(data);
+            // Fetch server products (admin or public) when possible
+            let serverProducts: Product[] = [];
+            try {
+                serverProducts = (user && user.role === 'admin') ? await api.adminGetProducts() : await api.getProducts();
+            } catch (e) {
+                // If admin fetch failed (proxy/auth issues), try public endpoint as a fallback
+                try { serverProducts = await api.getProducts(); } catch (_) { serverProducts = []; }
+            }
+
+            // Always load local (seed + local) products and merge with server results.
+            // Merge strategy: use server product fields when IDs collide, but include any local-only products.
+            const local = await db.getProducts();
+            const map = new Map<string, Product>();
+            local.forEach(p => map.set(p.id, p));
+            serverProducts.forEach(p => {
+                const existing = map.get(p.id) || ({} as Product);
+                map.set(p.id, { ...existing, ...p });
+            });
+
+            const merged = Array.from(map.values());
+            setProducts(merged);
         } catch (e) {
-            setProducts([]);
+            try {
+                const local = await db.getProducts();
+                setProducts(local);
+            } catch {
+                setProducts([]);
+            }
         }
     };
 
@@ -163,11 +190,18 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const isInWishlist = (productId: string) => wishlist.includes(productId);
 
     const login = async (email: string, pass: string, code?: string) => {
+        // Call login to let backend set cookies, then fetch /me to get authoritative user data (including role)
         const resp = await api.login(email, pass, code);
-        // backend sets cookies and returns user payload
-        const u = resp.user || resp;
-        const normalized = { id: u.id, email: u.email, name: u.first_name || u.name || '', role: u.role || 'user' } as User;
-        setUser(normalized);
+        try {
+            const me = await api.me();
+            const normalized = { id: me.id, email: me.email, name: me.first_name || (me as any).name || '', role: me.role || 'user' } as User;
+            setUser(normalized);
+        } catch (e) {
+            // Fallback to any user payload returned by login
+            const u = resp?.user || resp;
+            const normalized = { id: u?.id, email: u?.email, name: u?.first_name || u?.name || '', role: u?.role || 'user' } as User;
+            setUser(normalized);
+        }
         setAuthModalOpen(false);
         showToast(`خوش آمدید`);
     };

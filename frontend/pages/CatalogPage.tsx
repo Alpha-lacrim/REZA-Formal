@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
-import { products } from '../data';
+import { useGlobal } from '../contexts/GlobalContext';
 import SEO from '../components/SEO';
 
 const CatalogPage: React.FC = () => {
@@ -12,6 +12,8 @@ const CatalogPage: React.FC = () => {
     
     const [fabricFilter, setFabricFilter] = useState('');
     const [priceFilter, setPriceFilter] = useState('');
+
+    const { products } = useGlobal();
 
     const fabrics = Array.from(new Set(products.map(p => p.fabric).filter(Boolean)));
 

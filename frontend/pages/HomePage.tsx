@@ -3,7 +3,6 @@ import ImageLoader from '../components/ImageLoader';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Ruler, Globe, Truck, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import { products } from '../data';
 import SEO from '../components/SEO';
 import { useGlobal } from '../contexts/GlobalContext';
 
@@ -123,6 +122,7 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
 
 const ProductCarousel = ({ category }: { category: string }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
+    const { products } = useGlobal();
     const items = products.filter(p => p.category === category);
 
     const scroll = (direction: 'next' | 'prev') => {
