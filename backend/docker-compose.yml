@@ -1,27 +1,34 @@
-version: '3.8'
+# version: '3.8'
+
 services:
   db:
     image: mysql:8.0
+    restart: always
+    ports:
+      - "3307:3306" 
     env_file:
       - ./.env
-    ports:
-      - "3306:3306"
     volumes:
       - db_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
 
   web:
     build: .
-    command: bash -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: bash -c "/app/wait_for_db.sh && python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./:/app
     ports:
       - "8000:8000"
-    environment:
-      # Environment loaded from .env in this folder (do not commit secrets)
     env_file:
       - ./.env
     depends_on:
-      - db
+      db:
+        condition: service_healthy
 
 volumes:
   db_data:

@@ -53,10 +53,12 @@ def login(request):
             return Response({'detail':'Invalid 2FA code'}, status=403)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': {'id': user.id, 'email': user.email, 'first_name': user.first_name}})
-    # Set HttpOnly cookies for access and refresh
+    # Hardened cookie settings: HttpOnly, Secure in production, explicit Path, and stricter SameSite for refresh token
     secure_flag = not getattr(settings, 'DEBUG', False)
-    resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag)
-    resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Lax', secure=secure_flag)
+    # Access token: usable for same-site navigation but protected from JS
+    resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag, path='/')
+    # Refresh token: more restrictive SameSite to mitigate CSRF (may require adjustments for cross-site flows)
+    resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Strict', secure=secure_flag, path='/')
     return resp
 
 
@@ -72,8 +74,9 @@ def me(request):
 @api_view(['POST'])
 def logout_view(request):
     resp = Response({'detail': 'logged out'})
-    resp.delete_cookie('access')
-    resp.delete_cookie('refresh')
+    # Delete cookies using the same Path and samesite used when setting them
+    resp.delete_cookie('access', path='/', samesite='Lax')
+    resp.delete_cookie('refresh', path='/', samesite='Strict')
     return resp
 
 
