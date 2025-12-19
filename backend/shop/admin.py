@@ -24,4 +24,4 @@ class MessageAdmin(admin.ModelAdmin):
 
 @admin.register(SiteSettings)
 class SettingsAdmin(admin.ModelAdmin):
-    list_display = ('about_title','updated_at')
+    list_display = ('id',)

@@ -1,14 +1,15 @@
 import os
 from pathlib import Path
 import environ
+from datetime import timedelta
 
 BASE_DIR = Path(__file__).resolve().parent.parent
+
 env = environ.Env(DEBUG=(bool, False))
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='change-me')
 DEBUG = env('DEBUG')
-
 ALLOWED_HOSTS = ['*']
 
 INSTALLED_APPS = [
@@ -55,7 +56,7 @@ TEMPLATES = [
 WSGI_APPLICATION = 'reza_backend.wsgi.application'
 
 DATABASES = {
-    'default': env.db(default='sqlite:///'+str(BASE_DIR / 'db.sqlite3'))
+    'default': env.db(default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'))
 }
 
 AUTH_USER_MODEL = 'shop.User'
@@ -78,6 +79,14 @@ MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# ==============================================================================
+# UPLOAD LIMIT SETTINGS (ADDED TO FIX 400 Bad Request / RequestDataTooBig)
+# ==============================================================================
+# Increase maximum request body size (e.g., 50MB)
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  
+# Increase maximum file upload size (e.g., 50MB)
+FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024
+
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'shop.auth.CookieJWTAuthentication',
@@ -86,9 +95,10 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.AllowAny',
     ),
+    # Optional: Increase Django REST Framework specific upload limits if needed
+    # (Usually falls back to Django settings, but good to know)
 }
 
-from datetime import timedelta
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
@@ -97,5 +107,6 @@ SIMPLE_JWT = {
 # CORS: allow React dev origin by default
 cors_origins = env('ALLOWED_ORIGINS', default='http://localhost:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',') if o.strip()]
+
 # Allow cookies to be sent cross-site for auth (required for cookie-based JWT)
 CORS_ALLOW_CREDENTIALS = True

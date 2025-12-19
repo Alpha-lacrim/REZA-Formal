@@ -1,5 +1,6 @@
 from rest_framework import status, permissions
-from rest_framework.decorators import api_view, permission_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
@@ -16,54 +17,17 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 import os
 import json
-import uuid
 import logging
 
 User = get_user_model()
-
 logger = logging.getLogger(__name__)
-
 
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {'refresh': str(refresh), 'access': str(refresh.access_token)}
 
-
-def _shallow_request_data(request):
-    """Return a shallow, mutable dict of request.data without deep-copying file-like objects.
-
-    This avoids invoking QueryDict.copy() which attempts a deepcopy and fails
-    when file objects (e.g. _io.BufferedRandom / UploadedFile) are present.
-    """
-    try:
-        out = {}
-        # If request.data supports getlist (QueryDict), preserve multiple values
-        if hasattr(request.data, 'getlist'):
-            for key in request.data:
-                vals = request.data.getlist(key)
-                if len(vals) == 1:
-                    out[key] = vals[0]
-                else:
-                    out[key] = vals
-        else:
-            # Fallback to simple iteration (shouldn't deep-copy file objects)
-            for k, v in getattr(request.data, 'items', lambda: ())():
-                out[k] = v
-        return out
-    except Exception:
-        try:
-            return dict(request.data)
-        except Exception:
-            return request.data
-
-
+# Helper for Gallery Images (JSON List) ONLY
 def _save_uploaded_file_get_url(fobj, request=None):
-    """Save uploaded file to default storage and return its accessible absolute URL.
-
-    If `request` is provided, use `request.build_absolute_uri()` to produce
-    a full URL accepted by `URLField` validators. Otherwise fall back to
-    `default_storage.url()` or `MEDIA_URL`.
-    """
     ext = os.path.splitext(getattr(fobj, 'name', ''))[1] or ''
     name = f"uploads/{uuid.uuid4().hex}{ext}"
     saved_name = default_storage.save(name, ContentFile(fobj.read()))
@@ -80,6 +44,119 @@ def _save_uploaded_file_get_url(fobj, request=None):
     return urlpath
 
 
+def _save_dataurl_to_storage(dataurl: str, prefix: str = 'uploads/') -> str:
+    """
+    Decode a data URL (base64) and save to default_storage. Returns the URL path.
+    """
+    try:
+        header, encoded = dataurl.split(',', 1)
+        import base64
+        import uuid
+        data = base64.b64decode(encoded)
+        # guess extension from header
+        if 'image/png' in header:
+            ext = '.png'
+        elif 'image/jpeg' in header or 'image/jpg' in header:
+            ext = '.jpg'
+        elif 'image/gif' in header:
+            ext = '.gif'
+        else:
+            # fallback to png
+            ext = '.png'
+        name = f"{prefix.rstrip('/')}/{uuid.uuid4().hex}{ext}"
+        saved = default_storage.save(name, ContentFile(data))
+        try:
+            return default_storage.url(saved)
+        except Exception:
+            media_url = getattr(settings, 'MEDIA_URL', '/media/')
+            return media_url.rstrip('/') + '/' + saved.lstrip('/')
+    except Exception:
+        return dataurl
+
+def prepare_product_data(request):
+    """
+    Prepares data for the serializer.
+    1. Copies request.data to a mutable dict.
+    2. SKIPS manual processing of 'image' (let Serializer handle it).
+    3. Manually processes 'images' list (gallery) to URLs for JSONField.
+    """
+    # Create mutable copy of request data (but preserve file objects separately)
+    if hasattr(request.data, 'dict'):
+        data = request.data.dict()
+    else:
+        data = request.data.copy()
+
+    # If an image file was uploaded, preserve the UploadedFile so the
+    # serializer's ImageField can validate and save it (preferred flow).
+    if request.FILES and 'image' in request.FILES:
+        try:
+            data['image'] = request.FILES.get('image')
+        except Exception:
+            pass
+
+    # NOTE: We do NOT process data['image'] here. 
+    # We let the File object pass through to the serializer's ImageField.
+
+    # Process 'images' (Gallery) - Assume JSONField of strings
+    if request.FILES:
+        imgs = []
+        for key in ['images', 'images[]']:
+            if key in request.FILES:
+                for f in request.FILES.getlist(key):
+                    try:
+                        # Save file and get URL string
+                        imgs.append(_save_uploaded_file_get_url(f, request))
+                    except Exception:
+                        continue
+        
+        # Merge with existing gallery images
+        if imgs:
+            try:
+                existing = data.get('images') or []
+                if isinstance(existing, str):
+                    try:
+                        existing = json.loads(existing)
+                    except Exception:
+                        existing = []
+                
+                if not isinstance(existing, list):
+                    existing = []
+                    
+                data['images'] = existing + imgs
+            except Exception:
+                data['images'] = imgs
+            
+        # Fallback: if `image` field was provided as a data-URL (or list with a data-URL),
+        # decode it into a ContentFile so the serializer ImageField can accept it.
+        try:
+            img_field = data.get('image')
+            if isinstance(img_field, list) and len(img_field) > 0:
+                img_field = img_field[0]
+
+            if isinstance(img_field, str) and img_field.startswith('data:image/'):
+                # Decode and wrap as ContentFile with a generated name
+                header, encoded = img_field.split(',', 1)
+                import base64
+                binary = base64.b64decode(encoded)
+                # choose extension
+                if 'image/png' in header:
+                    ext = '.png'
+                elif 'image/jpeg' in header or 'image/jpg' in header:
+                    ext = '.jpg'
+                elif 'image/gif' in header:
+                    ext = '.gif'
+                else:
+                    ext = '.png'
+                filename = f"img_{uuid.uuid4().hex}{ext}"
+                data['image'] = ContentFile(binary, name=filename)
+        except Exception:
+            pass
+    return data
+
+# ==============================================================================
+# VIEWS
+# ==============================================================================
+
 @api_view(['POST'])
 def register(request):
     data = request.data
@@ -89,7 +166,6 @@ def register(request):
     user.first_name = data.get('first_name', '')
     user.save()
     return Response({'detail':'registered'})
-
 
 @api_view(['POST'])
 def login(request):
@@ -103,7 +179,6 @@ def login(request):
     user_auth = authenticate(request, username=user.username, password=password)
     if not user_auth:
         return Response({'detail':'Invalid credentials'}, status=400)
-    # If user has 2FA secret, require otp
     if user.two_factor_secret:
         if not otp:
             return Response({'detail':'2FA_REQUIRED'}, status=403)
@@ -112,15 +187,10 @@ def login(request):
             return Response({'detail':'Invalid 2FA code'}, status=403)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': {'id': user.id, 'email': user.email, 'first_name': user.first_name}})
-    # Hardened cookie settings: HttpOnly, Secure in production, explicit Path, and stricter SameSite for refresh token
     secure_flag = not getattr(settings, 'DEBUG', False)
-    # Access token: usable for same-site navigation but protected from JS
     resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag, path='/')
-    # Refresh token: more restrictive SameSite to mitigate CSRF (may require adjustments for cross-site flows)
     resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Strict', secure=secure_flag, path='/')
     return resp
-
-
 
 @api_view(['GET'])
 def me(request):
@@ -129,15 +199,12 @@ def me(request):
     user = request.user
     return Response({'id': user.id, 'email': user.email, 'first_name': user.first_name, 'role': getattr(user, 'role', 'user')})
 
-
 @api_view(['POST'])
 def logout_view(request):
     resp = Response({'detail': 'logged out'})
-    # Delete cookies using the same Path and samesite used when setting them
     resp.delete_cookie('access', path='/', samesite='Lax')
     resp.delete_cookie('refresh', path='/', samesite='Strict')
     return resp
-
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
@@ -148,10 +215,8 @@ def update_profile(request):
         user.first_name = data.get('first_name')
     if 'last_name' in data:
         user.last_name = data.get('last_name')
-    # Do not allow role or email changes via this endpoint
     user.save()
     return Response({'id': user.id, 'email': user.email, 'first_name': user.first_name})
-
 
 @api_view(['POST'])
 def google_auth(request):
@@ -159,15 +224,11 @@ def google_auth(request):
     if not id_token:
         return Response({'detail': 'id_token required'}, status=400)
     try:
-        # Decode without verifying signature for dev convenience. In production verify with Google's keys.
         payload = jwt.decode(id_token, options={"verify_signature": False})
         email = payload.get('email')
         name = payload.get('name') or (email.split('@')[0] if email else 'google_user')
-        picture = payload.get('picture')
     except Exception:
         return Response({'detail': 'Invalid id_token'}, status=400)
-
-    # Create or get user
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
@@ -175,14 +236,12 @@ def google_auth(request):
         user = User.objects.create_user(username=username, email=email, password=None)
         user.first_name = name
         user.save()
-
     tokens = get_tokens_for_user(user)
     resp = Response({'user': {'id': user.id, 'email': user.email, 'first_name': user.first_name}})
     secure_flag = not getattr(settings, 'DEBUG', False)
     resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag)
     resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Lax', secure=secure_flag)
     return resp
-
 
 @api_view(['POST'])
 def send_otp(request):
@@ -195,75 +254,45 @@ def send_otp(request):
         user.two_factor_secret = pyotp.random_base32()
         user.save()
     totp = pyotp.TOTP(user.two_factor_secret)
-    # For development return token; in production send by SMS/email
     return Response({'otp': totp.now()})
-
 
 @api_view(['GET'])
 def products_list(request):
     qs = Product.objects.all()
-    serializer = ProductSerializer(qs, many=True)
+    serializer = ProductSerializer(qs, many=True, context={'request': request})
     return Response(serializer.data)
 
-
 @api_view(['GET','POST','PUT','DELETE'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def product_detail(request, pk=None):
     if request.method == 'GET':
         prod = get_object_or_404(Product, pk=pk)
         return Response(ProductSerializer(prod).data)
+    
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
+
     if request.method == 'POST' or request.method == 'PUT':
-        data = _shallow_request_data(request)
-        # If files were uploaded (multipart/form-data), save them and inject URLs
-        files_urls = []
-        # handle multiple files under 'images' or 'images[]'
-        if request.FILES:
-            # single image
-            if 'image' in request.FILES:
-                try:
-                    data['image'] = _save_uploaded_file_get_url(request.FILES['image'])
-                except Exception:
-                    pass
-            # multiple images field
-            imgs = []
-            if 'images' in request.FILES:
-                for f in request.FILES.getlist('images'):
-                    try:
-                        imgs.append(_save_uploaded_file_get_url(f))
-                    except Exception:
-                        continue
-            if 'images[]' in request.FILES:
-                for f in request.FILES.getlist('images[]'):
-                    try:
-                        imgs.append(_save_uploaded_file_get_url(f))
-                    except Exception:
-                        continue
-            if imgs:
-                # merge with any provided images_urls
-                try:
-                    existing = data.get('images') or []
-                    if isinstance(existing, str):
-                        try:
-                            existing = json.loads(existing)
-                        except Exception:
-                            existing = [existing]
-                    data['images'] = list(existing) + imgs
-                except Exception:
-                    data['images'] = imgs
+        data = prepare_product_data(request)
+
         if request.method == 'POST':
-            data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
-        serializer = ProductSerializer(data=data)
+             data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
+             serializer = ProductSerializer(data=data)
+        else: # PUT
+             prod = get_object_or_404(Product, pk=pk)
+             serializer = ProductSerializer(prod, data=data, partial=True)
+
         if serializer.is_valid():
             serializer.save()
             return Response(serializer.data)
-        logger.warning('Product create/update validation failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
+        
+        logger.warning('Product detail error: %s', serializer.errors)
         return Response(serializer.errors, status=400)
+
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)
         prod.delete()
         return Response(status=204)
-
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -274,7 +303,6 @@ def create_order(request):
     items = serializer.validated_data['items']
     total = serializer.validated_data['total']
     shipping_address = serializer.validated_data['shipping_address']
-    # validate stock and create order
     order_id = 'ORD-' + str(uuid.uuid4())[:8]
     order = Order.objects.create(id=order_id, user=request.user, total=total, shipping_address=shipping_address)
     for it in items:
@@ -286,29 +314,47 @@ def create_order(request):
         OrderItem.objects.create(order=order, product=prod, qty=it['qty'], price=prod.price)
     return Response(OrderSerializer(order).data, status=201)
 
-
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
     qs = Order.objects.filter(user=request.user)
     return Response(OrderSerializer(qs, many=True).data)
 
-
 @api_view(['GET','PUT'])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def site_settings(request):
     settings = SiteSettings.objects.first()
     if request.method == 'GET':
         if not settings:
             return Response({}, status=200)
-        return Response(SiteSettingsSerializer(settings).data)
+        return Response(SiteSettingsSerializer(settings, context={'request': request}).data)
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
-    serializer = SiteSettingsSerializer(settings, data=request.data)
+
+    # Prepare mutable data copy so we can convert data-URLs to stored files
+    if hasattr(request.data, 'dict'):
+        data = request.data.dict()
+    else:
+        try:
+            data = request.data.copy()
+        except Exception:
+            data = request.data
+
+    # Convert data-URL strings to stored file URLs for image fields
+    image_fields = ['about_image', 'hero_image', 'suits_section_image', 'shirts_section_image', 'blazers_section_image', 'accessories_section_image', 'bespoke_section_image']
+    for f in image_fields:
+        val = data.get(f)
+        if isinstance(val, str) and val.startswith('data:image/'):
+            try:
+                data[f] = _save_dataurl_to_storage(val, prefix='site')
+            except Exception:
+                pass
+
+    serializer = SiteSettingsSerializer(settings, data=data)
     if serializer.is_valid():
         serializer.save()
-        return Response(serializer.data)
+        return Response(SiteSettingsSerializer(settings, context={'request': request}).data)
     return Response(serializer.errors, status=400)
-
 
 @api_view(['POST'])
 def contact(request):
@@ -317,7 +363,6 @@ def contact(request):
         serializer.save()
         return Response({'detail':'sent'})
     return Response(serializer.errors, status=400)
-
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -332,7 +377,6 @@ def admin_stats(request):
     messages_count = ContactMessage.objects.filter(read=False).count()
     return Response({'productsCount': products_count, 'ordersCount': orders.count(), 'usersCount': users_count, 'revenue': revenue, 'messagesCount': messages_count})
 
-
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def admin_orders(request):
@@ -340,7 +384,6 @@ def admin_orders(request):
         return Response({'detail':'admin required'}, status=403)
     qs = Order.objects.all().order_by('-created_at')
     return Response(OrderSerializer(qs, many=True).data)
-
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
@@ -351,7 +394,6 @@ def admin_update_order_status(request, pk):
     status_val = request.data.get('status')
     if status_val not in dict(Order.STATUS):
         return Response({'detail':'invalid status'}, status=400)
-    # If cancelling and previously not cancelled, restore stock
     if status_val == 'cancelled' and order.status != 'cancelled':
         for item in order.items.all():
             prod = item.product
@@ -362,7 +404,6 @@ def admin_update_order_status(request, pk):
     order.save()
     return Response(OrderSerializer(order).data)
 
-
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def admin_users(request):
@@ -372,7 +413,6 @@ def admin_users(request):
     data = [{'id': u.id, 'email': u.email, 'first_name': u.first_name, 'role': getattr(u, 'role', 'user')} for u in users]
     return Response(data)
 
-
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def admin_messages(request):
@@ -381,7 +421,6 @@ def admin_messages(request):
     msgs = ContactMessage.objects.all().order_by('-created_at')
     serializer = ContactMessageSerializer(msgs, many=True)
     return Response(serializer.data)
-
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -393,116 +432,71 @@ def admin_mark_message_read(request, pk):
     msg.save()
     return Response({'detail':'marked'})
 
-
 @api_view(['GET','POST'])
 @permission_classes([permissions.IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def admin_products(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
+    
     if request.method == 'GET':
         qs = Product.objects.all()
-        return Response(ProductSerializer(qs, many=True).data)
-    # POST -> create
-    data = _shallow_request_data(request)
-    # process uploaded files for create as well
-    if request.FILES:
-        if 'image' in request.FILES:
-            try:
-                data['image'] = _save_uploaded_file_get_url(request.FILES['image'])
-            except Exception:
-                pass
-        imgs = []
-        if 'images' in request.FILES:
-            for f in request.FILES.getlist('images'):
-                try:
-                    imgs.append(_save_uploaded_file_get_url(f))
-                except Exception:
-                    continue
-        if 'images[]' in request.FILES:
-            for f in request.FILES.getlist('images[]'):
-                try:
-                    imgs.append(_save_uploaded_file_get_url(f))
-                except Exception:
-                    continue
-        if imgs:
-            try:
-                existing = data.get('images') or []
-                if isinstance(existing, str):
-                    try:
-                        existing = json.loads(existing)
-                    except Exception:
-                        existing = [existing]
-                data['images'] = list(existing) + imgs
-            except Exception:
-                data['images'] = imgs
+        return Response(ProductSerializer(qs, many=True, context={'request': request}).data)
+
+    # POST (Create)
+    # Debug: log content type and uploaded files briefly to assist debugging client uploads
+    try:
+        logger.info('admin_products content_type=%s, files=%s', request.META.get('CONTENT_TYPE'), list(request.FILES.keys()))
+    except Exception:
+        pass
+    # 1. Prepare data (this leaves 'image' as a File, but handles 'images' list)
+    data = prepare_product_data(request)
 
     data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
-    serializer = ProductSerializer(data=data)
+    
+    # 2. Pass 'image' FILE to serializer. ImageField will handle it.
+    serializer = ProductSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         serializer.save()
-        return Response(serializer.data)
-    logger.warning('Product admin create validation failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
+        return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
+    
+    logger.warning('Product admin create error: %s', serializer.errors)
     return Response(serializer.errors, status=400)
-
 
 @api_view(['GET','PUT','DELETE'])
 @permission_classes([permissions.IsAuthenticated])
+@parser_classes([MultiPartParser, FormParser, JSONParser])
 def admin_product_detail(request, pk=None):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
+
     if request.method == 'GET':
         prod = get_object_or_404(Product, pk=pk)
-        return Response(ProductSerializer(prod).data)
-    if request.method in ['PUT']:
-        # Upsert: update if exists, otherwise create a new product with the provided id
+        return Response(ProductSerializer(prod, context={'request': request}).data)
+
+    if request.method == 'PUT':
         try:
             prod = Product.objects.get(pk=pk)
-            serializer = ProductSerializer(prod, data=request.data, partial=True)
+            # Prepare data (leaves 'image' as File)
+            data = prepare_product_data(request)
+            
+            serializer = ProductSerializer(prod, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data)
-            logger.warning('Product admin update validation failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
+                return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
+            
+            logger.warning('Product admin update error: %s', serializer.errors)
             return Response(serializer.errors, status=400)
+            
         except Product.DoesNotExist:
-            data = _shallow_request_data(request)
-            if request.FILES:
-                if 'image' in request.FILES:
-                    try:
-                        data['image'] = _save_uploaded_file_get_url(request.FILES['image'])
-                    except Exception:
-                        pass
-                imgs = []
-                if 'images' in request.FILES:
-                    for f in request.FILES.getlist('images'):
-                        try:
-                            imgs.append(_save_uploaded_file_get_url(f))
-                        except Exception:
-                            continue
-                if 'images[]' in request.FILES:
-                    for f in request.FILES.getlist('images[]'):
-                        try:
-                            imgs.append(_save_uploaded_file_get_url(f))
-                        except Exception:
-                            continue
-                if imgs:
-                    try:
-                        existing = data.get('images') or []
-                        if isinstance(existing, str):
-                            try:
-                                existing = json.loads(existing)
-                            except Exception:
-                                existing = [existing]
-                        data['images'] = list(existing) + imgs
-                    except Exception:
-                        data['images'] = imgs
-
+            data = prepare_product_data(request)
             data['id'] = pk
-            serializer = ProductSerializer(data=data)
+            serializer = ProductSerializer(data=data, context={'request': request})
             if serializer.is_valid():
                 serializer.save()
-                return Response(serializer.data, status=201)
-            logger.warning('Product admin upsert (create) failed: %s; files: %s; data keys: %s', serializer.errors, list(request.FILES.keys()), list(request.data.keys()))
+                return Response(ProductSerializer(serializer.instance, context={'request': request}).data, status=201)
             return Response(serializer.errors, status=400)
+
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)
         prod.delete()
