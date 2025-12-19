@@ -94,11 +94,11 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
     
     return (
         <section id={id} className={`flex flex-col md:flex-row h-auto md:h-[600px] overflow-hidden scroll-mt-24 ${reverse ? 'md:flex-row-reverse' : ''}`}>
-            <div className="w-full md:w-1/2 relative h-[400px] md:h-[600px] group overflow-hidden">
+            <div className="w-full md:w-5/12 relative h-[400px] md:h-[600px] group overflow-hidden">
                 <ImageLoader src={image} alt={title} className="w-full h-full transition-transform duration-1000 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-black/10 group-hover:bg-transparent transition-colors duration-500"></div>
             </div>
-            <div className="w-full md:w-1/2 bg-lux-black text-white flex items-center justify-center p-12 lg:p-24 relative">
+            <div className="w-full md:w-7/12 bg-lux-black text-white flex items-center justify-center p-12 lg:p-24 relative">
                  <div className="max-w-md text-center z-10">
                     <h4 className="text-lux-gold uppercase tracking-[0.2em] text-sm mb-4 font-bold">{subtitle}</h4>
                     <h2 className="font-serif text-3xl lg:text-5xl mb-6 leading-tight">{title}</h2>

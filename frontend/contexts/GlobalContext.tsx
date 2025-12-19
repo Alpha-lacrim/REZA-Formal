@@ -135,7 +135,23 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const loadSettings = async () => {
         try {
             const settings = await api.getSettings();
-            setSiteSettings(settings);
+            // Normalize backend snake_case keys to frontend camelCase SiteSettings
+            if (settings) {
+                const normalized: SiteSettings = {
+                    aboutTitle: (settings.about_title as string) || (settings.aboutTitle as string) || '',
+                    aboutDescription: (settings.about_description as string) || (settings.aboutDescription as string) || '',
+                    aboutImage: (settings.about_image as string) || (settings.aboutImage as string) || '',
+                    heroImage: (settings.hero_image as string) || (settings.heroImage as string) || '',
+                    suitsSectionImage: (settings.suits_section_image as string) || (settings.suitsSectionImage as string) || '',
+                    shirtsSectionImage: (settings.shirts_section_image as string) || (settings.shirtsSectionImage as string) || '',
+                    blazersSectionImage: (settings.blazers_section_image as string) || (settings.blazersSectionImage as string) || '',
+                    accessoriesSectionImage: (settings.accessories_section_image as string) || (settings.accessoriesSectionImage as string) || '',
+                    bespokeSectionImage: (settings.bespoke_section_image as string) || (settings.bespokeSectionImage as string) || ''
+                };
+                setSiteSettings(normalized);
+            } else {
+                setSiteSettings(null);
+            }
         } catch (e) {
             setSiteSettings(null);
         }
