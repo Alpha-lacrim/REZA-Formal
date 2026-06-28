@@ -1,22 +1,6 @@
 # version: '3.8'
 
 services:
-  db:
-    image: mysql:8.0
-    restart: always
-    ports:
-      - "3307:3306" 
-    env_file:
-      - ./.env
-    volumes:
-      - db_data:/var/lib/mysql
-    healthcheck:
-      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
-      interval: 5s
-      timeout: 5s
-      retries: 20
-      start_period: 30s
-
   web:
     build: .
     command: bash -c "/app/wait_for_db.sh && python manage.py makemigrations --noinput && python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
@@ -26,9 +10,5 @@ services:
       - "8000:8000"
     env_file:
       - ./.env
-    depends_on:
-      db:
-        condition: service_healthy
-
-volumes:
-  db_data:
+    # Note: SQL Server connection is configured via .env variables (DB_HOST, DB_USER, etc.)
+    # Ensure your SQL Server instance is running and accessible at the DB_HOST address

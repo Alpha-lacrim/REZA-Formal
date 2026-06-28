@@ -30,7 +30,7 @@ interface GlobalContextType {
     sendMessage: (name: string, email: string, message: string) => Promise<void>;
 
     siteSettings: SiteSettings | null;
-    updateSiteSettings: (settings: SiteSettings) => Promise<void>;
+    updateSiteSettings: (settings: SiteSettings | FormData) => Promise<void>;
 
     theme: 'light' | 'dark';
     toggleTheme: () => void;
@@ -41,6 +41,16 @@ interface GlobalContextType {
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
+
+const normalizeUserForContext = (raw: any, fallbackName = ''): User => ({
+    ...raw,
+    id: String(raw?.id ?? ''),
+    name: raw?.name || [raw?.first_name, raw?.last_name].filter(Boolean).join(' ') || fallbackName || raw?.email || '',
+    email: raw?.email || '',
+    role: raw?.role || 'user',
+    address: raw?.address || '',
+    createdAt: raw?.createdAt || Date.now()
+});
 
 export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [cart, setCart] = useState<{ [id: string]: number }>(() => {
@@ -87,8 +97,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         (async () => {
             try {
                 const me = await api.me();
-                const normalized = { id: me.id, email: me.email, name: me.first_name || (me as any).name || '', role: me.role || 'user' } as User;
-                setUser(normalized);
+                setUser(normalizeUserForContext(me));
             } catch (e) {
                 // not authenticated
             }
@@ -157,10 +166,33 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     };
 
+    const getTrackedStock = (productId: string) => {
+        const product = products.find(p => p.id === productId);
+        return product?.stock === undefined || product.stock === null ? Infinity : Number(product.stock);
+    };
+
     const addToCart = (productId: string, qty = 1) => {
-        setCart(prev => ({ ...prev, [productId]: (prev[productId] || 0) + qty }));
+        const requestedQty = Math.max(1, Number(qty) || 1);
+        const stock = getTrackedStock(productId);
+
+        if (stock <= 0) {
+            showToast('این محصول ناموجود است');
+            return;
+        }
+
+        setCart(prev => {
+            const currentQty = prev[productId] || 0;
+            const nextQty = Math.min(currentQty + requestedQty, stock);
+
+            if (nextQty === currentQty) {
+                showToast('موجودی بیشتری برای این محصول در دسترس نیست');
+                return prev;
+            }
+
+            showToast(nextQty < currentQty + requestedQty ? 'تعداد محصول با موجودی انبار تنظیم شد' : 'به سبد خرید اضافه شد');
+            return { ...prev, [productId]: nextQty };
+        });
         setIsCartOpen(true);
-        showToast('به سبد خرید اضافه شد');
     };
 
     const removeFromCart = (productId: string) => {
@@ -173,11 +205,16 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const updateQty = (productId: string, delta: number) => {
         setCart(prev => {
-            const newQty = (prev[productId] || 0) + delta;
+            const stock = getTrackedStock(productId);
+            const newQty = Math.min((prev[productId] || 0) + delta, stock);
             if (newQty <= 0) {
                 const next = { ...prev };
                 delete next[productId];
                 return next;
+            }
+            if (newQty === prev[productId] && delta > 0) {
+                showToast('موجودی بیشتری برای این محصول در دسترس نیست');
+                return prev;
             }
             return { ...prev, [productId]: newQty };
         });
@@ -210,13 +247,11 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         const resp = await api.login(email, pass, code);
         try {
             const me = await api.me();
-            const normalized = { id: me.id, email: me.email, name: me.first_name || (me as any).name || '', role: me.role || 'user' } as User;
-            setUser(normalized);
+            setUser(normalizeUserForContext(me));
         } catch (e) {
             // Fallback to any user payload returned by login
             const u = resp?.user || resp;
-            const normalized = { id: u?.id, email: u?.email, name: u?.first_name || u?.name || '', role: u?.role || 'user' } as User;
-            setUser(normalized);
+            setUser(normalizeUserForContext(u));
         }
         setAuthModalOpen(false);
         showToast(`خوش آمدید`);
@@ -228,8 +263,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             if (id_token_or_email && id_token_or_email.includes('.')) {
                 const resp = await api.googleAuth(id_token_or_email);
                 const u = resp.user || resp;
-                const normalized = { id: u.id, email: u.email, name: u.first_name || u.name || '', role: u.role || 'user' } as User;
-                setUser(normalized);
+                setUser(normalizeUserForContext(u));
             } else {
                 // fallback: call backend with a mock email via register/login flow is required
             }
@@ -245,8 +279,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         // backend may or may not return user directly
         const u = resp.user || resp || null;
         if (u) {
-            const normalized = { id: u.id, email: u.email, name: u.first_name || u.name || name, role: u.role || 'user' } as User;
-            setUser(normalized);
+            setUser(normalizeUserForContext(u, name));
         }
         setAuthModalOpen(false);
         showToast('حساب کاربری ایجاد شد');
@@ -274,9 +307,8 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     const cancelUserOrder = async (orderId: string) => {
-        // backend endpoint for cancelling order not yet implemented; refresh products locally
         try {
-            // placeholder: call my orders or cancel endpoint when available
+            await api.cancelOrder(orderId);
             await refreshProducts();
             showToast('سفارش لغو شد');
         } catch (e) {
@@ -293,7 +325,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         }
     };
 
-    const updateSiteSettings = async (settings: SiteSettings) => {
+    const updateSiteSettings = async (settings: SiteSettings | FormData) => {
         try {
             const saved = await api.saveSettings(settings);
             setSiteSettings(saved);

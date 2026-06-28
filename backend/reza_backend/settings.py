@@ -56,7 +56,20 @@ TEMPLATES = [
 WSGI_APPLICATION = 'reza_backend.wsgi.application'
 
 DATABASES = {
-    'default': env.db(default='sqlite:///' + str(BASE_DIR / 'db.sqlite3'))
+    'default': {
+        'ENGINE': 'mssql',
+        'NAME': env('DB_NAME', default='database'),
+        'USER': env('DB_USER', default='sa'),
+        'PASSWORD': env('DB_PASSWORD', default=''),
+        'HOST': env('DB_HOST', default='localhost'),
+        'PORT': env('DB_PORT', default='1433'),
+        'OPTIONS': {
+            'driver': env('DB_DRIVER', default='ODBC Driver 17 for SQL Server'),
+            'Encrypt': 'no',
+            'TrustServerCertificate': 'yes',
+            'Connection Timeout': '30',
+        },
+    }
 }
 
 AUTH_USER_MODEL = 'shop.User'
@@ -110,3 +123,27 @@ CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',') if o.strip()]
 
 # Allow cookies to be sent cross-site for auth (required for cookie-based JWT)
 CORS_ALLOW_CREDENTIALS = True
+
+# Patch for mssql-django: SQL Server v17 compatibility
+# mssql-django doesn't officially support SQL Server 2025 (v17)
+# but it works the same as 2022 (v16), so we override the version check
+def _patch_mssql_version_check():
+    try:
+        import mssql.base
+        from functools import lru_cache
+        
+        @lru_cache(maxsize=1)
+        def patched_sql_server_version(self):
+            # Get the actual version
+            with self.cursor() as cursor:
+                cursor.execute("SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT)")
+                actual_ver = cursor.fetchone()[0] or 15
+            # If version > 16 (SQL 2022), cap it at 16 for compatibility
+            return min(actual_ver, 16)
+        
+        # Replace the version property
+        mssql.base.DatabaseWrapper.sql_server_version = property(lambda self: patched_sql_server_version(self))
+    except Exception:
+        pass
+
+_patch_mssql_version_check()

@@ -7,6 +7,7 @@ import { Link } from 'react-router-dom';
 
 const ProductCard: React.FC<{ product: Product, className?: string }> = ({ product, className = "" }) => {
     const { addToCart } = useGlobal();
+    const isOutOfStock = product.stock !== undefined && product.stock <= 0;
 
     return (
         <article className={`product-card bg-white dark:bg-zinc-800 rounded-lg overflow-hidden border border-gray-100 dark:border-zinc-700 shadow-sm hover:shadow-lg transition-all duration-300 interactive card-elevate ${className}`}>
@@ -20,9 +21,10 @@ const ProductCard: React.FC<{ product: Product, className?: string }> = ({ produ
                     <strong className="text-lux-black dark:text-lux-gold">{formatPrice(product.price)}</strong>
                     <button 
                         onClick={() => addToCart(product.id)}
-                        className="px-4 py-2 rounded-lg bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-sm font-semibold hover:-translate-y-1 transition-transform btn-ripple interactive focus-ring"
+                        disabled={isOutOfStock}
+                        className="px-4 py-2 rounded-lg bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-sm font-semibold hover:-translate-y-1 transition-transform btn-ripple interactive focus-ring disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     >
-                        افزودن
+                        {isOutOfStock ? 'ناموجود' : 'افزودن'}
                     </button>
                 </div>
             </div>

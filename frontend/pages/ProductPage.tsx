@@ -40,8 +40,11 @@ const ProductPage: React.FC = () => {
     }
 
     const inWishlist = isInWishlist(product.id);
-    const stockStatus = (product.stock || 0) > 5 ? 'in_stock' : (product.stock || 0) > 0 ? 'low_stock' : 'out_of_stock';
-    const maxStock = product.stock || 0;
+    const trackedStock = product.stock;
+    const maxStock = trackedStock === undefined || trackedStock === null ? 99 : trackedStock;
+    const stockStatus = trackedStock === undefined || trackedStock === null
+        ? 'in_stock'
+        : trackedStock > 5 ? 'in_stock' : trackedStock > 0 ? 'low_stock' : 'out_of_stock';
 
     const handleIncrement = () => {
         if (quantity < maxStock) setQuantity(q => q + 1);
@@ -68,7 +71,7 @@ const ProductPage: React.FC = () => {
             "url": window.location.href,
             "priceCurrency": "IRR", 
             "price": product.price * 10, // Assuming price is in Tomans, convert to Rials for Schema standard
-            "availability": (product.stock || 0) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+            "availability": stockStatus !== 'out_of_stock' ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
             "itemCondition": "https://schema.org/NewCondition"
         }
     };

@@ -8,6 +8,7 @@ class User(AbstractUser):
     ROLE_CHOICES = (('user', 'User'), ('admin', 'Admin'))
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default='user')
     two_factor_secret = models.CharField(max_length=64, blank=True, null=True)
+    address = models.TextField(blank=True)
 
     def is_admin(self):
         return self.role == 'admin' or self.is_staff

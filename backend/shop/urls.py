@@ -25,6 +25,7 @@ urlpatterns = [
 
     path('orders/create/', views.create_order),
     path('orders/my/', views.my_orders),
+    path('orders/<str:pk>/cancel/', views.cancel_order),
 
     path('settings/', views.site_settings),
     path('contact/', views.contact),

@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import ImageLoader from './ImageLoader';
 import { X, Plus, Minus, Trash2 } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
@@ -9,6 +9,28 @@ import { CartItem } from '../types';
 
 const MiniCart: React.FC = () => {
     const { isCartOpen, toggleCart, cart, updateQty, removeFromCart, products: dbProducts } = useGlobal();
+    const cartRef = useRef<HTMLDivElement>(null);
+
+    // Close cart when clicking outside
+    useEffect(() => {
+        if (!isCartOpen) return;
+
+        const handleClickOutside = (event: MouseEvent) => {
+            if (cartRef.current && !cartRef.current.contains(event.target as Node)) {
+                toggleCart(false);
+            }
+        };
+
+        // Add small delay to avoid closing immediately on the click that opened it
+        const timer = setTimeout(() => {
+            document.addEventListener('mousedown', handleClickOutside);
+        }, 50);
+
+        return () => {
+            clearTimeout(timer);
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, [isCartOpen, toggleCart]);
 
     if (!isCartOpen) return null;
 
@@ -21,7 +43,7 @@ const MiniCart: React.FC = () => {
     const total = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
 
     return (
-        <div className="fixed bottom-4 right-4 z-[9999] w-[90vw] md:w-80 max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-2xl flex flex-col overflow-hidden max-h-[80vh] animate-in slide-in-from-bottom-5 fade-in duration-300">
+        <div ref={cartRef} className="fixed bottom-4 right-4 z-[9999] w-[90vw] md:w-80 max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-2xl flex flex-col overflow-hidden max-h-[80vh] animate-in slide-in-from-bottom-5 fade-in duration-300">
             <div className="flex justify-between items-center p-3 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900">
                 <strong className="text-lux-black dark:text-white">سبد خرید</strong>
                 <button onClick={() => toggleCart(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded">

@@ -36,15 +36,21 @@ const CartPage: React.FC = () => {
             return;
         }
 
-        if (!address) {
+        if (!address.trim()) {
             setError('لطفاً آدرس ارسال را وارد کنید');
+            return;
+        }
+
+        const unavailableItem = cartItems.find(item => item.stock !== undefined && item.qty > item.stock);
+        if (unavailableItem) {
+            setError('تعداد انتخاب‌شده از موجودی انبار بیشتر است');
             return;
         }
 
         setLoading(true);
         try {
             const items = cartItems.map(i => ({ id: i.id, qty: i.qty, price: i.price }));
-            await api.createOrder({ items, total, shipping_address: address });
+            await api.createOrder({ items, total, shipping_address: address.trim(), payment_method: paymentMethod });
             await refreshProducts(); // Update stock in global state
             clearCart();
             showToast('سفارش با موفقیت ثبت شد');

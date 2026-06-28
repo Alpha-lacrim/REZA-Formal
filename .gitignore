@@ -8,9 +8,24 @@ pnpm-debug.log*
 lerna-debug.log*
 
 node_modules
+.venv
+venv
+env
 dist
 dist-ssr
+build
+frontend/build
 *.local
+
+# Python generated/runtime files
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Django local/runtime data
+backend/db.sqlite3
+backend/media/
 
 # Editor directories and files
 .vscode/*

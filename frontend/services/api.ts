@@ -1,4 +1,98 @@
+import { Order, Product, SiteSettings, User } from '../types';
+
 const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
+
+function toNumber(value: unknown, fallback = 0): number {
+  const n = Number(value);
+  return Number.isFinite(n) ? n : fallback;
+}
+
+function parseJsonList(value: unknown): string[] {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
+  if (typeof value === 'string' && value.trim()) {
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed.filter((item): item is string => typeof item === 'string' && item.length > 0) : [value];
+    } catch {
+      return [value];
+    }
+  }
+  return [];
+}
+
+function normalizeProduct(raw: any): Product {
+  const images = parseJsonList(raw?.images);
+  const image = raw?.image || images[0] || '';
+
+  return {
+    id: String(raw?.id ?? ''),
+    name: raw?.name ?? '',
+    name_fa: raw?.name_fa,
+    price: toNumber(raw?.price),
+    currency: raw?.currency || 'Toman',
+    image,
+    images: images.length > 0 ? images : (image ? [image] : []),
+    short: raw?.short ?? '',
+    short_fa: raw?.short_fa,
+    description: raw?.description ?? '',
+    description_fa: raw?.description_fa,
+    category: raw?.category ?? '',
+    fabric: raw?.fabric || undefined,
+    stock: raw?.stock === null || raw?.stock === undefined ? undefined : toNumber(raw.stock)
+  };
+}
+
+function normalizeUser(raw: any): User {
+  const firstName = raw?.first_name ?? '';
+  const lastName = raw?.last_name ?? '';
+  const fullName = raw?.name || [firstName, lastName].filter(Boolean).join(' ') || raw?.email || '';
+
+  return {
+    id: String(raw?.id ?? ''),
+    name: fullName,
+    email: raw?.email ?? '',
+    role: raw?.role || 'user',
+    phone: raw?.phone,
+    address: raw?.address || '',
+    createdAt: raw?.createdAt ?? (raw?.date_joined ? Date.parse(raw.date_joined) : Date.now()),
+    avatar: raw?.avatar,
+    provider: raw?.provider
+  };
+}
+
+function normalizeOrderItem(raw: any) {
+  const product = raw?.product ? normalizeProduct(raw.product) : normalizeProduct(raw);
+  const qty = toNumber(raw?.qty, 1);
+  const price = toNumber(raw?.price, product.price);
+  return { ...product, qty, price };
+}
+
+function normalizeOrder(raw: any): Order {
+  const createdAt = raw?.createdAt ?? raw?.created_at;
+  return {
+    id: String(raw?.id ?? ''),
+    userId: String(raw?.userId ?? raw?.user_id ?? raw?.user ?? ''),
+    items: Array.isArray(raw?.items) ? raw.items.map(normalizeOrderItem) : [],
+    total: toNumber(raw?.total),
+    status: raw?.status || 'pending',
+    createdAt: typeof createdAt === 'number' ? createdAt : (createdAt ? Date.parse(createdAt) : Date.now()),
+    shippingAddress: raw?.shippingAddress ?? raw?.shipping_address ?? ''
+  };
+}
+
+function normalizeSettings(raw: any): SiteSettings {
+  return {
+    aboutTitle: raw?.aboutTitle ?? raw?.about_title ?? '',
+    aboutDescription: raw?.aboutDescription ?? raw?.about_description ?? '',
+    aboutImage: raw?.aboutImage ?? raw?.about_image ?? '',
+    heroImage: raw?.heroImage ?? raw?.hero_image ?? '',
+    suitsSectionImage: raw?.suitsSectionImage ?? raw?.suits_section_image ?? '',
+    shirtsSectionImage: raw?.shirtsSectionImage ?? raw?.shirts_section_image ?? '',
+    blazersSectionImage: raw?.blazersSectionImage ?? raw?.blazers_section_image ?? '',
+    accessoriesSectionImage: raw?.accessoriesSectionImage ?? raw?.accessories_section_image ?? '',
+    bespokeSectionImage: raw?.bespokeSectionImage ?? raw?.bespoke_section_image ?? ''
+  };
+}
 
 async function request(path: string, opts: RequestInit = {}) {
   const headers: Record<string, string> = { 
@@ -23,7 +117,13 @@ async function request(path: string, opts: RequestInit = {}) {
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-  if (!res.ok) throw { status: res.status, data };
+  if (!res.ok) {
+    const message = data?.detail || data?.message || (typeof data === 'string' ? data : 'Request failed');
+    const error = new Error(message) as Error & { status?: number; data?: unknown };
+    error.status = res.status;
+    error.data = data;
+    throw error;
+  }
   return data;
 }
 
@@ -33,20 +133,27 @@ function isFile(value: any): boolean {
 }
 
 export const api = {
-  async getProducts() { return await request('/api/products/'); },
-  async getProduct(id: string) { return await request('/api/products/' + id + '/'); },
-  async register(name: string, email: string, pass: string) { return await request('/api/auth/register/', { method: 'POST', body: JSON.stringify({ first_name: name, email, password: pass }) }); },
-  async login(email: string, pass: string, otp?: string) { return await request('/api/auth/login/', { method: 'POST', body: JSON.stringify({ email, password: pass, otp }) }); },
+  async getProducts() { return (await request('/api/products/')).map(normalizeProduct); },
+  async getProduct(id: string) { return normalizeProduct(await request('/api/products/' + id + '/')); },
+  async register(name: string, email: string, pass: string) {
+    const data = await request('/api/auth/register/', { method: 'POST', body: JSON.stringify({ first_name: name, email, password: pass }) });
+    return data?.user ? { ...data, user: normalizeUser(data.user) } : normalizeUser(data);
+  },
+  async login(email: string, pass: string, otp?: string) {
+    const data = await request('/api/auth/login/', { method: 'POST', body: JSON.stringify({ email, password: pass, otp }) });
+    return data?.user ? { ...data, user: normalizeUser(data.user) } : normalizeUser(data);
+  },
   async logout() { return await request('/api/auth/logout/', { method: 'POST' }); },
-  async me() { return await request('/api/auth/me/'); },
+  async me() { return normalizeUser(await request('/api/auth/me/')); },
   async sendOtp(email: string) { return await request('/api/auth/send-otp/', { method: 'POST', body: JSON.stringify({ email }) }); },
-  async createOrder(payload: any) { return await request('/api/orders/create/', { method: 'POST', body: JSON.stringify(payload) }); },
-  async myOrders() { return await request('/api/orders/my/'); },
+  async createOrder(payload: any) { return normalizeOrder(await request('/api/orders/create/', { method: 'POST', body: JSON.stringify(payload) })); },
+  async myOrders() { return (await request('/api/orders/my/')).map(normalizeOrder); },
+  async cancelOrder(id: string) { return normalizeOrder(await request('/api/orders/' + id + '/cancel/', { method: 'POST' })); },
   async getCart() { return await request('/api/cart/'); },
   async addToCart(product_id: string, qty = 1) { return await request('/api/cart/add/', { method: 'POST', body: JSON.stringify({ product_id, qty }) }); },
   async updateCartItem(product_id: string, qty: number) { return await request('/api/cart/update/', { method: 'POST', body: JSON.stringify({ product_id, qty }) }); },
   async clearCart() { return await request('/api/cart/clear/', { method: 'POST' }); },
-  async getSettings() { return await request('/api/settings/'); },
+  async getSettings() { return normalizeSettings(await request('/api/settings/')); },
   async saveSettings(data: any) {
     // If caller provided FormData, send multipart PUT without forcing JSON headers
     if (data instanceof FormData) {
@@ -56,29 +163,30 @@ export const api = {
         let parsed: any = null;
         try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
         if (!res.ok) throw { status: res.status, data: parsed };
-        return parsed;
+        return normalizeSettings(parsed);
       };
       const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
       try { return await send(API_BASE); } catch (e: any) { const backend = 'http://localhost:8000'; return await send(backend); }
     }
-    return await request('/api/settings/', { method: 'PUT', body: JSON.stringify(data) });
+    return normalizeSettings(await request('/api/settings/', { method: 'PUT', body: JSON.stringify(data) }));
   },
   async contact(name: string, email: string, message: string) { return await request('/api/contact/', { method: 'POST', body: JSON.stringify({ name, email, message }) }); },
-  async googleAuth(id_token: string) { return await request('/api/auth/google/', { method: 'POST', body: JSON.stringify({ id_token }) }); },
-  async updateProfile(payload: any) { return await request('/api/auth/me/update/', { method: 'PUT', body: JSON.stringify(payload) }); },
+  async googleAuth(id_token: string) {
+    const data = await request('/api/auth/google/', { method: 'POST', body: JSON.stringify({ id_token }) });
+    return data?.user ? { ...data, user: normalizeUser(data.user) } : normalizeUser(data);
+  },
+  async updateProfile(payload: any) { return normalizeUser(await request('/api/auth/me/update/', { method: 'PUT', body: JSON.stringify(payload) })); },
 
   async adminGetStats() { return await request('/api/admin/stats/'); },
-  async adminGetOrders() { return await request('/api/admin/orders/'); },
-  async adminUpdateOrderStatus(id: string, status: string) { return await request('/api/admin/orders/' + id + '/status/', { method: 'PUT', body: JSON.stringify({ status }) }); },
-  async adminGetUsers() { return await request('/api/admin/users/'); },
+  async adminGetOrders() { return (await request('/api/admin/orders/')).map(normalizeOrder); },
+  async adminUpdateOrderStatus(id: string, status: string) { return normalizeOrder(await request('/api/admin/orders/' + id + '/status/', { method: 'PUT', body: JSON.stringify({ status }) })); },
+  async adminGetUsers() { return (await request('/api/admin/users/')).map(normalizeUser); },
   async adminGetMessages() { return await request('/api/admin/messages/'); },
   async adminMarkMessageRead(id: string) { return await request('/api/admin/messages/' + id + '/mark-read/', { method: 'POST' }); },
-  async adminGetProducts() { return await request('/api/admin/products/'); },
+  async adminGetProducts() { return (await request('/api/admin/products/')).map(normalizeProduct); },
 
   async adminSaveProduct(product: any) {
     let payload = product;
-    // Debug: ensure we know whether caller passed FormData
-    try { console.debug('adminSaveProduct called; product instanceof FormData =', product instanceof FormData); } catch (e) {}
 
     // 1. Convert plain object to FormData if needed
     if (!(product instanceof FormData)) {
@@ -126,7 +234,7 @@ export const api = {
         try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
         if (!res.ok) throw { status: res.status, data };
-        return data;
+        return normalizeProduct(data);
       };
 
       const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
@@ -138,8 +246,8 @@ export const api = {
       }
     }
 
-    if (product.id) return await request('/api/admin/products/' + product.id + '/', { method: 'PUT', body: JSON.stringify(product) });
-    return await request('/api/admin/products/', { method: 'POST', body: JSON.stringify(product) });
+    if (product.id) return normalizeProduct(await request('/api/admin/products/' + product.id + '/', { method: 'PUT', body: JSON.stringify(product) }));
+    return normalizeProduct(await request('/api/admin/products/', { method: 'POST', body: JSON.stringify(product) }));
   },
 
   async adminDeleteProduct(id: string) { return await request('/api/admin/products/' + id + '/', { method: 'DELETE' }); }

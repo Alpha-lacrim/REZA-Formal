@@ -15,6 +15,7 @@ from django.conf import settings
 import jwt
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.db import transaction
 import os
 import json
 import logging
@@ -25,6 +26,17 @@ logger = logging.getLogger(__name__)
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+
+
+def serialize_user(user):
+    return {
+        'id': user.id,
+        'email': user.email,
+        'first_name': user.first_name,
+        'last_name': user.last_name,
+        'role': getattr(user, 'role', 'user'),
+        'address': getattr(user, 'address', ''),
+    }
 
 # Helper for Gallery Images (JSON List) ONLY
 def _save_uploaded_file_get_url(fobj, request=None):
@@ -160,12 +172,20 @@ def prepare_product_data(request):
 @api_view(['POST'])
 def register(request):
     data = request.data
-    if User.objects.filter(email=data.get('email')).exists():
+    email = (data.get('email') or '').strip().lower()
+    password = data.get('password') or ''
+    if not email or not password:
+        return Response({'detail': 'Email and password are required'}, status=400)
+    if User.objects.filter(email__iexact=email).exists():
         return Response({'detail':'Email already exists'}, status=400)
-    user = User.objects.create_user(username=data.get('email').split('@')[0], email=data.get('email'), password=data.get('password'))
+    username_base = email.split('@')[0][:140] or f'user_{uuid.uuid4().hex[:8]}'
+    username = username_base
+    if User.objects.filter(username=username).exists():
+        username = f'{username_base[:120]}_{uuid.uuid4().hex[:8]}'
+    user = User.objects.create_user(username=username, email=email, password=password)
     user.first_name = data.get('first_name', '')
     user.save()
-    return Response({'detail':'registered'})
+    return Response({'detail':'registered', 'user': serialize_user(user)})
 
 @api_view(['POST'])
 def login(request):
@@ -186,7 +206,7 @@ def login(request):
         if not totp.verify(otp):
             return Response({'detail':'Invalid 2FA code'}, status=403)
     tokens = get_tokens_for_user(user)
-    resp = Response({'user': {'id': user.id, 'email': user.email, 'first_name': user.first_name}})
+    resp = Response({'user': serialize_user(user)})
     secure_flag = not getattr(settings, 'DEBUG', False)
     resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag, path='/')
     resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Strict', secure=secure_flag, path='/')
@@ -197,7 +217,7 @@ def me(request):
     if not request.user or not request.user.is_authenticated:
         return Response({'detail': 'Not authenticated'}, status=401)
     user = request.user
-    return Response({'id': user.id, 'email': user.email, 'first_name': user.first_name, 'role': getattr(user, 'role', 'user')})
+    return Response(serialize_user(user))
 
 @api_view(['POST'])
 def logout_view(request):
@@ -215,8 +235,12 @@ def update_profile(request):
         user.first_name = data.get('first_name')
     if 'last_name' in data:
         user.last_name = data.get('last_name')
+    if 'name' in data and 'first_name' not in data:
+        user.first_name = data.get('name')
+    if 'address' in data:
+        user.address = data.get('address') or ''
     user.save()
-    return Response({'id': user.id, 'email': user.email, 'first_name': user.first_name})
+    return Response(serialize_user(user))
 
 @api_view(['POST'])
 def google_auth(request):
@@ -237,7 +261,7 @@ def google_auth(request):
         user.first_name = name
         user.save()
     tokens = get_tokens_for_user(user)
-    resp = Response({'user': {'id': user.id, 'email': user.email, 'first_name': user.first_name}})
+    resp = Response({'user': serialize_user(user)})
     secure_flag = not getattr(settings, 'DEBUG', False)
     resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag)
     resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Lax', secure=secure_flag)
@@ -267,7 +291,7 @@ def products_list(request):
 def product_detail(request, pk=None):
     if request.method == 'GET':
         prod = get_object_or_404(Product, pk=pk)
-        return Response(ProductSerializer(prod).data)
+        return Response(ProductSerializer(prod, context={'request': request}).data)
     
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
@@ -284,7 +308,7 @@ def product_detail(request, pk=None):
 
         if serializer.is_valid():
             serializer.save()
-            return Response(serializer.data)
+            return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
         
         logger.warning('Product detail error: %s', serializer.errors)
         return Response(serializer.errors, status=400)
@@ -301,24 +325,61 @@ def create_order(request):
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
     items = serializer.validated_data['items']
-    total = serializer.validated_data['total']
     shipping_address = serializer.validated_data['shipping_address']
-    order_id = 'ORD-' + str(uuid.uuid4())[:8]
-    order = Order.objects.create(id=order_id, user=request.user, total=total, shipping_address=shipping_address)
-    for it in items:
-        prod = get_object_or_404(Product, pk=it['id'])
-        if prod.stock < it['qty']:
-            return Response({'detail': f'Insufficient stock for {prod.name}'}, status=400)
-        prod.stock -= it['qty']
-        prod.save()
-        OrderItem.objects.create(order=order, product=prod, qty=it['qty'], price=prod.price)
-    return Response(OrderSerializer(order).data, status=201)
+    quantities = {}
+    for item in items:
+        quantities[item['id']] = quantities.get(item['id'], 0) + item['qty']
+
+    with transaction.atomic():
+        products = Product.objects.select_for_update().filter(pk__in=quantities.keys())
+        products_by_id = {product.id: product for product in products}
+        missing_ids = [product_id for product_id in quantities if product_id not in products_by_id]
+        if missing_ids:
+            return Response({'detail': f'Product not found: {missing_ids[0]}'}, status=404)
+
+        for product_id, qty in quantities.items():
+            product = products_by_id[product_id]
+            if product.stock < qty:
+                return Response({'detail': f'Insufficient stock for {product.name}'}, status=400)
+
+        total = sum(products_by_id[product_id].price * qty for product_id, qty in quantities.items())
+        order_id = 'ORD-' + str(uuid.uuid4())[:8]
+        order = Order.objects.create(id=order_id, user=request.user, total=total, shipping_address=shipping_address)
+
+        for product_id, qty in quantities.items():
+            product = products_by_id[product_id]
+            product.stock -= qty
+            product.save(update_fields=['stock'])
+            OrderItem.objects.create(order=order, product=product, qty=qty, price=product.price)
+
+    return Response(OrderSerializer(order, context={'request': request}).data, status=201)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
     qs = Order.objects.filter(user=request.user)
-    return Response(OrderSerializer(qs, many=True).data)
+    return Response(OrderSerializer(qs, many=True, context={'request': request}).data)
+
+
+@api_view(['POST'])
+@permission_classes([permissions.IsAuthenticated])
+def cancel_order(request, pk):
+    with transaction.atomic():
+        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
+        if order.user_id != request.user.id and not request.user.is_admin():
+            return Response({'detail': 'Not allowed'}, status=403)
+        if order.status != 'pending':
+            return Response({'detail': 'Only pending orders can be cancelled'}, status=400)
+
+        for item in order.items.select_related('product').all():
+            if item.product:
+                item.product.stock = (item.product.stock or 0) + item.qty
+                item.product.save(update_fields=['stock'])
+
+        order.status = 'cancelled'
+        order.save(update_fields=['status'])
+
+    return Response(OrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET','PUT'])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
@@ -353,7 +414,7 @@ def site_settings(request):
     serializer = SiteSettingsSerializer(settings, data=data)
     if serializer.is_valid():
         serializer.save()
-        return Response(SiteSettingsSerializer(settings, context={'request': request}).data)
+        return Response(SiteSettingsSerializer(serializer.instance, context={'request': request}).data)
     return Response(serializer.errors, status=400)
 
 @api_view(['POST'])
@@ -394,6 +455,8 @@ def admin_update_order_status(request, pk):
     status_val = request.data.get('status')
     if status_val not in dict(Order.STATUS):
         return Response({'detail':'invalid status'}, status=400)
+    if order.status == 'cancelled' and status_val != 'cancelled':
+        return Response({'detail':'cancelled orders cannot be reopened'}, status=400)
     if status_val == 'cancelled' and order.status != 'cancelled':
         for item in order.items.all():
             prod = item.product
@@ -410,7 +473,7 @@ def admin_users(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     users = User.objects.all()
-    data = [{'id': u.id, 'email': u.email, 'first_name': u.first_name, 'role': getattr(u, 'role', 'user')} for u in users]
+    data = [serialize_user(u) for u in users]
     return Response(data)
 
 @api_view(['GET'])
