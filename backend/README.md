@@ -34,7 +34,13 @@ python manage.py runserver
 ```
 
 Docker deployment:
-- Use Docker Compose to deploy the Django app: `docker-compose up --build`
-- Note: Docker will attempt to connect to SQL Server using the DB_HOST from `.env`. 
-- Ensure SQL Server is accessible from the Docker container network.
-- On Windows, you may need to use the host machine's IP instead of localhost.
+- Use the root Compose file from the project root:
+```bash
+cd ..
+cp .env.docker.example .env
+docker compose up --build
+```
+- Compose starts SQL Server, Django, and the frontend together.
+- Frontend: `http://localhost:3000`
+- Backend API: `http://localhost:8000`
+- See `docs/DOCKER_SETUP.md` for the full Docker workflow.

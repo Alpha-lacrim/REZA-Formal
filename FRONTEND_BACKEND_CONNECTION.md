@@ -1,5 +1,20 @@
 # Frontend-Backend Connection Guide
 
+## Docker Quick Start
+
+From the project root:
+
+```powershell
+Copy-Item .env.docker.example .env
+docker compose up --build
+```
+
+Docker starts SQL Server, Django, and the frontend together.
+
+- Frontend: http://localhost:3000
+- Backend API: http://localhost:8000
+- Full Docker guide: `docs/DOCKER_SETUP.md`
+
 ## ✅ Connection Status: COMPLETE
 
 Your frontend and backend are now fully connected and ready to use!

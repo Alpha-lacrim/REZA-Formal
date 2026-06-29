@@ -1,18 +1,47 @@
 #!/usr/bin/env bash
-# Wait for SQL Server to be available, then exit
-set -e
+set -euo pipefail
 
-host="${DB_HOST:-localhost}"
-port="${DB_PORT:-1433}"
-user="${DB_USER:-sa}"
-password="${DB_PASSWORD:-}"
+python - <<'PY'
+import os
+import sys
+import time
 
-echo "Waiting for SQL Server at $host:$port..."
+import pyodbc
 
-# Try to connect using sqlcmd with a simple query
-until sqlcmd -S "$host,$port" -U "$user" -P "$password" -Q "SELECT 1" -b > /dev/null 2>&1; do
-  printf '.'
-  sleep 1
-done
+host = os.environ.get("DB_HOST", "db")
+port = os.environ.get("DB_PORT", "1433")
+user = os.environ.get("DB_USER", "sa")
+password = os.environ.get("DB_PASSWORD", "")
+driver = os.environ.get("DB_DRIVER", "ODBC Driver 18 for SQL Server")
+encrypt = os.environ.get("DB_ENCRYPT", "no")
+trust = os.environ.get("DB_TRUST_SERVER_CERTIFICATE", "yes")
+timeout = int(os.environ.get("DB_WAIT_TIMEOUT", "180"))
 
-echo "SQL Server is available"
+server = host if "\\" in host else f"{host},{port}"
+connection = (
+    f"DRIVER={{{driver}}};"
+    f"SERVER={server};"
+    "DATABASE=master;"
+    f"UID={user};"
+    f"PWD={password};"
+    f"Encrypt={encrypt};"
+    f"TrustServerCertificate={trust};"
+    "Connection Timeout=5;"
+)
+
+deadline = time.time() + timeout
+print(f"Waiting for SQL Server at {server}...", flush=True)
+
+while True:
+    try:
+        with pyodbc.connect(connection, autocommit=True) as conn:
+            conn.cursor().execute("SELECT 1")
+        print("SQL Server is available", flush=True)
+        sys.exit(0)
+    except Exception as exc:
+        if time.time() >= deadline:
+            print(f"Timed out waiting for SQL Server: {exc}", file=sys.stderr, flush=True)
+            sys.exit(1)
+        print(".", end="", flush=True)
+        time.sleep(2)
+PY

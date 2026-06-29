@@ -1,0 +1,63 @@
+services:
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: reza-formal-db
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_PID: "Developer"
+      MSSQL_SA_PASSWORD: "${DB_PASSWORD:-RezaFormal!2026}"
+    ports:
+      - "${MSSQL_PORT:-1433}:1433"
+    volumes:
+      - mssql_data:/var/opt/mssql
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+    container_name: reza-formal-backend
+    depends_on:
+      - db
+    environment:
+      DEBUG: "${DJANGO_DEBUG:-True}"
+      DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:-change-me-for-local-docker}"
+      ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,backend}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000}"
+      CSRF_TRUSTED_ORIGINS: "${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000}"
+      DB_AUTO_CREATE: "${DB_AUTO_CREATE:-true}"
+      DB_NAME: "${DB_NAME:-reza}"
+      DB_USER: "${DB_USER:-sa}"
+      DB_PASSWORD: "${DB_PASSWORD:-RezaFormal!2026}"
+      DB_HOST: "${DB_HOST:-db}"
+      DB_PORT: "${DB_PORT:-1433}"
+      DB_DRIVER: "${DB_DRIVER:-ODBC Driver 18 for SQL Server}"
+      DB_ENCRYPT: "${DB_ENCRYPT:-no}"
+      DB_TRUST_SERVER_CERTIFICATE: "${DB_TRUST_SERVER_CERTIFICATE:-yes}"
+      MEDIA_URL: "/media/"
+      MEDIA_ROOT: "/app/media"
+      RUN_MIGRATIONS: "${RUN_MIGRATIONS:-true}"
+      RUN_COLLECTSTATIC: "${RUN_COLLECTSTATIC:-true}"
+      RUN_SEED_DATA: "${RUN_SEED_DATA:-true}"
+    ports:
+      - "${BACKEND_PORT:-8000}:8000"
+    volumes:
+      - django_media:/app/media
+      - django_static:/app/staticfiles
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_BASE: "${VITE_API_BASE:-/api}"
+    container_name: reza-formal-frontend
+    depends_on:
+      - backend
+    ports:
+      - "${FRONTEND_PORT:-3000}:80"
+    restart: unless-stopped
+
+volumes:
+  mssql_data:
+  django_media:
+  django_static:

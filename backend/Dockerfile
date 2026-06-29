@@ -1,31 +1,36 @@
-FROM python:3.11-slim
+FROM python:3.11-slim-bookworm
 
-ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
 
 WORKDIR /app
 
-# Install system dependencies for SQL Server connectivity (ODBC driver)
-RUN apt-get update && apt-get install -y \
-    pkg-config \
-    build-essential \
-    unixodbc-dev \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install ODBC Driver 17 for SQL Server
-RUN apt-get update && apt-get install -y \
-    curl \
-    gnupg \
-    && curl https://packages.microsoft.com/keys/microsoft.asc | apt-key add - \
-    && curl https://packages.microsoft.com/config/debian/11/prod.list > /etc/apt/sources.list.d/mssql-release.list \
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends \
+        apt-transport-https \
+        build-essential \
+        ca-certificates \
+        curl \
+        gnupg \
+        libgssapi-krb5-2 \
+        unixodbc-dev \
+    && curl -fsSL https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb -o /tmp/packages-microsoft-prod.deb \
+    && dpkg -i /tmp/packages-microsoft-prod.deb \
+    && rm /tmp/packages-microsoft-prod.deb \
     && apt-get update \
-    && ACCEPT_EULA=Y apt-get install -y msodbcsql17 \
+    && ACCEPT_EULA=Y apt-get install -y --no-install-recommends msodbcsql18 \
+    && apt-get clean \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install -r requirements.txt
 
 COPY . .
-# Copy and make wait script executable
-RUN chmod +x /app/wait_for_db.sh || true
+RUN chmod +x /app/wait_for_db.sh /app/docker-entrypoint.sh
 
-CMD ["/bin/bash", "-c", "/app/wait_for_db.sh && gunicorn reza_backend.wsgi:application --bind 0.0.0.0:8000"]
+EXPOSE 8000
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
+CMD ["gunicorn", "reza_backend.wsgi:application", "--bind", "0.0.0.0:8000", "--workers", "3"]

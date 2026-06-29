@@ -10,7 +10,8 @@ environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
 SECRET_KEY = env('DJANGO_SECRET_KEY', default='change-me')
 DEBUG = env('DEBUG')
-ALLOWED_HOSTS = ['*']
+allowed_hosts = env('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0,backend')
+ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
 
 INSTALLED_APPS = [
     'shop',
@@ -27,6 +28,7 @@ INSTALLED_APPS = [
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -65,9 +67,9 @@ DATABASES = {
         'PORT': env('DB_PORT', default='1433'),
         'OPTIONS': {
             'driver': env('DB_DRIVER', default='ODBC Driver 17 for SQL Server'),
-            'Encrypt': 'no',
-            'TrustServerCertificate': 'yes',
-            'Connection Timeout': '30',
+            'Encrypt': env('DB_ENCRYPT', default='no'),
+            'TrustServerCertificate': env('DB_TRUST_SERVER_CERTIFICATE', default='yes'),
+            'Connection Timeout': env('DB_CONNECTION_TIMEOUT', default='30'),
         },
     }
 }
@@ -87,8 +89,17 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 MEDIA_URL = env('MEDIA_URL', default='/media/')
-MEDIA_ROOT = os.path.join(BASE_DIR, 'media')
+MEDIA_ROOT = env('MEDIA_ROOT', default=os.path.join(BASE_DIR, 'media'))
+STORAGES = {
+    'default': {
+        'BACKEND': 'django.core.files.storage.FileSystemStorage',
+    },
+    'staticfiles': {
+        'BACKEND': 'whitenoise.storage.CompressedManifestStaticFilesStorage',
+    },
+}
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -118,8 +129,10 @@ SIMPLE_JWT = {
 }
 
 # CORS: allow React dev origin by default
-cors_origins = env('ALLOWED_ORIGINS', default='http://localhost:5173')
+cors_origins = env('ALLOWED_ORIGINS', default='http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',') if o.strip()]
+csrf_origins = env('CSRF_TRUSTED_ORIGINS', default=cors_origins)
+CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins.split(',') if o.strip().startswith(('http://', 'https://'))]
 
 # Allow cookies to be sent cross-site for auth (required for cookie-based JWT)
 CORS_ALLOW_CREDENTIALS = True

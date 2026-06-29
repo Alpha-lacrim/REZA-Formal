@@ -39,3 +39,12 @@
 - Added ignore rules for local virtual environments, Python bytecode/cache folders, local SQLite DB files, Django runtime media, and frontend build output.
 - Removed generated/runtime paths from Git tracking with `git rm --cached` while leaving local files available on disk where they still exist.
 - The cleanup covered `backend/.venv`, `backend/db.sqlite3`, `backend/media`, Python `__pycache__` folders, `frontend/build`, and `frontend/dist`.
+
+## Dockerization Follow-up
+
+- Added a root `docker-compose.yml` that starts SQL Server, Django, and the frontend together.
+- Added backend container startup scripts for database waiting, optional DB creation, migrations, static collection, and seed data.
+- Reworked the backend Dockerfile to install Microsoft ODBC Driver 18 and run Django with Gunicorn.
+- Added a frontend multi-stage Dockerfile that builds the Vite app and serves it with Nginx.
+- Added Nginx proxy rules for `/api/` and `/media/`.
+- Added `.env.docker.example`, Docker ignore files, shell line-ending rules, and `docs/DOCKER_SETUP.md`.
