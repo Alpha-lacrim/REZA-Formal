@@ -6,6 +6,7 @@ import { Order } from '../types';
 import { toPersianDigits, formatPrice } from '../utils';
 import { User, Package, MapPin, Save, LogOut, XCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 const UserPanel: React.FC = () => {
     const { user, updateUserProfile, logout, showToast, cancelUserOrder } = useGlobal();
@@ -77,6 +78,7 @@ const UserPanel: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-900 pt-24 pb-12">
+            <SEO title="User profile" />
             <div className="container max-w-5xl mx-auto px-4">
                 
                 <div className="flex flex-col md:flex-row gap-8">

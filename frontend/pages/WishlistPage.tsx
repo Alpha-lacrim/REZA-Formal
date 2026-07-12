@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useGlobal } from '../contexts/GlobalContext';
-import { products as fallbackProducts } from '../data';
+import SEO from '../components/SEO';
 import { Link, useNavigate } from 'react-router-dom';
 import ProductCard from '../components/ProductCard';
 import { ArrowLeft, HeartOff } from 'lucide-react';
@@ -14,7 +14,7 @@ const WishlistPage: React.FC = () => {
     }, []);
 
     const resolveProduct = (id: string) => {
-        return contextProducts.find(p => p.id === id) || fallbackProducts.find(p => p.id === id);
+        return contextProducts.find(p => p.id === id);
     };
 
     const wishlistItems = wishlist
@@ -23,6 +23,7 @@ const WishlistPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-900 pt-20">
+            <SEO title="Wishlist" />
             <header className="relative text-center bg-lux-black text-white py-8 overflow-hidden">
                 <div className="relative mx-auto w-full max-w-4xl px-4 z-10">
                     <h1 className="font-serif text-3xl md:text-5xl mb-2">علاقه‌مندی‌ها</h1>

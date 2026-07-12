@@ -2,7 +2,6 @@ import React, { useState, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
 import api from '../services/api';
-import { db } from '../services/db';
 import { Product, Order, ContactMessage, SiteSettings, User } from '../types';
 import { toPersianDigits, formatPrice } from '../utils';
 import { 
@@ -13,6 +12,7 @@ import {
     Users, Activity, CheckCircle2, Clock, Ban, Menu
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import SEO from '../components/SEO';
 
 const ITEMS_PER_PAGE = 8;
 
@@ -91,12 +91,8 @@ const AdminPanel: React.FC = () => {
             const s = await api.adminGetStats();
             setStats(s);
         } catch (e) {
-            try {
-                const localStats = await db.getStats();
-                setStats(localStats as any);
-            } catch {
-                setStats({ productsCount: 0, ordersCount: 0, usersCount: 0, revenue: 0, messagesCount: 0 });
-            }
+            setStats({ productsCount: 0, ordersCount: 0, usersCount: 0, revenue: 0, messagesCount: 0 });
+            showToast('خطا در دریافت آمار مدیریت');
         }
         if (activeTab === 'orders') {
             try {
@@ -105,27 +101,17 @@ const AdminPanel: React.FC = () => {
                 setOrders(o);
                 setUsers(u);
             } catch (e) {
-                try {
-                    const o = await db.getOrders();
-                    const u = await db.getUsers();
-                    setOrders(o);
-                    setUsers(u as any);
-                } catch {
-                    setOrders([]);
-                    setUsers([]);
-                }
+                setOrders([]);
+                setUsers([]);
+                showToast('خطا در دریافت سفارش‌ها');
             }
         } else if (activeTab === 'messages') {
             try {
                 const m = await api.adminGetMessages();
                 setMessages(m);
             } catch (e) {
-                try {
-                    const m = await db.getMessages();
-                    setMessages(m as any);
-                } catch {
-                    setMessages([]);
-                }
+                setMessages([]);
+                showToast('خطا در دریافت پیام‌ها');
             }
         }
     };
@@ -205,14 +191,7 @@ const AdminPanel: React.FC = () => {
                 await refreshProducts();
                 showToast('محصول حذف شد');
             } catch (e) {
-                // Fallback to local db delete
-                try {
-                    await db.deleteProduct(deleteConfirmation.productId as string);
-                    await refreshProducts();
-                    showToast('محصول (محلی) حذف شد');
-                } catch (err) {
-                    showToast('خطا در حذف محصول');
-                }
+                showToast('خطا در حذف محصول');
             }
             setDeleteConfirmation({ isOpen: false, productId: null });
         }
@@ -228,18 +207,7 @@ const AdminPanel: React.FC = () => {
             }
             showToast('وضعیت سفارش بروز شد');
         } catch (e) {
-            // Fallback to local db
-            try {
-                await db.updateOrderStatus(orderId, status);
-                const updatedOrders = await db.getOrders();
-                setOrders(updatedOrders as any);
-                if (viewingOrder && viewingOrder.id === orderId) {
-                    setViewingOrder(updatedOrders.find(o => o.id === orderId) || null);
-                }
-                showToast('وضعیت سفارش بروز شد (محلی)');
-            } catch (err) {
-                showToast('خطا در بروزرسانی وضعیت سفارش');
-            }
+            showToast('خطا در بروزرسانی وضعیت سفارش');
         }
     };
 
@@ -259,11 +227,14 @@ const AdminPanel: React.FC = () => {
             };
 
             const hasFiles = Object.keys(settingsFiles).length > 0;
+            const textSettings = {
+                about_title: settingsForm.aboutTitle || '',
+                about_description: settingsForm.aboutDescription || '',
+            };
             if (hasFiles) {
                 const fd = new FormData();
-                Object.entries(settingsForm).forEach(([k, v]) => {
-                    const key = fieldMap[k] || k;
-                    if (v !== undefined && v !== null) fd.append(key, String(v));
+                Object.entries(textSettings).forEach(([key, value]) => {
+                    fd.append(key, value);
                 });
                 Object.entries(settingsFiles).forEach(([k, f]) => {
                     const key = fieldMap[k] || k;
@@ -271,23 +242,12 @@ const AdminPanel: React.FC = () => {
                 });
                 await updateSiteSettings(fd as any);
             } else {
-                const payload: any = {};
-                Object.entries(settingsForm).forEach(([k, v]) => {
-                    const key = fieldMap[k] || k;
-                    payload[key] = v;
-                });
-                await updateSiteSettings(payload as any);
+                await updateSiteSettings(textSettings as any);
             }
             showToast('تنظیمات ذخیره شد');
         } catch (err) {
             console.error('Settings save failed', err);
-            try {
-                await db.saveSettings(settingsForm);
-                showToast('تنظیمات بصورت محلی ذخیره شد');
-            } catch (e) {
-                console.error('Local settings save failed', e);
-                showToast('خطا در ذخیره تنظیمات');
-            }
+            showToast('خطا در ذخیره تنظیمات');
         }
     };
 
@@ -299,15 +259,7 @@ const AdminPanel: React.FC = () => {
             const s = await api.adminGetStats();
             setStats(s);
         } catch (e) {
-            try {
-                await db.markMessageAsRead(id);
-                const updatedMessages = await db.getMessages();
-                setMessages(updatedMessages as any);
-                const s = await db.getStats();
-                setStats(s as any);
-            } catch (err) {
-                showToast('خطا در علامت‌گذاری پیام');
-            }
+            showToast('خطا در علامت‌گذاری پیام');
         }
     };
 
@@ -416,6 +368,7 @@ const AdminPanel: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-950 pt-20 flex flex-col md:flex-row transition-colors duration-300">
+            <SEO title="Admin panel" />
             
             {/* Sidebar (hidden on small screens; mobile drawer used instead) */}
             <aside className="hidden md:flex md:w-72 bg-white dark:bg-zinc-900 border-b md:border-b-0 md:border-l border-gray-200 dark:border-zinc-800 p-6 shrink-0 print:hidden flex-col h-auto md:h-[calc(100vh-5rem)] sticky top-20 shadow-sm z-30">
@@ -459,8 +412,8 @@ const AdminPanel: React.FC = () => {
                             <UserIcon size={20} />
                         </div>
                         <div className="flex-1 min-w-0">
-                            <p className="text-sm font-bold text-lux-black dark:text-white truncate">مدیر سیستم</p>
-                            <p className="text-[10px] text-gray-400 truncate">admin@reza.com</p>
+                            <p className="text-sm font-bold text-lux-black dark:text-white truncate">{user?.name || 'مدیر'}</p>
+                            <p className="text-[10px] text-gray-400 truncate">{user?.email || ''}</p>
                         </div>
                     </div>
                 </div>

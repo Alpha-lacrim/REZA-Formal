@@ -1,136 +1,76 @@
-# SQL Server Migration Summary
+# SQL Server configuration summary
 
-## Overview
-Your project has been successfully converted from MySQL to Microsoft SQL Server. All MySQL and SQLite3 code has been removed and replaced with SQL Server configuration.
+This document describes the current SQL Server integration. It supersedes the older migration notes that no longer matched the Docker stack.
 
-## Files Modified
+## Current architecture
 
-### 1. **requirements.txt**
-   - **Removed**: `mysqlclient>=2.1` (MySQL Python driver)
-   - **Added**: 
-     - `pyodbc>=5.0` (ODBC database driver for SQL Server)
-     - `mssql-django>=1.1` (Django backend for SQL Server)
+- Django uses the `mssql` database engine provided by `mssql-django`.
+- Python connects through `pyodbc`.
+- Manual development connects to an existing SQL Server instance configured in `backend/.env`.
+- Docker Compose starts SQL Server 2022 Developer as the `db` service and stores its data in the `mssql_data` named volume.
+- The backend container installs Microsoft ODBC Driver 18. The manual-development example defaults to Driver 17 because that is common on the existing Windows setup; set `DB_DRIVER` to a driver actually installed on the machine.
 
-### 2. **backend/reza_backend/settings.py**
-   - **Changed** DATABASE configuration:
-     - From hardcoded MySQL credentials to environment-based SQL Server configuration
-     - Now reads from `.env` variables: `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_DRIVER`
-     - Updated engine to `'mssql'` (requires mssql-django)
-   - **Removed**: 
-     - `mssql.base` import and patching code (no longer needed with newer mssql-django)
-     - Version compatibility workaround
+## Environment variables
 
-### 3. **.env**
-   - **Removed**: All MySQL-specific variables
-   - **Added** SQL Server configuration:
-     ```
-     DB_NAME=reza
-     DB_USER=sa
-     DB_PASSWORD=10151743!
-     DB_HOST=BRO\SQLEXPRESS
-     DB_PORT=1433
-     DB_DRIVER=ODBC Driver 17 for SQL Server
-     ```
-   - Kept existing Django secret and allowed origins
+| Variable | Description | Typical Docker value |
+| --- | --- | --- |
+| `DB_NAME` | Application database name | `reza` |
+| `DB_USER` | SQL login | `sa` |
+| `DB_PASSWORD` | SQL login password | Required secret |
+| `DB_HOST` | SQL Server hostname or named instance | `db` |
+| `DB_PORT` | SQL Server TCP port | `1433` |
+| `DB_DRIVER` | Installed ODBC driver name | `ODBC Driver 18 for SQL Server` |
+| `DB_ENCRYPT` | ODBC encryption option | `no` for local Compose |
+| `DB_TRUST_SERVER_CERTIFICATE` | Certificate trust option | `yes` for local Compose |
+| `DB_CONNECTION_TIMEOUT` | Django connection timeout in seconds | `30` |
+| `DB_WAIT_TIMEOUT` | Container startup wait in seconds | `180` |
+| `DB_AUTO_CREATE` | Create `DB_NAME` when absent at container startup | `true` |
 
-### 4. **.env.example**
-   - Updated with SQL Server configuration template
-   - Removed all MySQL-specific variables
-   - Provides clear examples for setting up SQL Server connection
+Root `.env` supplies Docker Compose. `backend/.env` supplies a manual Django run. Both are ignored by Git; use `.env.docker.example` and `backend/.env.example` as templates.
 
-### 5. **Dockerfile**
-   - **Removed**:
-     - MySQL client dependencies (`default-libmysqlclient-dev`, `default-mysql-client`)
-   - **Added**:
-     - ODBC driver dependencies (`unixodbc-dev`)
-     - Microsoft ODBC Driver 17 for SQL Server installation
+## Container startup sequence
 
-### 6. **docker-compose.yml**
-   - **Removed**: Entire MySQL database service (`db:` service)
-   - **Removed**: Volume declaration for MySQL data
-   - **Removed**: Health check and depends_on configuration
-   - **Simplified**: Web service now only runs Django app
-   - **Updated**: Comments to note external SQL Server dependency
+`backend/docker-entrypoint.sh` performs these enabled steps in order:
 
-### 7. **wait_for_db.sh**
-   - **Changed** from MySQL wait script to SQL Server wait script
-   - Uses `sqlcmd` to test SQL Server connectivity instead of `mysqladmin`
-   - Reads SQL Server connection parameters from environment variables
+1. `backend/wait_for_db.sh` retries a `pyodbc` connection to the `master` database.
+2. `DB_AUTO_CREATE=true` safely creates `DB_NAME` when it is absent.
+3. `RUN_MIGRATIONS=true` applies Django migrations.
+4. `RUN_COLLECTSTATIC=true` collects static files.
+5. `RUN_SEED_DATA=true` runs the idempotent product/site seed and optionally creates an environment-configured admin.
+6. Gunicorn starts the WSGI application.
 
-### 8. **backend/README.md**
-   - Updated quick start guide to focus on SQL Server setup
-   - Added detailed SQL Server configuration instructions
-   - Updated Docker deployment notes for SQL Server compatibility
-   - Removed MySQL-specific references
+Compose requires a non-empty `DB_PASSWORD` instead of falling back to a checked-in password. SQL Server enforces password complexity. Changing `.env` does not change the `sa` password inside an already initialized `mssql_data` volume.
 
-## Key Configuration Details
+## Manual Windows setup
 
-### SQL Server Connection
-Your `settings.py` now connects to SQL Server with these settings:
-```python
-DATABASES = {
-    'default': {
-        'ENGINE': 'mssql',
-        'NAME': env('DB_NAME'),           # reza
-        'USER': env('DB_USER'),           # sa
-        'PASSWORD': env('DB_PASSWORD'),   # 10151743!
-        'HOST': env('DB_HOST'),           # BRO\SQLEXPRESS
-        'PORT': env('DB_PORT'),           # 1433
-        'OPTIONS': {
-            'driver': env('DB_DRIVER'),   # ODBC Driver 17 for SQL Server
-            'Encrypt': 'yes',
-            'TrustServerCertificate': 'yes',
-            'Connection Timeout': '30',
-        },
-    }
-}
+1. Install Microsoft ODBC Driver 17 or 18 for SQL Server.
+2. Copy `backend/.env.example` to `backend/.env`.
+3. Set the local host/instance, driver, database, login, and password.
+4. Ensure the target database exists and the login can access it.
+5. Install requirements and run checks/migrations:
+
+```powershell
+Set-Location backend
+python -m pip install -r requirements.txt
+python manage.py check
+python manage.py migrate
+python manage.py seed_data
 ```
 
-### ODBC Driver
-The project now requires **ODBC Driver 17 for SQL Server** which is installed in:
-- Docker: Installed during build
-- Local dev: Must be installed separately on your system
+For named instances such as `localhost\SQLEXPRESS`, the backend omits `DB_PORT` from the effective server name. For a TCP hostname/IP, ensure SQL Server TCP/IP is enabled and the configured port is reachable.
 
-### Database Credentials
-Current configuration points to:
-- **Host**: `BRO\SQLEXPRESS`
-- **Database**: `reza`
-- **User**: `sa`
-- **Password**: `10151743!`
-- **Port**: `1433`
+## Version compatibility
 
-## Next Steps
+`backend/requirements.txt` requires `mssql-django>=1.7.3,<1.8`. That supported release line recognizes SQL Server 2025, so the old runtime monkey patch that capped the reported server version has been removed. Keep the dependency constraint and test database checks before moving to a different `mssql-django` minor release.
 
-1. **Install ODBC Driver** (if running locally on Windows):
-   - Download from: https://learn.microsoft.com/en-us/sql/connect/odbc/download-odbc-driver-for-sql-server
-   - Or use: `choco install odbc-driver-17-for-sql-server` (if using Chocolatey)
+## Credential remediation
 
-2. **Verify SQL Server Connection**:
-   ```bash
-   python manage.py dbshell
-   ```
+An earlier tracked version of this document contained a literal SQL password. The current tree has been scrubbed, but editing the file does not erase Git history.
 
-3. **Run Migrations**:
-   ```bash
-   python manage.py migrate
-   python manage.py seed_data
-   ```
+Required user actions if that value was ever used:
 
-4. **Start Development Server**:
-   ```bash
-   python manage.py runserver
-   ```
+1. Rotate the SQL login password everywhere it may still be active.
+2. Update only ignored/local secret stores and deployment secret managers.
+3. If the repository was shared or pushed, purge the old blob with a history-rewriting tool such as `git filter-repo`, coordinate the forced update with collaborators, and invalidate cached/forked copies where possible.
 
-## Removed Code
-- ✅ All MySQL configuration
-- ✅ All SQLite3 references
-- ✅ MySQL client tools and libraries
-- ✅ Docker MySQL service
-- ✅ MySQL health checks and wait scripts
-- ✅ MySQL-specific environment variables
-
-## No Changes Required
-- ✅ Django models remain unchanged
-- ✅ API endpoints remain unchanged
-- ✅ Frontend code (React) remains unchanged
-- ✅ Admin panel functionality remains unchanged
+History rewriting is intentionally not performed automatically because it changes commit identities and requires repository-owner coordination.

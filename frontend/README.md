@@ -1,20 +1,38 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# REZA Formal frontend
 
-# Run and deploy your AI Studio app
+React 19 + TypeScript storefront built with Vite. The Django API is the primary data source; localStorage remains only for cart, wishlist, theme, and selected fallback behavior.
 
-This contains everything you need to run your app locally.
+## Local development
 
-View your app in AI Studio: https://ai.studio/apps/drive/1vVrLM09nRtS_Tfz6KjdZQ43z6YU9Ey3G
+Prerequisite: a current Node.js LTS release.
 
-## Run Locally
+```powershell
+npm.cmd ci
+npm.cmd run dev
+```
 
-**Prerequisites:**  Node.js
+Vite serves http://localhost:3000 and proxies `/api` and `/media` to http://localhost:8000. Start the Django backend separately.
 
+No third-party AI key is required; the stale key-injection setup has been removed.
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## Checks and production build
+
+```powershell
+npm.cmd run typecheck
+npm.cmd run build
+npm.cmd run preview
+```
+
+Build output is written to `dist/` and is ignored by Git.
+
+## API configuration
+
+`VITE_API_BASE` is optional and embedded at build time:
+
+- empty/unset: same-origin `/api/...` requests (the local Vite proxy and Docker Nginx support this)
+- `/api`: same-origin prefix without duplicating the path
+- `https://api.example.com`: separately hosted API origin for production
+
+Rebuild after changing the value. Cross-origin deployments must also configure Django's allowed hosts, CORS origins, and CSRF trusted origins.
+
+The root `vercel.json` installs/builds this directory and publishes `frontend/dist`; it does not deploy Django or SQL Server.

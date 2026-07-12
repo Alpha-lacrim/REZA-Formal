@@ -1,213 +1,107 @@
-# Frontend-Backend Connection Guide
+# Frontend/backend connection
 
-## Docker Quick Start
+The React application uses `frontend/services/api.ts` as its primary integration with the Django API. Requests include credentials so Django can authenticate access and refresh JWT cookies.
 
-From the project root:
+## Local Docker path
 
 ```powershell
 Copy-Item .env.docker.example .env
+# Set the required secrets in .env.
 docker compose up --build
 ```
 
-Docker starts SQL Server, Django, and the frontend together.
+- Browser entry point: http://localhost:3000
+- Direct API: http://localhost:8000/api/products/
+- Frontend build setting: `VITE_API_BASE=/api`
 
-- Frontend: http://localhost:3000
-- Backend API: http://localhost:8000
-- Full Docker guide: `docs/DOCKER_SETUP.md`
+The API helper avoids duplicating the `/api` prefix. Nginx receives `/api/...` and `/media/...` requests on the frontend origin and proxies them to `backend:8000` inside the Compose network.
 
-## ✅ Connection Status: COMPLETE
+## Manual development path
 
-Your frontend and backend are now fully connected and ready to use!
+Run Django on port 8000 and Vite on port 3000. The active `frontend/vite.config.ts` proxies `/api` and `/media` to `http://localhost:8000`, so no frontend API environment override is required for this path.
 
-## Server Information
+```powershell
+# Terminal 1
+Set-Location backend
+python manage.py runserver
 
-### Backend (Django REST API)
-- **URL**: http://localhost:8000
-- **Status**: Running ✅
-- **Database**: Microsoft SQL Server (reza)
-- **CORS Origins**: 
-  - http://localhost:5173
-  - http://localhost:3000
-  - http://localhost:3001
-  - http://127.0.0.1:5173
-  - http://127.0.0.1:3000
-  - http://127.0.0.1:3001
-  - http://localhost:8000
-
-### Frontend (React + Vite)
-- **URL**: http://localhost:3001
-- **Status**: Running ✅
-- **API Base**: http://localhost:8000
-- **Port Note**: Running on port 3001 because port 3000 is in use
-
-## Configuration Details
-
-### Frontend API Service (`frontend/services/api.ts`)
-The frontend has automatic fallback logic:
-- Primary API base: `VITE_API_BASE` environment variable
-- Fallback: `http://localhost:8000`
-- Credentials: `include` (allows cookies for JWT auth)
-
-### Backend CORS Settings
-Located in `backend/reza_backend/settings.py`:
-```python
-CORS_ALLOWED_ORIGINS = [
-    'http://localhost:5173',
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://127.0.0.1:5173',
-    'http://127.0.0.1:3000',
-    'http://127.0.0.1:3001',
-    'http://localhost:8000'
-]
-CORS_ALLOW_CREDENTIALS = True  # Required for cookie-based JWT
+# Terminal 2
+Set-Location frontend
+npm.cmd run dev
 ```
 
-### Database Connection
-- **Engine**: mssql-django
-- **Host**: BRO\SQLEXPRESS
-- **Database**: reza
-- **User**: sa
-- **Driver**: ODBC Driver 17 for SQL Server
-- **Encryption**: Disabled (for local development)
-- **Status**: Connected ✅
+## API base rules
 
-## Available Backend API Endpoints
+`VITE_API_BASE` is a Vite build-time value:
 
-### Authentication
-- `POST /api/auth/register/` - Register new user
-- `POST /api/auth/login/` - Login (returns JWT in cookies)
-- `POST /api/auth/send-otp/` - Send OTP for 2FA
-- `GET /api/auth/me/` - Get current user info
-- `POST /api/auth/logout/` - Logout
-- `PUT /api/auth/me/update/` - Update user profile
-- `POST /api/auth/google/` - Google authentication
+- Empty/unset: same-origin requests such as `/api/products/`; Vite or Nginx must proxy them.
+- `/api`: same-origin API prefix; the API helper prevents `/api/api/...` paths.
+- `https://api.example.com`: cross-origin Django API; use this for a separately hosted production backend.
 
-### Products
-- `GET /api/products/` - List all products
-- `GET /api/products/<id>/` - Get product details
+Do not include `/api` twice. Rebuild the frontend after changing any `VITE_*` value.
 
-### Orders
-- `POST /api/orders/create/` - Create new order
-- `GET /api/orders/my/` - Get user's orders
+## Backend origin settings
 
-### Settings & Content
-- `GET /api/settings/` - Get site settings
-- `PUT /api/settings/` - Update site settings (admin only)
-- `POST /api/contact/` - Send contact message
+For a cross-origin frontend, configure the backend environment with complete origins (scheme plus hostname and optional port):
 
-### Admin Endpoints
-- `GET /api/admin/stats/` - Get dashboard statistics
-- `GET /api/admin/orders/` - List all orders
-- `PUT /api/admin/orders/<id>/status/` - Update order status
-- `GET /api/admin/users/` - List all users
-- `GET /api/admin/messages/` - Get contact messages
-- `POST /api/admin/messages/<id>/mark-read/` - Mark message as read
-- `GET /api/admin/products/` - Get all products for editing
-- `POST /api/admin/products/<id>/` - Save product
-
-## Testing the Connection
-
-### Test Admin Login
-```
-Email: admin@reza.com
-Password: admin
-2FA Secret: KAYV46C7N5ZG62D3
+```env
+ALLOWED_HOSTS=api.example.com
+ALLOWED_ORIGINS=https://www.example.com
+CSRF_TRUSTED_ORIGINS=https://www.example.com
 ```
 
-### Quick API Test (using curl)
-```bash
-# Get products
-curl http://localhost:8000/api/products/
+Cookie authentication requires `CORS_ALLOW_CREDENTIALS=True`, which is already enabled in `backend/reza_backend/settings.py`. For production, set the `AUTH_COOKIE_*`, session/CSRF secure-cookie, redirect/HSTS, and trusted-proxy variables for the verified HTTPS topology.
 
-# Login
-curl -X POST http://localhost:8000/api/auth/login/ \
-  -H "Content-Type: application/json" \
-  -d '{"email":"admin@reza.com","password":"admin"}' \
-  -c cookies.txt
+## Implemented endpoint groups
 
-# Get authenticated user
-curl http://localhost:8000/api/auth/me/ -b cookies.txt
+All paths below are under `/api/` and are defined in `backend/shop/urls.py`.
+
+- Authentication: register, login, send OTP, current user, profile update, logout, and Google auth
+- Catalog: product list and product detail
+- Orders: create, current-user list, and pending-order cancellation
+- Site content: settings and contact messages
+- Admin: statistics, orders/status, users, messages/read state, and product CRUD
+
+The exact HTTP methods and payload normalization live in `frontend/services/api.ts`; server validation and permissions live in `backend/shop/serializers.py` and `backend/shop/views.py`.
+
+## Quick checks
+
+Public product request:
+
+```powershell
+curl.exe http://localhost:8000/api/products/
 ```
 
-## How It Works
+Frontend verification:
 
-1. **Frontend** (React on http://localhost:3001)
-   - Makes API calls via `services/api.ts`
-   - Uses `GlobalContext` to manage state
-   - Automatically syncs with backend data
-   - Falls back to localStorage for offline support
+```powershell
+Set-Location frontend
+npm.cmd run typecheck
+npm.cmd run build
+```
 
-2. **Backend** (Django REST API on http://localhost:8000)
-   - Handles all API requests
-   - Manages authentication with JWT cookies
-   - Enforces CORS rules
-   - Reads/writes to SQL Server database
+Backend verification (with valid SQL Server settings):
 
-3. **Database** (SQL Server)
-   - Stores all application data
-   - Tables: Users, Products, Orders, OrderItems, ContactMessages, SiteSettings
-
-## Important Features
-
-### Authentication Flow
-1. User logs in via frontend form
-2. Frontend sends credentials to `/api/auth/login/`
-3. Backend validates and sets JWT in secure cookie
-4. All subsequent requests include JWT automatically
-5. Frontend checks `/api/auth/me/` to get user details and role
-
-### CORS Configuration
-- Frontend on different domain? Update `ALLOWED_ORIGINS` in `.env`
-- Credentials are sent with each request (cookies for JWT)
-- Backend allows credentials with `CORS_ALLOW_CREDENTIALS = True`
-
-### SQL Server Compatibility
-- Using SQL Server 2019+ (v15+)
-- mssql-django version 1.1+
-- Version check patched in settings.py to support SQL Server 2025 (v17)
-- ODBC Driver 17 for SQL Server
+```powershell
+Set-Location backend
+python manage.py check
+python manage.py makemigrations --check --dry-run
+```
 
 ## Troubleshooting
 
-### "Failed to fetch from /api/..."
-1. Check if backend is running: `python manage.py runserver`
-2. Verify CORS allows your origin
-3. Check browser console for actual error message
+### HTML is returned instead of JSON
 
-### "Cannot connect to SQL Server"
-1. Verify SQL Server is running
-2. Check connection string in `.env`
-3. Ensure ODBC Driver 17 is installed
-4. Check Windows authentication or user credentials
+Confirm the request URL contains exactly one `/api` segment and rebuild after changing `VITE_API_BASE`. In Docker, inspect both `docker compose logs frontend` and `docker compose logs backend`.
 
-### Frontend shows outdated data
-1. Clear browser cache
-2. Check `localStorage` in DevTools
-3. Refresh the page
-4. Restart backend server
+### Browser reports a CORS or CSRF error
 
-### API returns 401 Unauthorized
-1. User session may have expired (refresh token)
-2. Login again to get fresh JWT
-3. Check JWT is in cookies (DevTools > Application > Cookies)
+Confirm the browser's exact origin is present in both `ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`. Origins must include `http://` or `https://`; `ALLOWED_HOSTS` contains hostnames only.
 
-## Next Steps
+### API returns 401
 
-1. **Open Frontend**: http://localhost:3001
-2. **Login**: Use admin credentials (see Testing section)
-3. **Test Features**:
-   - View products
-   - Manage admin panel
-   - Create orders
-   - Update settings
-4. **Deploy**:
-   - Backend: Use gunicorn with production database
-   - Frontend: Build with `npm run build` and serve with web server
+Log in again, confirm the browser accepted the authentication cookies, and ensure requests use `credentials: 'include'`. Do not copy access/refresh cookie values into issue reports or committed test files.
 
-## File Reference
+### Images fail after deployment
 
-- Backend configuration: [backend/reza_backend/settings.py](backend/reza_backend/settings.py)
-- Frontend API service: [frontend/services/api.ts](frontend/services/api.ts)
-- Global state: [frontend/contexts/GlobalContext.tsx](frontend/contexts/GlobalContext.tsx)
-- Database environment: [backend/.env](backend/.env)
+Confirm the backend's `MEDIA_URL` is reachable and uploaded media uses persistent storage. The local Docker path persists media in the `django_media` named volume; Vercel serves only the frontend and does not host Django media.

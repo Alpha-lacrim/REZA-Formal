@@ -1,6 +1,20 @@
 import { Order, Product, SiteSettings, User } from '../types';
 
-const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
+const API_BASE = (import.meta.env.VITE_API_BASE || '').trim().replace(/\/+$/, '');
+
+function apiUrl(path: string): string {
+  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
+
+  if (!API_BASE) return normalizedPath;
+
+  // Accept both an origin (https://api.example.com) and an API prefix (/api)
+  // without producing paths such as /api/api/products/.
+  if (API_BASE.endsWith('/api') && (normalizedPath === '/api' || normalizedPath.startsWith('/api/'))) {
+    return `${API_BASE}${normalizedPath.slice(4)}`;
+  }
+
+  return `${API_BASE}${normalizedPath}`;
+}
 
 function toNumber(value: unknown, fallback = 0): number {
   const n = Number(value);
@@ -94,25 +108,39 @@ function normalizeSettings(raw: any): SiteSettings {
   };
 }
 
-async function request(path: string, opts: RequestInit = {}) {
-  const headers: Record<string, string> = { 
-    'Content-Type': 'application/json', 
-    ...(opts.headers as any || {}) 
-  };
-  
-  let res = await fetch(API_BASE + path, { ...opts, headers, credentials: 'include' });
-  let text = await res.text();
+const NO_AUTO_REFRESH_PATHS = new Set([
+  '/api/auth/login/',
+  '/api/auth/register/',
+  '/api/auth/refresh/',
+  '/api/auth/logout/',
+  '/api/auth/google/',
+]);
 
-  const contentType = res.headers.get('content-type') || '';
-  const looksLikeHtml = contentType.includes('text/html') || text.trim().startsWith('<!DOCTYPE html');
+async function fetchApi(path: string, opts: RequestInit): Promise<Response> {
+  const requestOptions = { ...opts, credentials: 'include' as RequestCredentials };
+  let response = await fetch(apiUrl(path), requestOptions);
 
-  if (res.status === 404 || looksLikeHtml) {
-    try {
-      const backend = 'http://localhost:8000';
-      res = await fetch(backend + path, { ...opts, headers, credentials: 'include' });
-      text = await res.text();
-    } catch (e) { }
+  if (response.status === 401 && !NO_AUTO_REFRESH_PATHS.has(path)) {
+    const refreshResponse = await fetch(apiUrl('/api/auth/refresh/'), {
+      method: 'POST',
+      credentials: 'include',
+    });
+    if (refreshResponse.ok) {
+      response = await fetch(apiUrl(path), requestOptions);
+    }
   }
+
+  return response;
+}
+
+async function request(path: string, opts: RequestInit = {}) {
+  const headers = new Headers(opts.headers);
+  if (opts.body && !(opts.body instanceof FormData) && !headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const res = await fetchApi(path, { ...opts, headers });
+  const text = await res.text();
 
   let data: any = null;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
@@ -145,36 +173,31 @@ export const api = {
   },
   async logout() { return await request('/api/auth/logout/', { method: 'POST' }); },
   async me() { return normalizeUser(await request('/api/auth/me/')); },
-  async sendOtp(email: string) { return await request('/api/auth/send-otp/', { method: 'POST', body: JSON.stringify({ email }) }); },
   async createOrder(payload: any) { return normalizeOrder(await request('/api/orders/create/', { method: 'POST', body: JSON.stringify(payload) })); },
   async myOrders() { return (await request('/api/orders/my/')).map(normalizeOrder); },
   async cancelOrder(id: string) { return normalizeOrder(await request('/api/orders/' + id + '/cancel/', { method: 'POST' })); },
-  async getCart() { return await request('/api/cart/'); },
-  async addToCart(product_id: string, qty = 1) { return await request('/api/cart/add/', { method: 'POST', body: JSON.stringify({ product_id, qty }) }); },
-  async updateCartItem(product_id: string, qty: number) { return await request('/api/cart/update/', { method: 'POST', body: JSON.stringify({ product_id, qty }) }); },
-  async clearCart() { return await request('/api/cart/clear/', { method: 'POST' }); },
   async getSettings() { return normalizeSettings(await request('/api/settings/')); },
   async saveSettings(data: any) {
     // If caller provided FormData, send multipart PUT without forcing JSON headers
     if (data instanceof FormData) {
-      const send = async (base: string) => {
-        const res = await fetch(base + '/api/settings/', { method: 'PUT', body: data, credentials: 'include' });
+      const send = async () => {
+        const res = await fetchApi('/api/settings/', { method: 'PUT', body: data });
         const text = await res.text();
         let parsed: any = null;
         try { parsed = text ? JSON.parse(text) : null; } catch { parsed = text; }
-        if (!res.ok) throw { status: res.status, data: parsed };
+        if (!res.ok) {
+          const error = new Error(parsed?.detail || parsed?.message || 'Request failed') as Error & { status?: number; data?: unknown };
+          error.status = res.status;
+          error.data = parsed;
+          throw error;
+        }
         return normalizeSettings(parsed);
       };
-      const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
-      try { return await send(API_BASE); } catch (e: any) { const backend = 'http://localhost:8000'; return await send(backend); }
+      return await send();
     }
     return normalizeSettings(await request('/api/settings/', { method: 'PUT', body: JSON.stringify(data) }));
   },
   async contact(name: string, email: string, message: string) { return await request('/api/contact/', { method: 'POST', body: JSON.stringify({ name, email, message }) }); },
-  async googleAuth(id_token: string) {
-    const data = await request('/api/auth/google/', { method: 'POST', body: JSON.stringify({ id_token }) });
-    return data?.user ? { ...data, user: normalizeUser(data.user) } : normalizeUser(data);
-  },
   async updateProfile(payload: any) { return normalizeUser(await request('/api/auth/me/update/', { method: 'PUT', body: JSON.stringify(payload) })); },
 
   async adminGetStats() { return await request('/api/admin/stats/'); },
@@ -221,29 +244,27 @@ export const api = {
       const path = id ? '/api/admin/products/' + id + '/' : '/api/admin/products/';
       const method = id ? 'PUT' : 'POST';
 
-      const send = async (base: string) => {
+      const send = async () => {
         // IMPORTANT: NO headers. Let browser set Content-Type
-        const res = await fetch(base + path, { 
+        const res = await fetchApi(path, {
             method: method, 
-            body: payload, 
-            credentials: 'include' 
+            body: payload,
         });
         
         const text = await res.text();
         let data: any = null;
         try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
-        if (!res.ok) throw { status: res.status, data };
+        if (!res.ok) {
+          const error = new Error(data?.detail || data?.message || 'Request failed') as Error & { status?: number; data?: unknown };
+          error.status = res.status;
+          error.data = data;
+          throw error;
+        }
         return normalizeProduct(data);
       };
 
-      const API_BASE = (import.meta.env?.VITE_API_BASE as string) || 'http://localhost:8000';
-      try {
-        return await send(API_BASE);
-      } catch (e: any) {
-        const backend = 'http://localhost:8000';
-        return await send(backend);
-      }
+      return await send();
     }
 
     if (product.id) return normalizeProduct(await request('/api/admin/products/' + product.id + '/', { method: 'PUT', body: JSON.stringify(product) }));

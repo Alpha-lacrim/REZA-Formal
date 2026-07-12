@@ -2,14 +2,24 @@ import os
 from pathlib import Path
 import environ
 from datetime import timedelta
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-env = environ.Env(DEBUG=(bool, False))
+env = environ.Env()
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
 
-SECRET_KEY = env('DJANGO_SECRET_KEY', default='change-me')
-DEBUG = env('DEBUG')
+DEBUG = env.bool('DEBUG', default=False)
+SECRET_KEY = env('DJANGO_SECRET_KEY', default='').strip()
+if not SECRET_KEY:
+    if DEBUG:
+        SECRET_KEY = 'django-insecure-development-only-key'
+    else:
+        raise ImproperlyConfigured('DJANGO_SECRET_KEY must be set when DEBUG is false')
+
+if not DEBUG and SECRET_KEY in {'change-me', 'change-me-to-a-secure-key', 'change-me-for-local-docker'}:
+    raise ImproperlyConfigured('DJANGO_SECRET_KEY must not use a documented placeholder in production')
+
 allowed_hosts = env('ALLOWED_HOSTS', default='localhost,127.0.0.1,0.0.0.0,backend')
 ALLOWED_HOSTS = [host.strip() for host in allowed_hosts.split(',') if host.strip()]
 
@@ -89,9 +99,10 @@ USE_I18N = True
 USE_TZ = True
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATIC_ROOT = BASE_DIR / 'staticfiles'
 MEDIA_URL = env('MEDIA_URL', default='/media/')
-MEDIA_ROOT = env('MEDIA_ROOT', default=os.path.join(BASE_DIR, 'media'))
+media_root = Path(env('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
+MEDIA_ROOT = media_root if media_root.is_absolute() else BASE_DIR / media_root
 STORAGES = {
     'default': {
         'BACKEND': 'django.core.files.storage.FileSystemStorage',
@@ -117,7 +128,7 @@ REST_FRAMEWORK = {
         'rest_framework_simplejwt.authentication.JWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
-        'rest_framework.permissions.AllowAny',
+        'rest_framework.permissions.IsAuthenticated',
     ),
     # Optional: Increase Django REST Framework specific upload limits if needed
     # (Usually falls back to Django settings, but good to know)
@@ -128,35 +139,40 @@ SIMPLE_JWT = {
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
 
+GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='').strip()
+
+
+def _same_site_setting(name, default):
+    value = env(name, default=default).strip().capitalize()
+    if value not in {'Lax', 'Strict'}:
+        raise ImproperlyConfigured(
+            f'{name} must be Lax or Strict; SameSite=None is unsafe until '
+            'cookie-authenticated API requests enforce CSRF tokens'
+        )
+    return value
+
+
+AUTH_COOKIE_SECURE = env.bool('AUTH_COOKIE_SECURE', default=not DEBUG)
+AUTH_COOKIE_SAMESITE = _same_site_setting('AUTH_COOKIE_SAMESITE', 'Lax')
+AUTH_REFRESH_COOKIE_SAMESITE = _same_site_setting('AUTH_REFRESH_COOKIE_SAMESITE', 'Strict')
+
 # CORS: allow React dev origin by default
 cors_origins = env('ALLOWED_ORIGINS', default='http://localhost:3000,http://localhost:3001,http://localhost:5173,http://127.0.0.1:3000,http://127.0.0.1:3001,http://127.0.0.1:5173')
 CORS_ALLOWED_ORIGINS = [o.strip() for o in cors_origins.split(',') if o.strip()]
 csrf_origins = env('CSRF_TRUSTED_ORIGINS', default=cors_origins)
 CSRF_TRUSTED_ORIGINS = [o.strip() for o in csrf_origins.split(',') if o.strip().startswith(('http://', 'https://'))]
 
-# Allow cookies to be sent cross-site for auth (required for cookie-based JWT)
+# Allow credentialed requests from explicitly configured frontend origins.
 CORS_ALLOW_CREDENTIALS = True
 
-# Patch for mssql-django: SQL Server v17 compatibility
-# mssql-django doesn't officially support SQL Server 2025 (v17)
-# but it works the same as 2022 (v16), so we override the version check
-def _patch_mssql_version_check():
-    try:
-        import mssql.base
-        from functools import lru_cache
-        
-        @lru_cache(maxsize=1)
-        def patched_sql_server_version(self):
-            # Get the actual version
-            with self.cursor() as cursor:
-                cursor.execute("SELECT CAST(SERVERPROPERTY('ProductMajorVersion') AS INT)")
-                actual_ver = cursor.fetchone()[0] or 15
-            # If version > 16 (SQL 2022), cap it at 16 for compatibility
-            return min(actual_ver, 16)
-        
-        # Replace the version property
-        mssql.base.DatabaseWrapper.sql_server_version = property(lambda self: patched_sql_server_version(self))
-    except Exception:
-        pass
-
-_patch_mssql_version_check()
+# HTTPS/security controls are configurable so local HTTP remains usable. In a
+# production environment, terminate TLS at the app or a trusted proxy and turn
+# on redirect/HSTS explicitly after confirming the deployment topology.
+SESSION_COOKIE_SECURE = env.bool('SESSION_COOKIE_SECURE', default=not DEBUG)
+CSRF_COOKIE_SECURE = env.bool('CSRF_COOKIE_SECURE', default=not DEBUG)
+SECURE_SSL_REDIRECT = env.bool('SECURE_SSL_REDIRECT', default=False)
+SECURE_HSTS_SECONDS = env.int('SECURE_HSTS_SECONDS', default=0)
+SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', default=False)
+SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)
+if env.bool('TRUST_X_FORWARDED_PROTO', default=False):
+    SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')

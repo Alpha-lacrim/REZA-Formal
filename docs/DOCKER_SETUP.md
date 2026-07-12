@@ -1,52 +1,113 @@
-# Docker Setup
+# Docker setup
 
-Run these commands from the project root:
+Run the full local stack from the repository root.
+
+## 1. Configure the environment
 
 ```powershell
-cd C:\Users\Pouyan\REZA_Formal_Website\REZA-Formal
 Copy-Item .env.docker.example .env
+```
+
+Edit `.env` before starting. These values are required:
+
+- `DJANGO_SECRET_KEY`: a long random Django signing key
+- `DB_PASSWORD`: a strong SQL Server `sa` password containing uppercase, lowercase, number, and symbol
+
+Compose rejects empty values instead of silently using checked-in credentials.
+
+Admin creation is optional. Set both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` to create a local admin during `seed_data`; leave both empty to skip it. `DJANGO_SUPERUSER_USERNAME` defaults to `admin`.
+
+Do not commit `.env`.
+
+## 2. Build and start
+
+```powershell
+docker compose config --quiet
 docker compose up --build
 ```
 
-Then open:
+Open:
 
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000/api/products/
 - Django admin: http://localhost:8000/admin/
 
-Default local Docker credentials:
-
-- Email: `admin@reza.com`
-- Password: `admin`
-
 ## Services
 
-- `db`: SQL Server 2022 Developer container with persistent `mssql_data`.
-- `backend`: Django REST API using Gunicorn, SQL Server ODBC Driver 18, automatic DB create, migrations, static collection, and seed data.
-- `frontend`: Vite production build served by Nginx. Nginx proxies `/api/` and `/media/` to the backend service.
+- `db`: SQL Server 2022 Developer with the persistent `mssql_data` volume.
+- `backend`: installs ODBC Driver 18, waits for SQL Server with `pyodbc`, optionally creates the database, applies migrations, collects static assets, seeds idempotent data, and starts Gunicorn.
+- `frontend`: builds the Vite application and serves it with Nginx. Nginx proxies `/api/` and `/media/` to the backend service.
 
-## Useful Commands
+SQL Server and the direct Django port are published only on `127.0.0.1`. The frontend is published on `FRONTEND_PORT` and containers use the private Compose network internally.
+
+`VITE_API_BASE=/api` is valid for the container build: the frontend API helper recognizes the prefix without duplicating `/api`, and Nginx forwards those requests to Django.
+
+## Useful commands
 
 ```powershell
 docker compose ps
+docker compose logs -f db
 docker compose logs -f backend
 docker compose logs -f frontend
+docker compose up -d --build
 docker compose down
+```
+
+To rebuild only one service:
+
+```powershell
+docker compose build backend
+docker compose up -d backend
+```
+
+To delete the database, uploaded-media, and collected-static volumes and start from scratch:
+
+```powershell
 docker compose down -v
 ```
 
-Use `docker compose down -v` only when you want to delete Docker database/media volumes and start fresh.
+`down -v` permanently removes local container data; use it only when a reset is intended.
 
-## Configuration
+## Configuration reference
 
-Docker Compose reads `.env` from the project root. The important values are:
+Common root `.env` settings:
 
-```env
-DB_PASSWORD=RezaFormal!2026
-FRONTEND_PORT=3000
-BACKEND_PORT=8000
-MSSQL_PORT=1433
-VITE_API_BASE=/api
-```
+| Variable | Purpose | Default |
+| --- | --- | --- |
+| `DJANGO_SECRET_KEY` | Django signing secret | Required |
+| `DB_PASSWORD` | Shared SQL Server/Django password | Required |
+| `DB_NAME` | Application database | `reza` |
+| `FRONTEND_PORT` | Host storefront port | `3000` |
+| `BACKEND_PORT` | Host Django port | `8000` |
+| `MSSQL_PORT` | Host SQL Server port | `1433` |
+| `DB_WAIT_TIMEOUT` | Backend startup wait in seconds | `180` |
+| `RUN_MIGRATIONS` | Apply migrations at backend startup | `true` |
+| `RUN_COLLECTSTATIC` | Collect Django static files | `true` |
+| `RUN_SEED_DATA` | Run idempotent product/settings/admin seed | `true` |
+| `DB_AUTO_CREATE` | Create `DB_NAME` when absent | `true` |
+| `VITE_API_BASE` | Frontend API origin or prefix | `/api` |
+| `GOOGLE_OAUTH_CLIENT_ID` | Backend Google token audience; blank disables it | Blank |
+| `AUTH_COOKIE_SECURE` | Send JWT cookies only over HTTPS | `False` locally |
+| `AUTH_COOKIE_SAMESITE` | Access-cookie SameSite policy (`Lax` or `Strict`) | `Lax` |
+| `AUTH_REFRESH_COOKIE_SAMESITE` | Refresh-cookie SameSite policy | `Strict` |
+| `TRUST_X_FORWARDED_PROTO` | Trust a proxy's forwarded HTTPS scheme | `False` |
 
-If a port is already in use, change the matching value in `.env` before running Compose.
+For a non-local deployment, also review `DJANGO_DEBUG`, `ALLOWED_HOSTS`, `ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, cookie/HTTPS/HSTS controls, encryption options, persistent media storage, and the seeded-admin settings. Enable secure cookies and redirects only after HTTPS and trusted proxy forwarding are verified, or login redirect/cookie loops can result.
+
+## Troubleshooting
+
+### Compose reports a required variable is missing
+
+Set non-empty `DJANGO_SECRET_KEY` and `DB_PASSWORD` values in the root `.env`. Confirm that you are running Compose from the repository root.
+
+### SQL Server never becomes ready
+
+Check `docker compose logs db` first. SQL Server rejects passwords that do not satisfy its complexity policy. If credentials were changed after the data volume was created, the existing SQL Server instance still has the original password; restore it or intentionally reset with `docker compose down -v`.
+
+### Port is already in use
+
+Change `FRONTEND_PORT`, `BACKEND_PORT`, or `MSSQL_PORT` in `.env`, then restart Compose.
+
+### Frontend receives API errors
+
+Check `docker compose logs backend`, then confirm `VITE_API_BASE=/api` and rebuild the frontend because Vite environment variables are embedded at build time.

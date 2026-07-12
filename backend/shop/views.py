@@ -5,17 +5,24 @@ from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from .models import Product, Order, OrderItem, ContactMessage, SiteSettings
-from .serializers import ProductSerializer, OrderSerializer, ContactMessageSerializer, SiteSettingsSerializer, CreateOrderSerializer
+from .serializers import (
+    ContactMessageSerializer,
+    CreateOrderSerializer,
+    OrderSerializer,
+    ProductSerializer,
+    RegisterSerializer,
+    SiteSettingsSerializer,
+)
 from django.contrib.auth import get_user_model
+from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
 import pyotp
-from django.utils import timezone
 import uuid
 from django.conf import settings
-import jwt
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.db import transaction
+from django.db.models import F
 import os
 import json
 import logging
@@ -23,9 +30,78 @@ import logging
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
+
+class InvalidGoogleToken(Exception):
+    pass
+
+
+class GoogleTokenVerificationUnavailable(Exception):
+    pass
+
+
+def _verify_google_token(raw_id_token, client_id):
+    try:
+        from google.auth.exceptions import GoogleAuthError, TransportError
+        from google.auth.transport import requests as google_requests
+        from google.oauth2 import id_token as google_id_token
+    except ImportError as exc:
+        raise GoogleTokenVerificationUnavailable from exc
+
+    try:
+        return google_id_token.verify_oauth2_token(
+            raw_id_token,
+            google_requests.Request(),
+            client_id,
+        )
+    except TransportError as exc:
+        raise GoogleTokenVerificationUnavailable from exc
+    except (GoogleAuthError, ValueError) as exc:
+        raise InvalidGoogleToken from exc
+
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+
+
+def _set_auth_cookies(response, tokens):
+    cookie_options = {
+        'httponly': True,
+        'secure': settings.AUTH_COOKIE_SECURE,
+        'path': '/',
+    }
+    response.set_cookie(
+        'access',
+        tokens['access'],
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        **cookie_options,
+    )
+    response.set_cookie(
+        'refresh',
+        tokens['refresh'],
+        samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
+        **cookie_options,
+    )
+
+
+def _clear_auth_cookies(response):
+    response.delete_cookie(
+        'access',
+        path='/',
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+    )
+    response.delete_cookie(
+        'refresh',
+        path='/',
+        samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
+    )
+
+
+def _unique_username(email):
+    base = email.split('@', 1)[0][:120] or 'user'
+    username = base
+    while User.objects.filter(username=username).exists():
+        username = f'{base}_{uuid.uuid4().hex[:8]}'
+    return username
 
 
 def serialize_user(user):
@@ -170,28 +246,38 @@ def prepare_product_data(request):
 # ==============================================================================
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def register(request):
-    data = request.data
-    email = (data.get('email') or '').strip().lower()
-    password = data.get('password') or ''
-    if not email or not password:
-        return Response({'detail': 'Email and password are required'}, status=400)
+    serializer = RegisterSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+
+    data = serializer.validated_data
+    email = data['email'].strip().lower()
     if User.objects.filter(email__iexact=email).exists():
         return Response({'detail':'Email already exists'}, status=400)
-    username_base = email.split('@')[0][:140] or f'user_{uuid.uuid4().hex[:8]}'
-    username = username_base
-    if User.objects.filter(username=username).exists():
-        username = f'{username_base[:120]}_{uuid.uuid4().hex[:8]}'
-    user = User.objects.create_user(username=username, email=email, password=password)
-    user.first_name = data.get('first_name', '')
-    user.save()
-    return Response({'detail':'registered', 'user': serialize_user(user)})
+    user = User.objects.create_user(
+        username=_unique_username(email),
+        email=email,
+        password=data['password'],
+        first_name=data.get('first_name', ''),
+    )
+    tokens = get_tokens_for_user(user)
+    response = Response(
+        {'detail': 'registered', 'user': serialize_user(user)},
+        status=status.HTTP_201_CREATED,
+    )
+    _set_auth_cookies(response, tokens)
+    return response
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def login(request):
-    email = request.data.get('email')
-    password = request.data.get('password')
+    email = str(request.data.get('email') or '').strip()
+    password = request.data.get('password') or ''
     otp = request.data.get('otp')
+    if not email or not password:
+        return Response({'detail': 'Email and password are required'}, status=400)
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
@@ -207,9 +293,7 @@ def login(request):
             return Response({'detail':'Invalid 2FA code'}, status=403)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': serialize_user(user)})
-    secure_flag = not getattr(settings, 'DEBUG', False)
-    resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag, path='/')
-    resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Strict', secure=secure_flag, path='/')
+    _set_auth_cookies(resp, tokens)
     return resp
 
 @api_view(['GET'])
@@ -220,11 +304,38 @@ def me(request):
     return Response(serialize_user(user))
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def logout_view(request):
     resp = Response({'detail': 'logged out'})
-    resp.delete_cookie('access', path='/', samesite='Lax')
-    resp.delete_cookie('refresh', path='/', samesite='Strict')
+    _clear_auth_cookies(resp)
     return resp
+
+
+@api_view(['POST'])
+@permission_classes([permissions.AllowAny])
+def refresh_auth(request):
+    raw_refresh = request.COOKIES.get('refresh')
+    if not raw_refresh:
+        return Response({'detail': 'Refresh token required'}, status=401)
+
+    try:
+        refresh = RefreshToken(raw_refresh)
+        access = str(refresh.access_token)
+    except TokenError:
+        response = Response({'detail': 'Invalid or expired refresh token'}, status=401)
+        _clear_auth_cookies(response)
+        return response
+
+    response = Response({'detail': 'refreshed'})
+    response.set_cookie(
+        'access',
+        access,
+        httponly=True,
+        secure=settings.AUTH_COOKIE_SECURE,
+        samesite=settings.AUTH_COOKIE_SAMESITE,
+        path='/',
+    )
+    return response
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
@@ -243,50 +354,63 @@ def update_profile(request):
     return Response(serialize_user(user))
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def google_auth(request):
-    id_token = request.data.get('id_token')
-    if not id_token:
+    raw_id_token = request.data.get('id_token')
+    if not raw_id_token:
         return Response({'detail': 'id_token required'}, status=400)
+
+    client_id = settings.GOOGLE_OAUTH_CLIENT_ID
+    if not client_id:
+        logger.error('Google authentication requested without GOOGLE_OAUTH_CLIENT_ID')
+        return Response({'detail': 'Google authentication is not configured'}, status=503)
+
     try:
-        payload = jwt.decode(id_token, options={"verify_signature": False})
-        email = payload.get('email')
-        name = payload.get('name') or (email.split('@')[0] if email else 'google_user')
-    except Exception:
+        payload = _verify_google_token(raw_id_token, client_id)
+    except GoogleTokenVerificationUnavailable:
+        logger.warning('Google token verification service is unavailable')
+        return Response({'detail': 'Google authentication is temporarily unavailable'}, status=503)
+    except InvalidGoogleToken:
         return Response({'detail': 'Invalid id_token'}, status=400)
-    try:
-        user = User.objects.get(email__iexact=email)
-    except User.DoesNotExist:
-        username = email.split('@')[0] if email else f'google_{uuid.uuid4().hex[:8]}'
-        user = User.objects.create_user(username=username, email=email, password=None)
-        user.first_name = name
-        user.save()
+
+    email = str(payload.get('email') or '').strip().lower()
+    if not email or payload.get('email_verified') is not True or not payload.get('sub'):
+        return Response({'detail': 'Google account email is not verified'}, status=400)
+
+    user = User.objects.filter(email__iexact=email).first()
+    if user is None:
+        name = str(payload.get('name') or email.split('@', 1)[0])[:150]
+        user = User.objects.create_user(
+            username=_unique_username(email),
+            email=email,
+            password=None,
+            first_name=name,
+        )
+    if not user.is_active:
+        return Response({'detail': 'Account is disabled'}, status=403)
+
     tokens = get_tokens_for_user(user)
     resp = Response({'user': serialize_user(user)})
-    secure_flag = not getattr(settings, 'DEBUG', False)
-    resp.set_cookie('access', tokens['access'], httponly=True, samesite='Lax', secure=secure_flag)
-    resp.set_cookie('refresh', tokens['refresh'], httponly=True, samesite='Lax', secure=secure_flag)
+    _set_auth_cookies(resp, tokens)
     return resp
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def send_otp(request):
-    email = request.data.get('email')
-    try:
-        user = User.objects.get(email__iexact=email)
-    except User.DoesNotExist:
-        return Response({'detail':'User not found'}, status=404)
-    if not user.two_factor_secret:
-        user.two_factor_secret = pyotp.random_base32()
-        user.save()
-    totp = pyotp.TOTP(user.two_factor_secret)
-    return Response({'otp': totp.now()})
+    # Never return a second-factor code to the same unauthenticated client.
+    # A real implementation must deliver a short-lived code through a separately
+    # verified channel (or use an authenticator-app enrollment flow).
+    return Response({'detail': 'OTP delivery is not configured'}, status=501)
 
 @api_view(['GET'])
+@permission_classes([permissions.AllowAny])
 def products_list(request):
     qs = Product.objects.all()
     serializer = ProductSerializer(qs, many=True, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['GET','POST','PUT','DELETE'])
+@permission_classes([permissions.AllowAny])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def product_detail(request, pk=None):
     if request.method == 'GET':
@@ -300,7 +424,7 @@ def product_detail(request, pk=None):
         data = prepare_product_data(request)
 
         if request.method == 'POST':
-             data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
+             data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
              serializer = ProductSerializer(data=data)
         else: # PUT
              prod = get_object_or_404(Product, pk=pk)
@@ -308,7 +432,11 @@ def product_detail(request, pk=None):
 
         if serializer.is_valid():
             serializer.save()
-            return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
+            response_status = status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK
+            return Response(
+                ProductSerializer(serializer.instance, context={'request': request}).data,
+                status=response_status,
+            )
         
         logger.warning('Product detail error: %s', serializer.errors)
         return Response(serializer.errors, status=400)
@@ -343,7 +471,7 @@ def create_order(request):
                 return Response({'detail': f'Insufficient stock for {product.name}'}, status=400)
 
         total = sum(products_by_id[product_id].price * qty for product_id, qty in quantities.items())
-        order_id = 'ORD-' + str(uuid.uuid4())[:8]
+        order_id = f'ORD-{uuid.uuid4().hex[:28]}'
         order = Order.objects.create(id=order_id, user=request.user, total=total, shipping_address=shipping_address)
 
         for product_id, qty in quantities.items():
@@ -372,9 +500,8 @@ def cancel_order(request, pk):
             return Response({'detail': 'Only pending orders can be cancelled'}, status=400)
 
         for item in order.items.select_related('product').all():
-            if item.product:
-                item.product.stock = (item.product.stock or 0) + item.qty
-                item.product.save(update_fields=['stock'])
+            if item.product_id:
+                Product.objects.filter(pk=item.product_id).update(stock=F('stock') + item.qty)
 
         order.status = 'cancelled'
         order.save(update_fields=['status'])
@@ -382,6 +509,7 @@ def cancel_order(request, pk):
     return Response(OrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET','PUT'])
+@permission_classes([permissions.AllowAny])
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def site_settings(request):
     settings = SiteSettings.objects.first()
@@ -418,6 +546,7 @@ def site_settings(request):
     return Response(serializer.errors, status=400)
 
 @api_view(['POST'])
+@permission_classes([permissions.AllowAny])
 def contact(request):
     serializer = ContactMessageSerializer(data=request.data)
     if serializer.is_valid():
@@ -451,20 +580,23 @@ def admin_orders(request):
 def admin_update_order_status(request, pk):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
-    order = get_object_or_404(Order, pk=pk)
     status_val = request.data.get('status')
     if status_val not in dict(Order.STATUS):
         return Response({'detail':'invalid status'}, status=400)
-    if order.status == 'cancelled' and status_val != 'cancelled':
-        return Response({'detail':'cancelled orders cannot be reopened'}, status=400)
-    if status_val == 'cancelled' and order.status != 'cancelled':
-        for item in order.items.all():
-            prod = item.product
-            if prod:
-                prod.stock = (prod.stock or 0) + item.qty
-                prod.save()
-    order.status = status_val
-    order.save()
+
+    with transaction.atomic():
+        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
+        if order.status == 'cancelled' and status_val != 'cancelled':
+            return Response({'detail':'cancelled orders cannot be reopened'}, status=400)
+        if status_val == 'cancelled' and order.status != 'cancelled':
+            for item in order.items.select_related('product').all():
+                if item.product_id:
+                    Product.objects.filter(pk=item.product_id).update(
+                        stock=F('stock') + item.qty
+                    )
+        order.status = status_val
+        order.save(update_fields=['status'])
+
     return Response(OrderSerializer(order).data)
 
 @api_view(['GET'])
@@ -515,13 +647,16 @@ def admin_products(request):
     # 1. Prepare data (this leaves 'image' as a File, but handles 'images' list)
     data = prepare_product_data(request)
 
-    data['id'] = data.get('id') or f'prod-{int(timezone.now().timestamp())}'
+    data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
     
     # 2. Pass 'image' FILE to serializer. ImageField will handle it.
     serializer = ProductSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         serializer.save()
-        return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
+        return Response(
+            ProductSerializer(serializer.instance, context={'request': request}).data,
+            status=status.HTTP_201_CREATED,
+        )
     
     logger.warning('Product admin create error: %s', serializer.errors)
     return Response(serializer.errors, status=400)

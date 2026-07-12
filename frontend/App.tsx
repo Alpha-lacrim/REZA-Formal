@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { HashRouter, Routes, Route } from 'react-router-dom';
+import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { GlobalProvider, useGlobal } from './contexts/GlobalContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -27,6 +27,20 @@ const Toast = () => {
     );
 };
 
+const ProtectedRoute: React.FC<{ adminOnly?: boolean; children: React.ReactElement }> = ({ adminOnly = false, children }) => {
+    const { user, isAuthLoading } = useGlobal();
+
+    if (isAuthLoading) {
+        return <PageLoader />;
+    }
+
+    if (!user || (adminOnly && user.role !== 'admin')) {
+        return <Navigate to="/" replace />;
+    }
+
+    return children;
+};
+
 const AppContent = () => {
     return (
         <HashRouter>
@@ -37,8 +51,8 @@ const AppContent = () => {
                     <Route path="/catalog" element={<CatalogPage />} />
                     <Route path="/product/:id" element={<ProductPage />} />
                     <Route path="/cart" element={<CartPage />} />
-                    <Route path="/admin" element={<AdminPanel />} />
-                    <Route path="/profile" element={<UserPanel />} />
+                    <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPanel /></ProtectedRoute>} />
+                    <Route path="/profile" element={<ProtectedRoute><UserPanel /></ProtectedRoute>} />
                     <Route path="/wishlist" element={<WishlistPage />} />
                     <Route path="/about" element={<AboutPage />} />
                     <Route path="/bespoke" element={<BespokePage />} />

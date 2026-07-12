@@ -6,7 +6,7 @@ import { useGlobal } from '../contexts/GlobalContext';
 import { formatPrice, toPersianDigits } from '../utils';
 import { CartItem } from '../types';
 import api from '../services/api';
-import { products as fallbackProducts } from '../data';
+import SEO from '../components/SEO';
 
 const CartPage: React.FC = () => {
     const { cart, updateQty, removeFromCart, user, setAuthModalOpen, clearCart, showToast, products: contextProducts, refreshProducts } = useGlobal();
@@ -17,7 +17,7 @@ const CartPage: React.FC = () => {
     const [error, setError] = useState('');
 
     const resolveProduct = (id: string) => {
-        return contextProducts.find(p => p.id === id) || fallbackProducts.find(p => p.id === id);
+        return contextProducts.find(p => p.id === id);
     };
 
     const cartItems = Object.entries(cart).map(([id, qty]) => {
@@ -65,6 +65,7 @@ const CartPage: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-900 pt-20">
+            <SEO title="Shopping cart" />
             <header className="relative text-center bg-lux-black text-white py-8 overflow-hidden">
                 <div className="relative mx-auto w-full max-w-4xl px-4 z-10">
                     <h1 className="font-serif text-3xl md:text-5xl mb-2">سبد خرید</h1>

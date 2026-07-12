@@ -1,42 +1,58 @@
-## Purpose
-This file gives fast, actionable context for AI coding agents working on this repo so suggestions and code edits align with project structure and conventions.
+# AI contributor instructions
 
-### Big picture
-- Vite + React single-page app. Entry is `index.tsx` / `App.tsx`.
-- State and cross-app actions are centralized in `contexts/GlobalContext.tsx` (cart, auth, products, site settings, theme, toasts).
-- `services/db.ts` is the single simulated backend: it reads/writes to `localStorage` and implements auth (including 2FA), product CRUD, orders, messages and site settings.
-- UI pages live in `pages/` and small UI pieces are under `components/`. Admin UI that exercises most backend flows is `pages/AdminPanel.tsx`.
+## Start here
 
-### Important patterns & conventions (do not change lightly)
-- Single-source-of-truth backend is `services/db.ts`. Prefer adding/updating methods there for data changes rather than touching localStorage elsewhere.
-- Local storage keys use repo prefixes (e.g. `reza_cart_v1`, `reza_session_v1`) and constants inside `services/db.ts` (K_USERS, K_PRODUCTS...). Keep migrations additive.
-- Sanitization: `db.sanitize()` is applied to user-supplied strings; follow that pattern when adding new text fields.
-- Images: AdminPanel supports uploading images as data URLs (FileReader) and `db.isValidUrl()` accepts `data:image/` URIs — store image data directly when appropriate.
-- Auth: an admin user is auto-created on first run (`admin@reza.com`, password `admin`). Default 2FA secret is `DEFAULT_ADMIN_2FA_SECRET` in `services/db.ts`.
+Before changing the repository, read and follow root `AGENTS.md`, then use `Codex.md` for maintained project context and `Handoff.md` for the latest completed/incomplete work. Update the continuity files as directed by `AGENTS.md` at the start and end of each session.
 
-### Dev / build / run
-- Install: `npm install`
-- Dev server: `npm run dev` (Vite)
-- Build: `npm run build`
-- Preview built site: `npm run preview`
-- No external runtime env vars are required for local dev. The project has `firebase` listed in `package.json` but there is no runtime Firebase usage in source files — treat as an unused dependency unless you discover otherwise.
+## Architecture
 
-### Integration points & testing notes
-- `services/db.ts` is the place to simulate or wire a real backend. If replacing with a real API, keep the same method signatures used by `GlobalContext` and `pages/*`.
-- `GlobalContext` uses `db` methods directly; changes to `db` signatures require updating context wrappers.
-- Admin flows (product save/delete, settings upload, order status) are exercised in `pages/AdminPanel.tsx` — use this page for manual testing after code changes.
+- `frontend/` is the React 19 + TypeScript + Vite single-page application. Its entry points are `frontend/index.tsx` and `frontend/App.tsx`.
+- `backend/` is the Django REST API. URL routing starts in `backend/reza_backend/urls.py` and `backend/shop/urls.py`.
+- Microsoft SQL Server is the persistent database through `mssql-django` and `pyodbc`.
+- `frontend/services/api.ts` is the primary data/auth integration. It normalizes Django responses to the frontend types and sends cookie-authenticated requests.
+- `frontend/services/db.ts` is a legacy/local fallback. It supplies fallback products and some admin fallbacks; it is not the authoritative production backend.
+- `frontend/contexts/GlobalContext.tsx` owns cross-application state and actions. Cart, wishlist, and theme preferences are intentionally browser-local; accounts, products, orders, messages, and site settings use the API where implemented.
 
-### Helpful file references (quick)
-- `services/db.ts` — simulated backend and localStorage schema
-- `contexts/GlobalContext.tsx` — app-level state, methods used by UI
-- `pages/AdminPanel.tsx` — admin CRUD + settings + file upload examples
-- `components/*` — reusable UI; follow existing styling and toast usage (`showToast`)
-- `types.ts` — canonical types for Product, User, Order, SiteSettings
-- `data.ts` — seed products used at first run
+## Integration rules
 
-### Examples agents should follow
-- To add a new product field: update `types.ts`, accept and sanitize it in `db.saveProduct()`, and surface it in `pages/AdminPanel.tsx` and `ProductCard.tsx`.
-- To change admin credentials/2FA seed: edit `DEFAULT_ADMIN_2FA_SECRET` in `services/db.ts`. Remember this file also bootstraps the admin user on first run.
-- To add a backend endpoint replacement: implement a new module that exposes the same functions as `db` and switch `GlobalContext` to import that module.
+- Keep frontend request paths aligned with `backend/shop/urls.py`. When an endpoint or payload changes, update the Django view/serializer and `frontend/services/api.ts` together.
+- Keep normalization at the API boundary. Django generally returns snake_case fields; React types in `frontend/types.ts` generally use camelCase.
+- Authentication uses JWT cookies and `credentials: 'include'`. Cross-origin deployments therefore require matching `ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` values in the backend environment.
+- Product/settings image writes use `FormData`. Do not manually set multipart `Content-Type`; the browser must add its boundary.
+- Treat `frontend/services/db.ts` fallbacks as compatibility behavior. Do not add new authoritative business data to localStorage.
+- Database writes that span validation, stock, and orders should remain atomic and server-authoritative.
 
-If anything here is unclear or you want the instructions to emphasize additional files or workflows, tell me what to add or adjust.
+## Configuration and run paths
+
+- Full local stack: copy `.env.docker.example` to root `.env`, set the required secrets, then run `docker compose up --build`.
+- Backend-only local development: copy `backend/.env.example` to `backend/.env`, install `backend/requirements.txt`, then run Django from `backend/`.
+- Frontend-only local development: run `npm ci` and `npm run dev` from `frontend/`. Vite proxies `/api` and `/media` to `http://localhost:8000`.
+- `VITE_API_BASE` may be an API origin such as `https://api.example.com`, an `/api` prefix, or empty for same-origin requests. Do not append a second `/api` prefix.
+- Root `vercel.json` deploys only the static frontend. The Django/SQL Server backend needs a separate persistent host; set Vercel's `VITE_API_BASE` to that HTTPS origin.
+
+## Verification
+
+- Frontend: `npm run typecheck` and `npm run build` from `frontend/`.
+- Backend tests: `python manage.py test --settings=reza_backend.test_settings` from `backend/`. The isolated settings use an in-memory SQLite database and do not contact the configured SQL Server.
+- Backend: `python manage.py check` and `python manage.py makemigrations --check --dry-run` from `backend/` with a valid environment.
+- Compose shape: set validation-only secret environment variables, then run `docker compose config --quiet` from the repository root.
+- Browser end-to-end tests are not included. Do not recreate the removed one-off credential/cookie login and upload scripts as substitutes.
+
+## Security and repository hygiene
+
+- Never commit `.env` files, API keys, SQL credentials, cookie jars, uploads, database files, build output, virtual environments, or source snapshot archives.
+- Do not publish seeded credentials. `seed_data` creates an admin only when both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` are provided; keep those values outside Git.
+- Do not expose OTP values in production responses or accept unverified third-party identity tokens. These flows require production hardening before public deployment.
+- Do not log access/refresh cookies or full authentication responses.
+
+## Important files
+
+- `frontend/services/api.ts`: API URL handling, request behavior, and response normalization.
+- `frontend/contexts/GlobalContext.tsx`: application state and API/local fallback orchestration.
+- `frontend/types.ts`: canonical frontend domain types.
+- `backend/shop/models.py`: persistent domain model.
+- `backend/shop/serializers.py`: API validation and representation.
+- `backend/shop/views.py` and `backend/shop/urls.py`: API behavior and routes.
+- `backend/shop/tests.py` and `backend/reza_backend/test_settings.py`: hermetic backend API tests and isolated settings.
+- `backend/reza_backend/settings.py`: environment, database, CORS/CSRF, static/media, and auth settings.
+- `docker-compose.yml`, `.env.docker.example`, and `docs/DOCKER_SETUP.md`: full-stack local container workflow.

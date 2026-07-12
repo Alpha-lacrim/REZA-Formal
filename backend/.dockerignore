@@ -5,7 +5,10 @@ __pycache__
 *.pyo
 *.pyd
 .pytest_cache
+.coverage
+htmlcov
 db.sqlite3
 media
 staticfiles
 *.log
+README.md

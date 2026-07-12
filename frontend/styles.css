@@ -139,3 +139,10 @@ input:focus, textarea:focus, select:focus { box-shadow: 0 0 0 3px rgba(197,160,8
 
 /* Subtle hover for links */
 a.transition-color { transition: color 200ms ease, background-color 200ms ease; }
+
+/* Visually hide scrollbars while retaining scroll behavior. */
+.hide-scroll::-webkit-scrollbar { display: none; }
+.hide-scroll {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+}

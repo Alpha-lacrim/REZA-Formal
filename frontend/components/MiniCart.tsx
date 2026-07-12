@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import ImageLoader from './ImageLoader';
 import { X, Plus, Minus, Trash2 } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
-import { products as fallbackProducts } from '../data';
 import { formatPrice, toPersianDigits } from '../utils';
 import { Link } from 'react-router-dom';
 import { CartItem } from '../types';
@@ -35,8 +34,7 @@ const MiniCart: React.FC = () => {
     if (!isCartOpen) return null;
 
     const cartItems = Object.entries(cart).map(([id, qty]) => {
-        // Fallback to static seed if not found in context
-        const product = dbProducts.find(p => p.id === id) || fallbackProducts.find(p => p.id === id);
+        const product = dbProducts.find(p => p.id === id);
         return product ? { ...product, qty } : null;
     }).filter((item): item is CartItem => item !== null);
 

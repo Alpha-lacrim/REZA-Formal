@@ -10,14 +10,12 @@ import SEO from '../components/SEO';
 const ProductPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { addToCart, toggleWishlist, isInWishlist, products: contextProducts } = useGlobal();
+    const { addToCart, toggleWishlist, isInWishlist, products } = useGlobal();
     const [activeTab, setActiveTab] = useState<'desc' | 'reviews'>('desc');
     const [quantity, setQuantity] = useState(1);
     const [selectedImage, setSelectedImage] = useState('');
     
-    // Fallback to static seed if not found in context
-    const { products } = useGlobal();
-    const product = contextProducts.find(p => p.id === id) || products.find(p => p.id === id);
+    const product = products.find(p => p.id === id);
     const relatedProducts = products.filter(p => p.category === product?.category && p.id !== product?.id).slice(0, 4);
 
     const images = product?.images && product.images.length > 0 ? product.images : (product?.image ? [product.image] : []);
@@ -26,7 +24,7 @@ const ProductPage: React.FC = () => {
         window.scrollTo(0, 0);
         setActiveTab('desc');
         setQuantity(1);
-        if (images.length > 0) setSelectedImage(images[0]);
+        setSelectedImage(images[0] || '');
     }, [id, product]);
 
     if (!product) {

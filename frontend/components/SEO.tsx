@@ -24,11 +24,18 @@ const SEO: React.FC<SEOProps> = ({ title, description, image, schema, type = 'we
             element.setAttribute('content', content);
         };
 
+        const removeMeta = (name: string, attribute: 'name' | 'property' = 'name') => {
+            document.querySelector(`meta[${attribute}="${name}"]`)?.remove();
+        };
+
         // Update Meta Description
         if (description) {
             updateMeta('description', description);
             updateMeta('og:description', description, 'property');
             updateMeta('twitter:description', description);
+        } else {
+            removeMeta('og:description', 'property');
+            removeMeta('twitter:description');
         }
 
         // Update Open Graph Image
@@ -36,6 +43,10 @@ const SEO: React.FC<SEOProps> = ({ title, description, image, schema, type = 'we
             updateMeta('og:image', image, 'property');
             updateMeta('twitter:image', image);
             updateMeta('twitter:card', 'summary_large_image');
+        } else {
+            removeMeta('og:image', 'property');
+            removeMeta('twitter:image');
+            removeMeta('twitter:card');
         }
 
         // Update Open Graph Title & Type
@@ -54,6 +65,8 @@ const SEO: React.FC<SEOProps> = ({ title, description, image, schema, type = 'we
                 document.head.appendChild(script);
             }
             script.textContent = JSON.stringify(schema);
+        } else {
+            document.getElementById('schema-json-ld')?.remove();
         }
 
         // Cleanup function (optional, mostly for SPA transitions)

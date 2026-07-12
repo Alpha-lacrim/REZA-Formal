@@ -17,13 +17,12 @@ interface GlobalContextType {
     isInWishlist: (productId: string) => boolean;
 
     user: User | null;
+    isAuthLoading: boolean;
     login: (email: string, pass: string, code?: string) => Promise<void>;
-    loginWithGoogle: (email?: string) => Promise<void>;
     register: (name: string, email: string, pass: string) => Promise<void>;
     logout: () => void;
     updateUserProfile: (data: Partial<User>) => Promise<void>;
     cancelUserOrder: (orderId: string) => Promise<void>;
-    sendOtp: (email: string) => Promise<string>;
     
     products: Product[];
     refreshProducts: () => Promise<void>;
@@ -63,6 +62,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
+    const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
     const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
 
@@ -100,6 +100,8 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 setUser(normalizeUserForContext(me));
             } catch (e) {
                 // not authenticated
+            } finally {
+                setIsAuthLoading(false);
             }
 
             // After attempting to populate user, refresh products and settings.
@@ -110,27 +112,21 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const refreshProducts = async () => {
         try {
-            // Fetch server products (admin or public) when possible
-            let serverProducts: Product[] = [];
-            try {
-                serverProducts = (user && user.role === 'admin') ? await api.adminGetProducts() : await api.getProducts();
-            } catch (e) {
-                // If admin fetch failed (proxy/auth issues), try public endpoint as a fallback
-                try { serverProducts = await api.getProducts(); } catch (_) { serverProducts = []; }
+            let serverProducts: Product[];
+            if (user?.role === 'admin') {
+                try {
+                    serverProducts = await api.adminGetProducts();
+                } catch {
+                    // The public endpoint remains useful if an admin session expires.
+                    serverProducts = await api.getProducts();
+                }
+            } else {
+                serverProducts = await api.getProducts();
             }
 
-            // Always load local (seed + local) products and merge with server results.
-            // Merge strategy: use server product fields when IDs collide, but include any local-only products.
-            const local = await db.getProducts();
-            const map = new Map<string, Product>();
-            local.forEach(p => map.set(p.id, p));
-            serverProducts.forEach(p => {
-                const existing = map.get(p.id) || ({} as Product);
-                map.set(p.id, { ...existing, ...p });
-            });
-
-            const merged = Array.from(map.values());
-            setProducts(merged);
+            // A successful server response is authoritative, including an empty list.
+            // Local seeds are browse-only fallback data when the API is unavailable.
+            setProducts(serverProducts);
         } catch (e) {
             try {
                 const local = await db.getProducts();
@@ -144,23 +140,8 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const loadSettings = async () => {
         try {
             const settings = await api.getSettings();
-            // Normalize backend snake_case keys to frontend camelCase SiteSettings
-            if (settings) {
-                const normalized: SiteSettings = {
-                    aboutTitle: (settings.about_title as string) || (settings.aboutTitle as string) || '',
-                    aboutDescription: (settings.about_description as string) || (settings.aboutDescription as string) || '',
-                    aboutImage: (settings.about_image as string) || (settings.aboutImage as string) || '',
-                    heroImage: (settings.hero_image as string) || (settings.heroImage as string) || '',
-                    suitsSectionImage: (settings.suits_section_image as string) || (settings.suitsSectionImage as string) || '',
-                    shirtsSectionImage: (settings.shirts_section_image as string) || (settings.shirtsSectionImage as string) || '',
-                    blazersSectionImage: (settings.blazers_section_image as string) || (settings.blazersSectionImage as string) || '',
-                    accessoriesSectionImage: (settings.accessories_section_image as string) || (settings.accessoriesSectionImage as string) || '',
-                    bespokeSectionImage: (settings.bespoke_section_image as string) || (settings.bespokeSectionImage as string) || ''
-                };
-                setSiteSettings(normalized);
-            } else {
-                setSiteSettings(null);
-            }
+            // The API service owns wire-format normalization.
+            setSiteSettings(settings || null);
         } catch (e) {
             setSiteSettings(null);
         }
@@ -257,26 +238,9 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         showToast(`خوش آمدید`);
     };
 
-    const loginWithGoogle = async (id_token_or_email?: string) => {
-        try {
-            // If an id_token is passed, call google auth; otherwise fallback to mock
-            if (id_token_or_email && id_token_or_email.includes('.')) {
-                const resp = await api.googleAuth(id_token_or_email);
-                const u = resp.user || resp;
-                setUser(normalizeUserForContext(u));
-            } else {
-                // fallback: call backend with a mock email via register/login flow is required
-            }
-            setAuthModalOpen(false);
-            showToast('خوش آمدید');
-        } catch (e) {
-            showToast('خطا در ورود با گوگل');
-        }
-    };
-
     const register = async (name: string, email: string, pass: string) => {
+        // Registration returns the new user and establishes the JWT cookies.
         const resp = await api.register(name, email, pass);
-        // backend may or may not return user directly
         const u = resp.user || resp || null;
         if (u) {
             setUser(normalizeUserForContext(u, name));
@@ -317,12 +281,15 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     const sendMessage = async (name: string, email: string, message: string) => {
+        let sendError: unknown;
         try {
             await api.contact(name, email, message);
             showToast('پیام شما با موفقیت ارسال شد');
         } catch (e) {
+            sendError = e;
             showToast('خطا در ارسال پیام');
         }
+        if (sendError) throw sendError;
     };
 
     const updateSiteSettings = async (settings: SiteSettings | FormData) => {
@@ -332,14 +299,6 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             showToast('تنظیمات سایت ذخیره شد');
         } catch (e) {
             showToast('خطا در ذخیره تنظیمات');
-        }
-    };
-
-    const sendOtp = async (email: string): Promise<string> => {
-        try {
-            const resp = await api.sendOtp(email);
-            return resp.otp || resp;
-        } catch (e) {
             throw e;
         }
     };
@@ -357,10 +316,9 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         <GlobalContext.Provider value={{
             cart, addToCart, removeFromCart, updateQty, clearCart, isCartOpen, toggleCart,
             wishlist, toggleWishlist, isInWishlist,
-            user, login, loginWithGoogle, register, logout, updateUserProfile, cancelUserOrder, sendMessage,
+            user, isAuthLoading, login, register, logout, updateUserProfile, cancelUserOrder, sendMessage,
             products, refreshProducts,
             siteSettings, updateSiteSettings,
-            sendOtp,
             theme, toggleTheme,
             isAuthModalOpen, setAuthModalOpen,
             toastMessage, showToast
