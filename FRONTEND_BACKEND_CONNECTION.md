@@ -1,6 +1,6 @@
 # Frontend/backend connection
 
-The React application uses `frontend/services/api.ts` as its primary integration with the Django API. Requests include credentials so Django can authenticate access and refresh JWT cookies.
+The React application uses `frontend/services/api.ts` as its integration with the Django API. Requests include credentials; on a protected-request 401, the client uses `/api/auth/refresh/` once and retries after Django renews the HttpOnly access cookie.
 
 ## Local Docker path
 
@@ -14,7 +14,7 @@ docker compose up --build
 - Direct API: http://localhost:8000/api/products/
 - Frontend build setting: `VITE_API_BASE=/api`
 
-The API helper avoids duplicating the `/api` prefix. Nginx receives `/api/...` and `/media/...` requests on the frontend origin and proxies them to `backend:8000` inside the Compose network.
+The API helper avoids duplicating the `/api` prefix. Nginx proxies `/api/...` to `backend:8000` and serves `/media/...` directly from the backend's shared read-only `django_media` volume.
 
 ## Manual development path
 
@@ -40,6 +40,8 @@ npm.cmd run dev
 
 Do not include `/api` twice. Rebuild the frontend after changing any `VITE_*` value.
 
+Cookie auth permits only `SameSite=Lax`/`Strict`, so a separately hosted frontend and API must still share the same registrable site (for example `www.example.com` and `api.example.com`) or be joined by a same-origin proxy. Unrelated hosting domains require a separately designed CSRF-protected auth strategy.
+
 ## Backend origin settings
 
 For a cross-origin frontend, configure the backend environment with complete origins (scheme plus hostname and optional port):
@@ -56,7 +58,7 @@ Cookie authentication requires `CORS_ALLOW_CREDENTIALS=True`, which is already e
 
 All paths below are under `/api/` and are defined in `backend/shop/urls.py`.
 
-- Authentication: register, login, send OTP, current user, profile update, logout, and Google auth
+- Authentication: register, login, access refresh, current user, profile update, logout, disabled OTP delivery, and verified Google-token handling
 - Catalog: product list and product detail
 - Orders: create, current-user list, and pending-order cancellation
 - Site content: settings and contact messages

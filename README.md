@@ -35,7 +35,7 @@ Compose starts:
 
 - `db`: SQL Server 2022 Developer with persistent `mssql_data`
 - `backend`: Gunicorn/Django after database wait, optional database creation, migrations, static collection, and idempotent seed data
-- `frontend`: a production Vite build served by Nginx, with `/api/` and `/media/` proxied to Django
+- `frontend`: a production Vite build served by Nginx; `/api/` is proxied to Django and `/media/` is served from the shared read-only media volume
 
 The database and direct backend ports bind to `127.0.0.1`; containers communicate through the private Compose network. See [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md) for configuration and reset instructions.
 
@@ -43,7 +43,7 @@ The database and direct backend ports bind to `127.0.0.1`; containers communicat
 
 ### Backend
 
-Use Python 3.11 or 3.12; the container uses 3.11 and the existing ignored local virtual environment was created with 3.12. Newer system Python releases may not yet be supported by the SQL Server/ODBC dependency stack. Install Microsoft ODBC Driver 17 or change `DB_DRIVER` to a compatible locally installed driver. Ensure SQL Server is running and the target database exists.
+Use the project-tested Python 3.11/3.12 baseline; the container uses 3.11 and the existing ignored local virtual environment was created with 3.12. Install Microsoft ODBC Driver 17 or change `DB_DRIVER` to a compatible locally installed driver. Ensure SQL Server is running and the target database exists.
 
 ```powershell
 Set-Location backend
@@ -80,6 +80,7 @@ npm.cmd run typecheck
 npm.cmd run build
 
 # Backend tests (from backend/; no SQL Server connection required)
+Set-Location ..\backend
 python manage.py test --settings=reza_backend.test_settings
 
 # Backend configuration checks (with a valid SQL Server environment)
@@ -87,16 +88,17 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 
 # Compose (from the repository root, with root .env configured)
+Set-Location ..
 docker compose config --quiet
 ```
 
 ## Deployment
 
-`vercel.json` is intentionally frontend-only. It installs and builds `frontend/` and publishes `frontend/dist`. The application uses hash-based routing, so server-side SPA rewrites are unnecessary. Before a Vercel deployment, set `VITE_API_BASE` in Vercel to the public HTTPS origin of a separately hosted Django API, for example `https://api.example.com`.
+`vercel.json` is intentionally frontend-only. It installs and builds `frontend/` and publishes `frontend/dist`. The application uses hash-based routing, so server-side SPA rewrites are unnecessary. Before a Vercel deployment, set `VITE_API_BASE` to the public HTTPS origin of the separately hosted Django API.
 
 The Django application depends on SQL Server, native ODBC support, uploaded-media persistence, and startup migrations. Deploy it on a persistent container/application host rather than through the old Vercel Python configuration.
 
-For cross-origin deployment, add the frontend origin to backend `ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS`, add the backend hostname to `ALLOWED_HOSTS`, and configure secure-cookie/HTTPS proxy settings for the actual topology. Google login additionally requires a configured backend `GOOGLE_OAUTH_CLIENT_ID` and a frontend Google Identity flow that supplies a verified ID token.
+Cookie auth currently requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com` (a custom Vercel domain is fine). A default `project.vercel.app` frontend plus an unrelated API host will not receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; a genuinely cross-site design requires a complete CSRF-protected auth redesign and must account for browser third-party-cookie restrictions. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login additionally requires a configured backend `GOOGLE_OAUTH_CLIENT_ID` and a frontend Google Identity flow that supplies a verified ID token.
 
 ## Project structure
 
@@ -114,7 +116,7 @@ REZA-Formal/
 
 - Root `.env` is read by Docker Compose; `backend/.env` is read by manual Django runs. Both are ignored.
 - Uploaded media, local databases, virtual environments, Python caches, cookie jars, archives, dependencies, and build output are ignored.
-- `frontend/services/api.ts` is the primary server integration. `frontend/services/db.ts` remains only as a local/fallback compatibility layer.
+- `frontend/services/api.ts` is the primary server integration. `frontend/services/db.ts` is only a read-only emergency catalog fallback.
 - OTP delivery is intentionally disabled until a separately verified delivery/enrollment flow is implemented.
 
 ## More documentation

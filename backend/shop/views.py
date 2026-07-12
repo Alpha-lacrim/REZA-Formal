@@ -21,7 +21,7 @@ import uuid
 from django.conf import settings
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
-from django.db import transaction
+from django.db import IntegrityError, transaction
 from django.db.models import F
 import os
 import json
@@ -96,12 +96,9 @@ def _clear_auth_cookies(response):
     )
 
 
-def _unique_username(email):
+def _new_username(email):
     base = email.split('@', 1)[0][:120] or 'user'
-    username = base
-    while User.objects.filter(username=username).exists():
-        username = f'{base}_{uuid.uuid4().hex[:8]}'
-    return username
+    return f'{base}_{uuid.uuid4().hex[:8]}'
 
 
 def serialize_user(user):
@@ -132,15 +129,15 @@ def _save_uploaded_file_get_url(fobj, request=None):
     return urlpath
 
 
-def _save_dataurl_to_storage(dataurl: str, prefix: str = 'uploads/') -> str:
+def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentFile:
     """
-    Decode a data URL (base64) and save to default_storage. Returns the URL path.
+    Decode an image data URL into a serializer-compatible ContentFile.
     """
     try:
         header, encoded = dataurl.split(',', 1)
         import base64
         import uuid
-        data = base64.b64decode(encoded)
+        data = base64.b64decode(encoded, validate=True)
         # guess extension from header
         if 'image/png' in header:
             ext = '.png'
@@ -148,18 +145,15 @@ def _save_dataurl_to_storage(dataurl: str, prefix: str = 'uploads/') -> str:
             ext = '.jpg'
         elif 'image/gif' in header:
             ext = '.gif'
+        elif 'image/webp' in header:
+            ext = '.webp'
         else:
             # fallback to png
             ext = '.png'
-        name = f"{prefix.rstrip('/')}/{uuid.uuid4().hex}{ext}"
-        saved = default_storage.save(name, ContentFile(data))
-        try:
-            return default_storage.url(saved)
-        except Exception:
-            media_url = getattr(settings, 'MEDIA_URL', '/media/')
-            return media_url.rstrip('/') + '/' + saved.lstrip('/')
-    except Exception:
-        return dataurl
+        name = f"{prefix.rstrip('/')}_{uuid.uuid4().hex}{ext}"
+        return ContentFile(data, name=name)
+    except Exception as exc:
+        raise ValueError('Invalid image data URL') from exc
 
 def prepare_product_data(request):
     """
@@ -256,12 +250,18 @@ def register(request):
     email = data['email'].strip().lower()
     if User.objects.filter(email__iexact=email).exists():
         return Response({'detail':'Email already exists'}, status=400)
-    user = User.objects.create_user(
-        username=_unique_username(email),
-        email=email,
-        password=data['password'],
-        first_name=data.get('first_name', ''),
-    )
+    try:
+        with transaction.atomic():
+            user = User.objects.create_user(
+                username=_new_username(email),
+                email=email,
+                password=data['password'],
+                first_name=data.get('first_name', ''),
+            )
+    except IntegrityError:
+        if User.objects.filter(email__iexact=email).exists():
+            return Response({'detail': 'Email already exists'}, status=400)
+        return Response({'detail': 'Unable to create account; please retry'}, status=409)
     tokens = get_tokens_for_user(user)
     response = Response(
         {'detail': 'registered', 'user': serialize_user(user)},
@@ -282,6 +282,9 @@ def login(request):
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
         return Response({'detail':'Invalid credentials'}, status=400)
+    except User.MultipleObjectsReturned:
+        logger.error('Multiple users share the same normalized email')
+        return Response({'detail': 'Account data conflict; contact support'}, status=409)
     user_auth = authenticate(request, username=user.username, password=password)
     if not user_auth:
         return Response({'detail':'Invalid credentials'}, status=400)
@@ -380,12 +383,18 @@ def google_auth(request):
     user = User.objects.filter(email__iexact=email).first()
     if user is None:
         name = str(payload.get('name') or email.split('@', 1)[0])[:150]
-        user = User.objects.create_user(
-            username=_unique_username(email),
-            email=email,
-            password=None,
-            first_name=name,
-        )
+        try:
+            with transaction.atomic():
+                user = User.objects.create_user(
+                    username=_new_username(email),
+                    email=email,
+                    password=None,
+                    first_name=name,
+                )
+        except IntegrityError:
+            user = User.objects.filter(email__iexact=email).first()
+            if user is None:
+                return Response({'detail': 'Unable to create account; please retry'}, status=409)
     if not user.is_active:
         return Response({'detail': 'Account is disabled'}, status=403)
 
@@ -529,20 +538,41 @@ def site_settings(request):
         except Exception:
             data = request.data
 
-    # Convert data-URL strings to stored file URLs for image fields
+    # Convert data URLs to uploaded files and process explicit clear flags.
     image_fields = ['about_image', 'hero_image', 'suits_section_image', 'shirts_section_image', 'blazers_section_image', 'accessories_section_image', 'bespoke_section_image']
+    for f in image_fields:
+        clear_value = str(data.pop(f'clear_{f}', '')).strip().lower()
+        if clear_value in {'1', 'true', 'yes', 'on'}:
+            data[f] = None
+
     for f in image_fields:
         val = data.get(f)
         if isinstance(val, str) and val.startswith('data:image/'):
             try:
-                data[f] = _save_dataurl_to_storage(val, prefix='site')
-            except Exception:
-                pass
+                data[f] = _dataurl_to_content_file(val, prefix=f)
+            except ValueError:
+                return Response({f: ['Invalid image data URL']}, status=400)
 
-    serializer = SiteSettingsSerializer(settings, data=data)
+    old_files = {
+        f: getattr(settings, f, None)
+        for f in image_fields
+    } if settings else {}
+
+    serializer = SiteSettingsSerializer(settings, data=data, partial=True)
     if serializer.is_valid():
-        serializer.save()
-        return Response(SiteSettingsSerializer(serializer.instance, context={'request': request}).data)
+        instance = serializer.save()
+        remaining_names = {
+            getattr(instance, f).name
+            for f in image_fields
+            if getattr(instance, f, None)
+        }
+        for old_file in old_files.values():
+            if old_file and old_file.name not in remaining_names:
+                try:
+                    old_file.delete(save=False)
+                except Exception:
+                    logger.warning('Could not delete replaced site image %s', old_file.name)
+        return Response(SiteSettingsSerializer(instance, context={'request': request}).data)
     return Response(serializer.errors, status=400)
 
 @api_view(['POST'])

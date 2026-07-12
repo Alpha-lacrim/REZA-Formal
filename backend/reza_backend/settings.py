@@ -67,14 +67,20 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'reza_backend.wsgi.application'
 
+db_host = env('DB_HOST', default='localhost')
+db_port = env('DB_PORT', default='1433')
+if '\\' in db_host:
+    # Named SQL Server instances normally discover their own dynamic port.
+    db_port = ''
+
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
         'NAME': env('DB_NAME', default='database'),
         'USER': env('DB_USER', default='sa'),
         'PASSWORD': env('DB_PASSWORD', default=''),
-        'HOST': env('DB_HOST', default='localhost'),
-        'PORT': env('DB_PORT', default='1433'),
+        'HOST': db_host,
+        'PORT': db_port,
         'OPTIONS': {
             'driver': env('DB_DRIVER', default='ODBC Driver 17 for SQL Server'),
             'Encrypt': env('DB_ENCRYPT', default='no'),

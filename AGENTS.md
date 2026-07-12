@@ -41,9 +41,9 @@ npm.cmd run build
 
 # Backend (isolated test configuration; does not touch the live SQL Server)
 cd ..\backend
-.\.venv\Scripts\python.exe manage.py check
-.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run
-.\.venv\Scripts\python.exe manage.py test
+.\.venv\Scripts\python.exe manage.py check --settings=reza_backend.test_settings
+.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings
+.\.venv\Scripts\python.exe manage.py test --settings=reza_backend.test_settings
 
 # Repository-level configuration
 cd ..

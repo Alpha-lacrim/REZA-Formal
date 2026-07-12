@@ -6,12 +6,18 @@ from django.utils import timezone
 class User(AbstractUser):
     # Extend user with role and 2FA secret
     ROLE_CHOICES = (('user', 'User'), ('admin', 'Admin'))
+    email = models.EmailField('email address', unique=True)
     role = models.CharField(max_length=16, choices=ROLE_CHOICES, default='user')
     two_factor_secret = models.CharField(max_length=64, blank=True, null=True)
     address = models.TextField(blank=True)
 
     def is_admin(self):
         return self.role == 'admin' or self.is_staff
+
+    def save(self, *args, **kwargs):
+        if self.email:
+            self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
 
 
 # Ensure any Django superuser is treated as admin (keeps role/is_staff in sync).

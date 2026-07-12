@@ -64,6 +64,29 @@ class AuthenticationTests(TestCase):
         self.assertEqual(logout_response.status_code, 200)
         self.assertEqual(logout_response.cookies['access'].value, '')
 
+    def test_valid_cookie_for_inactive_user_does_not_block_logout(self):
+        user = User.objects.create_user(
+            username='disabled-user',
+            email='disabled@example.com',
+            password='A-strong-disabled-password-493!',
+        )
+        login_response = self.client.post(
+            '/api/auth/login/',
+            {
+                'email': 'disabled@example.com',
+                'password': 'A-strong-disabled-password-493!',
+            },
+            format='json',
+        )
+        self.assertEqual(login_response.status_code, 200)
+        user.is_active = False
+        user.save(update_fields=['is_active'])
+
+        logout_response = self.client.post('/api/auth/logout/', format='json')
+
+        self.assertEqual(logout_response.status_code, 200)
+        self.assertEqual(logout_response.cookies['access'].value, '')
+
     def test_refresh_cookie_replaces_an_invalid_access_cookie(self):
         User.objects.create_user(
             username='refresh-user',
@@ -111,6 +134,25 @@ class AuthenticationTests(TestCase):
         self.assertEqual(weak_password.status_code, 400)
         self.assertIn('password', weak_password.data)
         self.assertFalse(User.objects.exists())
+
+    def test_registration_enforces_case_insensitive_email_uniqueness(self):
+        User.objects.create_user(
+            username='existing-email',
+            email='existing@example.com',
+            password='A-strong-existing-password-493!',
+        )
+
+        response = self.client.post(
+            '/api/auth/register/',
+            {
+                'email': 'EXISTING@example.com',
+                'password': 'A-strong-registration-password-493!',
+            },
+            format='json',
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertEqual(User.objects.filter(email='existing@example.com').count(), 1)
 
     def test_login_rejects_missing_credentials_without_server_error(self):
         response = self.client.post('/api/auth/login/', {}, format='json')
@@ -289,6 +331,34 @@ class AdminProductTests(TestCase):
         self.assertNotEqual(first.data['id'], second.data['id'])
         self.assertTrue(first.data['id'].startswith('prod-'))
         self.assertEqual(negative.status_code, 400)
+
+
+class SiteSettingsTests(TestCase):
+    def setUp(self):
+        self.client = APIClient()
+        admin = User.objects.create_superuser(
+            username='settings-admin',
+            email='settings-admin@example.com',
+            password='A-strong-settings-password-493!',
+        )
+        self.client.force_authenticate(admin)
+
+    def test_explicit_image_clear_flag_removes_existing_field(self):
+        settings = SiteSettings.objects.create(
+            about_title='Existing',
+            hero_image='site/old-hero.jpg',
+        )
+
+        response = self.client.put(
+            '/api/settings/',
+            {'about_title': 'Updated', 'clear_hero_image': 'true'},
+            format='multipart',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        settings.refresh_from_db()
+        self.assertEqual(settings.about_title, 'Updated')
+        self.assertFalse(settings.hero_image)
 
 
 class SeedDataTests(TestCase):

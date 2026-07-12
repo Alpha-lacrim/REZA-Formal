@@ -1,5 +1,7 @@
 # REZA Formal Codebase Analysis - 2026-06-28
 
+> Historical snapshot: the OTP-echo and unsigned-Google-token findings below were resolved in the 2026-07-12 audit. OTP delivery now fails closed until a real provider/enrollment flow exists, and Google ID tokens are verified server-side. See `Handoff.md` for current status.
+
 ## Scope
 
 Reviewed the active React/Vite storefront and Django REST backend with an e-commerce correctness lens: product data, cart behavior, checkout/order creation, profile data, admin order handling, settings, and build health.
@@ -15,8 +17,8 @@ Reviewed the active React/Vite storefront and Django REST backend with an e-comm
 - The frontend fallback catalog was effectively empty, leaving the storefront blank when the backend/local storage had no products.
 - Vite build had a stale `/index.css` link warning.
 
-## Remaining Risks
+## Risks recorded in this historical snapshot
 
-- OTP delivery is still development-style: the backend returns the OTP and the UI displays it in a toast. A production store should send OTP via email/SMS and never expose it in the API response.
-- Google auth currently decodes the token without signature verification. This should be replaced with a verified provider flow before production use.
-- The repo contains unrelated pre-existing dirty files, deleted media/database files, and generated cache/build artifacts. I did not revert or clean those because they predated this pass.
+- **Resolved 2026-07-12:** the backend no longer returns OTP values; delivery/enrollment now fails closed until a real provider exists.
+- **Resolved 2026-07-12:** Google ID tokens are signature- and audience-verified server-side; the frontend flow remains intentionally unimplemented.
+- **Resolved 2026-07-12:** generated environments, media, build output, cookie/debug files, and snapshot artifacts were removed from tracking and covered by ignore rules.

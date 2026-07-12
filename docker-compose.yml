@@ -71,6 +71,8 @@ services:
       - backend
     ports:
       - "${FRONTEND_PORT:-3000}:80"
+    volumes:
+      - django_media:/var/www/media:ro
     restart: unless-stopped
 
 volumes:

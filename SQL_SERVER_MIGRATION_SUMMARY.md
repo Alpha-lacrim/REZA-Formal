@@ -15,7 +15,7 @@ This document describes the current SQL Server integration. It supersedes the ol
 | Variable | Description | Typical Docker value |
 | --- | --- | --- |
 | `DB_NAME` | Application database name | `reza` |
-| `DB_USER` | SQL login | `sa` |
+| `DB_USER` | SQL login; local Compose must use `sa` unless another privileged login is already provisioned | `sa` |
 | `DB_PASSWORD` | SQL login password | Required secret |
 | `DB_HOST` | SQL Server hostname or named instance | `db` |
 | `DB_PORT` | SQL Server TCP port | `1433` |

@@ -36,7 +36,7 @@ Open:
 
 - `db`: SQL Server 2022 Developer with the persistent `mssql_data` volume.
 - `backend`: installs ODBC Driver 18, waits for SQL Server with `pyodbc`, optionally creates the database, applies migrations, collects static assets, seeds idempotent data, and starts Gunicorn.
-- `frontend`: builds the Vite application and serves it with Nginx. Nginx proxies `/api/` and `/media/` to the backend service.
+- `frontend`: builds the Vite application and serves it with Nginx. Nginx proxies `/api/` to Django and serves `/media/` from the read-only `django_media` volume shared with the backend.
 
 SQL Server and the direct Django port are published only on `127.0.0.1`. The frontend is published on `FRONTEND_PORT` and containers use the private Compose network internally.
 
@@ -76,6 +76,7 @@ Common root `.env` settings:
 | --- | --- | --- |
 | `DJANGO_SECRET_KEY` | Django signing secret | Required |
 | `DB_PASSWORD` | Shared SQL Server/Django password | Required |
+| `DB_USER` | SQL login used by Django/startup; local Compose must remain `sa` unless another privileged login was provisioned first | `sa` |
 | `DB_NAME` | Application database | `reza` |
 | `FRONTEND_PORT` | Host storefront port | `3000` |
 | `BACKEND_PORT` | Host Django port | `8000` |

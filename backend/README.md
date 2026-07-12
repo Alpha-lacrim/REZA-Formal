@@ -4,7 +4,7 @@ Django REST API backed by Microsoft SQL Server.
 
 ## Supported local Python
 
-Use Python 3.11 or 3.12. The Docker image uses 3.11 and the existing Windows virtual environment uses 3.12. Avoid creating the environment with a newer system Python until `pyodbc` and `mssql-django` support has been verified for it.
+Use the project-tested Python 3.11/3.12 baseline. The Docker image uses 3.11 and the existing Windows virtual environment uses 3.12.
 
 ## Manual Windows setup
 
@@ -29,6 +29,8 @@ python manage.py runserver
 ```
 
 `seed_data` creates products/site settings when needed. It creates an admin only when both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` are set. Leaving both empty skips admin creation; setting only one is a configuration error.
+
+Before applying migration `0005`, back up an existing database. The migration normalizes emails, enforces uniqueness, and intentionally stops with user IDs if legacy accounts have blank or case-insensitive duplicate emails. Resolve those records, then rerun `migrate`. It also irreversibly clears `two_factor_secret` values created by the retired OTP-echo flow because those users were never given an authenticator enrollment secret or recovery path.
 
 ## Linux/macOS virtual environment
 

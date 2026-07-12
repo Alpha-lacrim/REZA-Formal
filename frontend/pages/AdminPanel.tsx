@@ -65,6 +65,7 @@ const AdminPanel: React.FC = () => {
     });
     // Hold raw File objects for settings uploads so we can send FormData
     const [settingsFiles, setSettingsFiles] = useState<Partial<Record<keyof SiteSettings, File>>>({});
+    const [clearedSettingsImages, setClearedSettingsImages] = useState<Set<keyof SiteSettings>>(new Set());
 
     useEffect(() => {
         if (user && user.role !== 'admin') {
@@ -226,12 +227,12 @@ const AdminPanel: React.FC = () => {
                 bespokeSectionImage: 'bespoke_section_image'
             };
 
-            const hasFiles = Object.keys(settingsFiles).length > 0;
+            const hasImageChanges = Object.keys(settingsFiles).length > 0 || clearedSettingsImages.size > 0;
             const textSettings = {
                 about_title: settingsForm.aboutTitle || '',
                 about_description: settingsForm.aboutDescription || '',
             };
-            if (hasFiles) {
+            if (hasImageChanges) {
                 const fd = new FormData();
                 Object.entries(textSettings).forEach(([key, value]) => {
                     fd.append(key, value);
@@ -240,10 +241,15 @@ const AdminPanel: React.FC = () => {
                     const key = fieldMap[k] || k;
                     if (f) fd.append(key, f as File);
                 });
+                clearedSettingsImages.forEach(field => {
+                    fd.append(`clear_${fieldMap[field]}`, 'true');
+                });
                 await updateSiteSettings(fd as any);
             } else {
                 await updateSiteSettings(textSettings as any);
             }
+            setSettingsFiles({});
+            setClearedSettingsImages(new Set());
             showToast('تنظیمات ذخیره شد');
         } catch (err) {
             console.error('Settings save failed', err);
@@ -286,6 +292,11 @@ const AdminPanel: React.FC = () => {
         const file = e.target.files?.[0];
         if (file) {
             setSettingsFiles(prev => ({ ...prev, [field]: file }));
+            setClearedSettingsImages(prev => {
+                const next = new Set(prev);
+                next.delete(field);
+                return next;
+            });
             const reader = new FileReader();
             reader.onloadend = () => {
                 setSettingsForm(prev => ({ ...prev, [field]: reader.result as string }));
@@ -880,6 +891,7 @@ const AdminPanel: React.FC = () => {
                                                                         const newFiles = { ...settingsFiles };
                                                                         delete newFiles[field.key];
                                                                         setSettingsFiles(newFiles);
+                                                                        setClearedSettingsImages(prev => new Set(prev).add(field.key));
                                                                         setSettingsForm({ ...settingsForm, [field.key]: '' });
                                                                     }}
                                                                     className="p-2.5 text-rose-500 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-900/20"

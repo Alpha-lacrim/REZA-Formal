@@ -10,7 +10,7 @@ Before changing the repository, read and follow root `AGENTS.md`, then use `Code
 - `backend/` is the Django REST API. URL routing starts in `backend/reza_backend/urls.py` and `backend/shop/urls.py`.
 - Microsoft SQL Server is the persistent database through `mssql-django` and `pyodbc`.
 - `frontend/services/api.ts` is the primary data/auth integration. It normalizes Django responses to the frontend types and sends cookie-authenticated requests.
-- `frontend/services/db.ts` is a legacy/local fallback. It supplies fallback products and some admin fallbacks; it is not the authoritative production backend.
+- `frontend/services/db.ts` is a read-only emergency catalog fallback. It never performs authoritative admin, account, order, message, or settings writes.
 - `frontend/contexts/GlobalContext.tsx` owns cross-application state and actions. Cart, wishlist, and theme preferences are intentionally browser-local; accounts, products, orders, messages, and site settings use the API where implemented.
 
 ## Integration rules
@@ -19,7 +19,7 @@ Before changing the repository, read and follow root `AGENTS.md`, then use `Code
 - Keep normalization at the API boundary. Django generally returns snake_case fields; React types in `frontend/types.ts` generally use camelCase.
 - Authentication uses JWT cookies and `credentials: 'include'`. Cross-origin deployments therefore require matching `ALLOWED_ORIGINS` and `CSRF_TRUSTED_ORIGINS` values in the backend environment.
 - Product/settings image writes use `FormData`. Do not manually set multipart `Content-Type`; the browser must add its boundary.
-- Treat `frontend/services/db.ts` fallbacks as compatibility behavior. Do not add new authoritative business data to localStorage.
+- Treat `frontend/services/db.ts` as browse-only compatibility behavior. Do not add authoritative business data or false-success admin writes to localStorage.
 - Database writes that span validation, stock, and orders should remain atomic and server-authoritative.
 
 ## Configuration and run paths

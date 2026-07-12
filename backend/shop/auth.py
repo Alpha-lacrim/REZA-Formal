@@ -1,3 +1,4 @@
+from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
 
@@ -10,8 +11,11 @@ class CookieJWTAuthentication(JWTAuthentication):
             return None
         try:
             validated_token = self.get_validated_token(raw_token)
-        except InvalidToken:
+            user = self.get_user(validated_token)
+        except (InvalidToken, AuthenticationFailed):
             # Treat an expired/corrupt cookie as anonymous. Protected views still
             # reject the request, while public auth views can replace or clear it.
+            # AuthenticationFailed also covers valid tokens whose user was
+            # deleted or disabled.
             return None
-        return self.get_user(validated_token), validated_token
+        return user, validated_token
