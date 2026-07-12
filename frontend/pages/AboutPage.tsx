@@ -41,7 +41,7 @@ const AboutPage: React.FC = () => {
                 <div className="flex flex-col lg:flex-row gap-12 items-center">
                     <div className="w-full lg:w-1/2 h-[400px] md:h-[500px] rounded-2xl overflow-hidden shadow-2xl relative group">
                         <ImageLoader 
-                            src={siteSettings.aboutImage || 'https://picsum.photos/1200/800?grayscale'} 
+                            src={siteSettings.aboutImage || '/images/utilities/bespoke.webp'}
                             alt="About Reza Formal" 
                             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
                             loading="eager"

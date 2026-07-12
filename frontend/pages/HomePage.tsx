@@ -21,7 +21,7 @@ const Hero = () => {
         <header className="relative h-screen flex items-center justify-center overflow-hidden bg-zinc-900">
             <div className="absolute inset-0 z-0">
                  <ImageLoader 
-                    src={siteSettings?.heroImage || "https://picsum.photos/1920/1080?grayscale&random=99"} 
+                    src={siteSettings?.heroImage || "/images/utilities/hero.jpg"}
                     alt="Luxury Suit Man" 
                     className="w-full h-full object-cover opacity-40" 
                     dataUtility 
@@ -203,7 +203,7 @@ const HomePage: React.FC = () => {
         "@type": "MensClothingStore",
         "name": "REZA Formal",
         "description": "لوکس‌ترین فروشگاه کت و شلوار و اکسسوری مردانه در تهران.",
-        "image": "https://picsum.photos/1200/800",
+        "image": "https://rezaformal.com/images/utilities/hero.jpg",
         "telephone": "02122902908",
         "url": "https://rezaformal.com",
         "address": {
@@ -221,7 +221,7 @@ const HomePage: React.FC = () => {
             <SEO 
                 title="خانه"
                 description="رضا فرمال، ارائه دهنده برترین پوشاک مردانه، کت و شلوار دامادی و اکسسوری‌های لوکس با دوخت سفارشی در تهران."
-                image="https://picsum.photos/1200/630?grayscale"
+                image="https://rezaformal.com/images/utilities/hero.jpg"
                 schema={schema}
             />
             <Hero />
@@ -229,7 +229,7 @@ const HomePage: React.FC = () => {
             
             <IntroSection 
                 id="suits"
-                image={siteSettings?.suitsSectionImage || "https://picsum.photos/800/1200?random=100"}
+                image={siteSettings?.suitsSectionImage || "/images/suit/midnight.jpg"}
                 subtitle="آتلیه کت و شلوار"
                 title="کمال در دوخت و طراحی"
                 description="کت و شلوارهای ما با بهره‌گیری از بهترین پارچه‌های پشمی و دوخت‌های مدرن، وقار و اعتماد به نفس را برای شما به ارمغان می‌آورند. هر دوخت داستانی از اصالت را روایت می‌کند."
@@ -250,7 +250,7 @@ const HomePage: React.FC = () => {
 
             <IntroSection 
                 id="shirts"
-                image={siteSettings?.shirtsSectionImage || "https://picsum.photos/800/1200?random=101"}
+                image={siteSettings?.shirtsSectionImage || "/images/shirts/s3.jpg"}
                 subtitle="کلکسیون پیراهن"
                 title="لطافت و کیفیت بی‌نظیر"
                 description="پیراهن‌های ما با پارچه‌های صد در صد پنبه و دوخت‌های ظریف، راحتی و استایل را در هم آمیخته‌اند. انتخابی ایده‌آل برای تکمیل استایل رسمی شما در هر موقعیت."
@@ -271,7 +271,7 @@ const HomePage: React.FC = () => {
 
             <IntroSection 
                 id="blazer"
-                image={siteSettings?.blazersSectionImage || "https://picsum.photos/800/1200?random=102"}
+                image={siteSettings?.blazersSectionImage || "/images/blazer/s1_b1.jpg"}
                 subtitle="کلکسیون بلیزر"
                 title="استایل نیمه‌رسمی متمایز"
                 description="با بلیزرهای تک‌دوخت ما، در هر جمعی متمایز باشید. ترکیبی از راحتی و جذابیت برای موقعیت‌های کژوال و نیمه‌رسمی که شخصیت شما را برجسته می‌کند."
@@ -292,7 +292,7 @@ const HomePage: React.FC = () => {
 
             <IntroSection 
                 id="accessories"
-                image={siteSettings?.accessoriesSectionImage || "https://picsum.photos/800/1200?random=103"}
+                image={siteSettings?.accessoriesSectionImage || "/images/accessories/suit-accessories-cover.jpg"}
                 subtitle="اکسسوری"
                 title="جزئیات تعیین‌کننده"
                 description="اکسسوری‌های دست‌ساز ما، از کراوات‌های ابریشمی تا دکمه‌سردست‌های خاص، امضای نهایی استایل منحصر به فرد شما هستند. زیبایی در جزئیات است."
@@ -313,7 +313,7 @@ const HomePage: React.FC = () => {
 
              <IntroSection 
                 id="bespoke"
-                image={siteSettings?.bespokeSectionImage || "https://picsum.photos/800/1200?random=104"}
+                image={siteSettings?.bespokeSectionImage || "/images/utilities/bespoke.webp"}
                 subtitle="آتلیه دوخت"
                 title="ظرافت و زیبایی در پوشش"
                 description="خدمات سفارشی ما نهایت زیبایی و ظرافت در پوشش است. با مشاوره خصوصی و انتخاب پارچه‌ها، لباسی کاملاً اختصاصی برای شما طراحی می‌شود."

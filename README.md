@@ -16,12 +16,13 @@ Prerequisites are Git and a running Docker Desktop installation.
 From the repository root:
 
 ```powershell
-Copy-Item .env.docker.example .env
-# Edit .env and set DJANGO_SECRET_KEY and DB_PASSWORD.
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-DevelopmentEnv.ps1
 docker compose up --build
 ```
 
-`DJANGO_SECRET_KEY` should be a long random value. `DB_PASSWORD` must satisfy SQL Server's password policy (at least eight characters with uppercase, lowercase, number, and symbol). Compose refuses to start when either is empty.
+The setup script creates the ignored root `.env` when needed, generates strong `DJANGO_SECRET_KEY` and SQL-policy-compliant `DB_PASSWORD` values without displaying them, synchronizes the database password to `backend/.env`, and removes obsolete frontend Gemini variables. Later runs preserve non-empty root secrets; use `-RotateSecrets` only when rotation is intentional and the existing SQL Server password/volume will be updated or reset too. Compose refuses to start when either required value is empty.
+
+If Windows cannot bind host port `1433`, rerun the setup helper with an unused override such as `-MssqlPort 11433`. This changes only the optional host connection port; containers continue to use SQL Server on internal port `1433`.
 
 Admin creation is optional. To create a local admin during seeding, set both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` in `.env`; leaving both empty skips admin creation. Never commit this file.
 
@@ -107,6 +108,7 @@ REZA-Formal/
   backend/                  Django REST API
   frontend/                 React/Vite storefront
   docs/                     Setup and audit notes
+  scripts/                  Repeatable local setup helpers
   docker-compose.yml        Full local container stack
   .env.docker.example       Root Compose environment template
   vercel.json               Frontend-only Vercel build config

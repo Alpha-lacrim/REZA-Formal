@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-07-12
+Last verified: 2026-07-13
 
 ## Purpose and product
 
@@ -46,6 +46,8 @@ This file contains durable project context for later coding sessions. Put chrono
 
 The `frontend` image builds Vite assets and serves them with Nginx. Nginx proxies `/api/` to Gunicorn and serves `/media/` directly from the read-only `django_media` volume shared with the backend. The backend waits for SQL Server, optionally creates the application database, applies migrations, collects static files, and runs seed data before Gunicorn starts.
 
+The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-13. This workstation uses ignored `MSSQL_PORT=11433` because Windows rejected host port `1433`; services still connect to `db:1433` inside Compose.
+
 ## Important files
 
 | File | Why it matters |
@@ -54,6 +56,7 @@ The `frontend` image builds Vite assets and serves them with Nginx. Nginx proxie
 | `Handoff.md` | Newest-first record of changes, checks, incomplete work, and owner actions. |
 | `README.md` | Supported local and Docker entry points. |
 | `docker-compose.yml` | Complete local multi-container topology and environment wiring. |
+| `scripts/Setup-DevelopmentEnv.ps1` | Creates ignored development env files, generates required secrets without displaying them, synchronizes the fresh database password, and removes obsolete Gemini variables. |
 | `.env.docker.example` | Names and safe examples for Docker configuration; never add real secrets. |
 | `frontend/package.json` | Frontend scripts and dependency contract. |
 | `frontend/vite.config.ts` | Vite build and development-server behavior. |
@@ -93,6 +96,7 @@ When the contract changes, update the backend route/view/serializer, `frontend/s
 - Core backend names include `DJANGO_SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_DRIVER`, `DB_ENCRYPT`, and `DB_TRUST_SERVER_CERTIFICATE`.
 - Optional auth/deployment names include `DJANGO_SUPERUSER_*`, `GOOGLE_OAUTH_CLIENT_ID`, `AUTH_COOKIE_*`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*`, and `TRUST_X_FORWARDED_PROTO`.
 - Docker startup flags include `DB_AUTO_CREATE`, `RUN_MIGRATIONS`, `RUN_COLLECTSTATIC`, and `RUN_SEED_DATA`.
+- `MSSQL_PORT` controls only the optional host mapping. `DB_PORT` remains the backend-to-SQL Server port and is normally `1433` in Compose.
 
 Never record environment values here. When adding a variable, update the appropriate example, Compose wiring, setup documentation, and this name-only inventory.
 
@@ -100,7 +104,7 @@ Never record environment values here. When adding a variable, update the appropr
 
 ```powershell
 # Full stack
-Copy-Item .env.docker.example .env
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-DevelopmentEnv.ps1
 docker compose up --build
 
 # Frontend
@@ -132,6 +136,8 @@ Use the repository's isolated test settings/command documented in `AGENTS.md` fo
 - Cookie auth currently permits only `SameSite=Lax` or `Strict`; use same-site frontend/API domains or add a complete CSRF token flow before considering `SameSite=None`.
 - OTP delivery/enrollment and the frontend Google Identity flow are intentionally disabled until real providers are configured; the backend never echoes an OTP or trusts an unsigned Google token.
 - Validate uploaded files and keep the Nginx/Django upload-size limits aligned.
+- Use bundled `frontend/public/images/` assets for default UI imagery; fresh installs must not depend on remote placeholder-image services.
+- Pass raw ODBC keywords such as `Encrypt` and `TrustServerCertificate` through `DATABASES['default']['OPTIONS']['extra_params']`; unsupported top-level option names are silently ignored by `mssql-django`.
 - Do not retry failed production API writes against a hard-coded localhost address.
 - Vercel, if used, hosts only the frontend; the stateful Django/SQL Server stack needs a separate compatible host.
 - Do not commit local `.env` files, databases, media, virtual environments, build output, cookies, archives, or temporary debug scripts.

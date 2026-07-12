@@ -1,8 +1,55 @@
 # Session Handoff
 
-Last updated: 2026-07-12
+Last updated: 2026-07-13
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-07-13 - Prepare the first development launch
+
+### Objective and starting state
+
+- Complete the remaining local setup actions from the audit before the project's first launch.
+- The repository started clean on local branch `dev` at commit `04218a3`; no database, deployed environment, or legacy administrator account has been created.
+
+### Changed
+
+- Added `scripts/Setup-DevelopmentEnv.ps1` to create ignored development env files, generate fresh Django/SQL secrets without printing them, synchronize the initial database password, remove obsolete Gemini variable names, preserve existing secrets on later runs, and optionally override the host SQL port.
+- Generated new ignored root/backend secrets for the first launch. The previously tracked SQL value is not used by the new SQL Server, and `frontend/.env.local` contains no Gemini/Generative AI key.
+- Refreshed `backend/.venv` from `backend/requirements.txt`, moving it from Django 6.0 to Django 5.2.16 and installing the missing Google Auth, WhiteNoise, and Gunicorn packages.
+- Built and launched the complete Docker stack. Windows refused host port `1433`, so the ignored root `.env` now maps SQL Server to host port `11433`; container-to-container traffic remains on `1433`.
+- Fixed Django's live ODBC configuration: `mssql-django` requires `Encrypt` and `TrustServerCertificate` inside `OPTIONS.extra_params` and `connection_timeout` as its supported option. Added a regression test and validation for the environment values.
+- Replaced runtime `picsum.photos`/texture placeholders with bundled image assets so fresh installs render meaningful hero, about, category, bespoke, SEO, and decorative imagery without third-party placeholder availability.
+- Confirmed there is no legacy `admin@reza.com` account or superuser. The first seed intentionally skipped admin creation because credentials were not configured.
+- Completed a cookie-authenticated register/profile/order/history/cancel/stock/logout flow through Nginx, then removed the temporary smoke user, order, and order items.
+- Prepared this verified history for a local fast-forward from `dev` to `main`; no remote push is performed automatically.
+
+### Verification
+
+- The setup helper succeeded on first run, preserved existing secrets on a second run, produced synchronized SQL passwords with required complexity, and kept all env files ignored.
+- `pip install --upgrade -r requirements.txt` completed; `pip check` reports no broken requirements.
+- Isolated Django `check`, migration-drift check, and 22/22 tests passed with SQLite and no live SQL access.
+- `npm.cmd run typecheck` and the Vite production build passed after the local-image changes.
+- `docker compose config --quiet` passed; the frontend and backend images built successfully, including Nginx, Node, Python 3.11, Microsoft ODBC Driver 18, all Python dependencies, and Gunicorn.
+- The fresh SQL Server container created database `reza`; migrations `0001` through `0005`, static collection, catalog/site-settings seed, and Gunicorn startup completed successfully.
+- Live-container `manage.py check` passed. Frontend, direct API, proxied product/settings API, and Django admin-login routes returned HTTP 200.
+- The authenticated Nginx/API flow returned the expected 201/200/401 statuses and restored product stock after cancellation.
+- Headless Microsoft Edge produced a populated React DOM and a visually inspected 1440x1000 screenshot with the RTL navigation, local hero image, and page content rendered correctly.
+- Final Compose state: SQL Server, backend, and frontend are all running; host ports are `11433`, `8000`, and `3000` respectively.
+
+### Incomplete / follow-up
+
+- No interactive admin CRUD flow was run because no administrator was requested or created; public/user flows and the Django admin login route were tested.
+- Tailwind still loads from its browser CDN. Move it to the build pipeline before enforcing a strict production Content Security Policy.
+- OTP delivery/enrollment and the frontend Google Identity flow remain deliberately unavailable until real providers/flows are implemented.
+- Production still requires same-site HTTPS deployment configuration and durable external media storage or a persistent compatible volume.
+
+### Owner actions required
+
+- No database backup, legacy-email repair, old admin deletion, or live SQL credential change was necessary: this was a new database initialized with a freshly generated ignored password.
+- The development stack is currently available at `http://localhost:3000`; stop it without deleting data using `docker compose down` when finished.
+- Create an administrator only when needed, using `docker compose exec backend python manage.py createsuperuser` or by configuring both optional seeded-admin variables and rerunning the seed command. Do not use the retired fixed admin credentials.
+- The old SQL string remains in local Git history but is unused by any launched service. Only purge history if that old value was reused for another real system or the repository was shared before redaction.
+- Local `main` will contain the verified commits after this session; pushing to the remote remains an explicit owner decision.
 
 ## 2026-07-12 - Complete the full-project audit
 

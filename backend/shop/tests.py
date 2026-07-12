@@ -7,7 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core.exceptions import ImproperlyConfigured
 from django.core.management import call_command
 from django.core.management.base import CommandError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase
 from rest_framework.test import APIClient
 
 from .management.commands.seed_data import PRODUCTS
@@ -15,6 +15,19 @@ from .models import ContactMessage, Order, OrderItem, Product, SiteSettings
 
 
 User = get_user_model()
+
+
+class DatabaseSettingsTests(SimpleTestCase):
+    def test_mssql_odbc_keywords_are_forwarded_through_extra_params(self):
+        from reza_backend import settings as project_settings
+
+        options = project_settings.DATABASES['default']['OPTIONS']
+
+        self.assertIn('Encrypt=', options['extra_params'])
+        self.assertIn('TrustServerCertificate=', options['extra_params'])
+        self.assertNotIn('Encrypt', options)
+        self.assertNotIn('TrustServerCertificate', options)
+        self.assertIsInstance(options['connection_timeout'], int)
 
 
 class AuthenticationTests(TestCase):

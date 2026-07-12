@@ -5,15 +5,17 @@ Run the full local stack from the repository root.
 ## 1. Configure the environment
 
 ```powershell
-Copy-Item .env.docker.example .env
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-DevelopmentEnv.ps1
 ```
 
-Edit `.env` before starting. These values are required:
+The script creates ignored root `.env` and `backend/.env` files when needed, removes obsolete frontend Gemini variables, and securely generates these required values without printing them:
 
 - `DJANGO_SECRET_KEY`: a long random Django signing key
 - `DB_PASSWORD`: a strong SQL Server `sa` password containing uppercase, lowercase, number, and symbol
 
 Compose rejects empty values instead of silently using checked-in credentials.
+
+Later script runs preserve existing non-empty root secrets. Use `-RotateSecrets` only for an intentional rotation; an existing SQL Server volume keeps its original `sa` password and must be updated separately or intentionally reset.
 
 Admin creation is optional. Set both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` to create a local admin during `seed_data`; leave both empty to skip it. `DJANGO_SUPERUSER_USERNAME` defaults to `admin`.
 
@@ -108,6 +110,14 @@ Check `docker compose logs db` first. SQL Server rejects passwords that do not s
 ### Port is already in use
 
 Change `FRONTEND_PORT`, `BACKEND_PORT`, or `MSSQL_PORT` in `.env`, then restart Compose.
+
+The setup helper can update the ignored SQL host mapping without displaying any secret values:
+
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\scripts\Setup-DevelopmentEnv.ps1 -MssqlPort 11433
+```
+
+This does not change the container-to-container database port, which remains `1433`.
 
 ### Frontend receives API errors
 

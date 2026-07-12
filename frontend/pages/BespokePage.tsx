@@ -47,7 +47,7 @@ const BespokePage: React.FC = () => {
             <SEO 
                 title="آتلیه دوخت سفارشی" 
                 description="خدمات دوخت سفارشی (Bespoke) رضا فرمال. تجربه پوشیدن کت و شلواری که تنها برای شما ساخته شده است."
-                image="https://picsum.photos/1200/800?random=bespoke"
+                image="https://rezaformal.com/images/utilities/bespoke.webp"
             />
             
             {/* Header */}
@@ -72,7 +72,7 @@ const BespokePage: React.FC = () => {
                 <div className="flex flex-col lg:flex-row gap-12 items-center mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
                     <div className="w-full lg:w-1/2 h-[400px] rounded-xl overflow-hidden shadow-2xl relative group">
                         <ImageLoader 
-                            src="https://picsum.photos/800/600?random=tailor" 
+                            src="/images/utilities/bespoke.webp"
                             alt="Master Tailor" 
                             className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
                             loading="eager"
@@ -123,7 +123,13 @@ const BespokePage: React.FC = () => {
                 <div id="reservation-form" className="max-w-4xl mx-auto bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-gray-100 dark:border-zinc-700 overflow-hidden">
                     <div className="grid grid-cols-1 md:grid-cols-2">
                         <div className="bg-lux-black p-8 text-white flex flex-col justify-center relative overflow-hidden">
-                            <div className="absolute inset-0 bg-lux-gold/10 opacity-20" style={{ backgroundImage: "url('https://www.transparenttextures.com/patterns/cubes.png')" }}></div>
+                            <div
+                                className="absolute inset-0 bg-lux-gold/10 opacity-20"
+                                style={{
+                                    backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(197, 160, 89, 0.4) 1px, transparent 0)',
+                                    backgroundSize: '18px 18px',
+                                }}
+                            ></div>
                             <div className="relative z-10">
                                 <h3 className="font-serif text-3xl mb-4">رزرو وقت</h3>
                                 <p className="text-gray-300 font-light mb-8 leading-relaxed">

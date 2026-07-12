@@ -73,6 +73,16 @@ if '\\' in db_host:
     # Named SQL Server instances normally discover their own dynamic port.
     db_port = ''
 
+db_encrypt = env('DB_ENCRYPT', default='no').strip().lower()
+if db_encrypt not in {'yes', 'no', 'mandatory', 'optional', 'strict'}:
+    raise ImproperlyConfigured('DB_ENCRYPT must be yes, no, mandatory, optional, or strict')
+db_trust_server_certificate = env(
+    'DB_TRUST_SERVER_CERTIFICATE',
+    default='yes',
+).strip().lower()
+if db_trust_server_certificate not in {'yes', 'no'}:
+    raise ImproperlyConfigured('DB_TRUST_SERVER_CERTIFICATE must be yes or no')
+
 DATABASES = {
     'default': {
         'ENGINE': 'mssql',
@@ -83,9 +93,13 @@ DATABASES = {
         'PORT': db_port,
         'OPTIONS': {
             'driver': env('DB_DRIVER', default='ODBC Driver 17 for SQL Server'),
-            'Encrypt': env('DB_ENCRYPT', default='no'),
-            'TrustServerCertificate': env('DB_TRUST_SERVER_CERTIFICATE', default='yes'),
-            'Connection Timeout': env('DB_CONNECTION_TIMEOUT', default='30'),
+            # mssql-django only forwards ODBC connection keywords through
+            # extra_params; arbitrary top-level OPTIONS keys are ignored.
+            'extra_params': (
+                f'Encrypt={db_encrypt};'
+                f'TrustServerCertificate={db_trust_server_certificate}'
+            ),
+            'connection_timeout': env.int('DB_CONNECTION_TIMEOUT', default=30),
         },
     }
 }
