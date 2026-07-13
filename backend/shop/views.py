@@ -1,15 +1,24 @@
 from rest_framework import status, permissions
-from rest_framework.decorators import api_view, permission_classes, parser_classes
+from rest_framework.decorators import api_view, permission_classes, parser_classes, throttle_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
-from .models import Product, Order, OrderItem, ContactMessage, SiteSettings
+from .models import (
+    ContactMessage,
+    InventoryMovement,
+    Order,
+    OrderItem,
+    Product,
+    ProductVariant,
+    SiteSettings,
+)
 from .serializers import (
     ContactMessageSerializer,
     CreateOrderSerializer,
     OrderSerializer,
     ProductSerializer,
+    ProductVariantInputSerializer,
     RegisterSerializer,
     SiteSettingsSerializer,
 )
@@ -19,13 +28,18 @@ from rest_framework_simplejwt.tokens import RefreshToken
 import pyotp
 import uuid
 from django.conf import settings
+from django.middleware.csrf import get_token
 from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import F
+from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
+from .auth import enforce_csrf
 import os
 import json
 import logging
+from decimal import Decimal
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
@@ -61,6 +75,13 @@ def _verify_google_token(raw_id_token, client_id):
 def get_tokens_for_user(user):
     refresh = RefreshToken.for_user(user)
     return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def csrf_token(request):
+    """Issue the CSRF cookie/token used by authenticated browser mutations."""
+    return Response({'csrfToken': get_token(request)})
 
 
 def _set_auth_cookies(response, tokens):
@@ -108,7 +129,10 @@ def serialize_user(user):
         'first_name': user.first_name,
         'last_name': user.last_name,
         'role': getattr(user, 'role', 'user'),
+        'phone': getattr(user, 'phone', ''),
         'address': getattr(user, 'address', ''),
+        'date_joined': user.date_joined,
+        'last_login': user.last_login,
     }
 
 # Helper for Gallery Images (JSON List) ONLY
@@ -167,6 +191,13 @@ def prepare_product_data(request):
         data = request.data.dict()
     else:
         data = request.data.copy()
+
+    for client_name, model_name in (
+        ('active', 'is_active'),
+        ('compareAtPrice', 'compare_at_price'),
+    ):
+        if client_name in data and model_name not in data:
+            data[model_name] = data.pop(client_name)
 
     # If an image file was uploaded, preserve the UploadedFile so the
     # serializer's ImageField can validate and save it (preferred flow).
@@ -235,13 +266,119 @@ def prepare_product_data(request):
             pass
     return data
 
+
+def _extract_variants(data):
+    """Remove and validate an optional embedded variant array from product data."""
+    raw = data.pop('variants', None)
+    if raw in (None, ''):
+        return None, None
+    if isinstance(raw, str):
+        try:
+            raw = json.loads(raw)
+        except (TypeError, ValueError):
+            return None, {'variants': ['Expected a JSON array.']}
+    if not isinstance(raw, list):
+        return None, {'variants': ['Expected an array.']}
+    for item in raw:
+        if isinstance(item, dict) and 'active' in item and 'is_active' not in item:
+            item['is_active'] = item.pop('active')
+    serializer = ProductVariantInputSerializer(data=raw, many=True)
+    if not serializer.is_valid():
+        return None, {'variants': serializer.errors}
+    if not serializer.validated_data:
+        return None, None
+    return serializer.validated_data, None
+
+
+def _sync_product_variants(product, variants, actor):
+    """Keep SKU inventory auditable and maintain legacy Product.stock as a projection."""
+    if variants is None:
+        current = list(product.variants.select_for_update())
+        if len(current) > 1 or (current and (current[0].size or current[0].color)):
+            projected_stock = sum(item.stock for item in current if item.is_active)
+            if product.stock != projected_stock:
+                product.stock = projected_stock
+                product.save(update_fields=['stock', 'updated_at'])
+            return
+        if current:
+            variant = current[0]
+            created = False
+        else:
+            variant = ProductVariant.objects.create(
+                product=product,
+                size='',
+                color='',
+                sku=f'DEFAULT-{product.pk}'.upper(),
+                stock=product.stock,
+                is_active=product.is_active,
+            )
+            created = True
+        old_stock = variant.stock
+        if not created and (variant.stock != product.stock or variant.is_active != product.is_active):
+            variant.stock = product.stock
+            variant.is_active = product.is_active
+            variant.save(update_fields=['stock', 'is_active', 'updated_at'])
+        delta = product.stock if created else product.stock - old_stock
+        if delta:
+            InventoryMovement.objects.create(
+                variant=variant,
+                actor=actor,
+                sku=variant.sku,
+                delta=delta,
+                resulting_stock=variant.stock,
+                reason='initial' if created else 'adjustment',
+                reference=f'PRODUCT-{product.pk}',
+            )
+        return
+
+    existing = {str(item.id): item for item in product.variants.select_for_update()}
+    retained = set()
+    active_stock = 0
+    for values in variants:
+        variant_id = str(values.pop('id', ''))
+        variant = existing.get(variant_id) if variant_id else None
+        if variant is None:
+            variant = ProductVariant(product=product)
+            old_stock = 0
+            reason = 'initial'
+        else:
+            old_stock = variant.stock
+            retained.add(str(variant.id))
+            reason = 'adjustment'
+        for field in ('sku', 'size', 'color', 'price', 'stock', 'is_active'):
+            if field in values:
+                setattr(variant, field, values[field])
+        variant.full_clean()
+        variant.save()
+        retained.add(str(variant.id))
+        if variant.is_active:
+            active_stock += variant.stock
+        delta = variant.stock - old_stock
+        if delta:
+            InventoryMovement.objects.create(
+                variant=variant,
+                actor=actor,
+                sku=variant.sku,
+                delta=delta,
+                resulting_stock=variant.stock,
+                reason=reason,
+                reference=f'PRODUCT-{product.pk}',
+            )
+
+    product.variants.exclude(id__in=retained).update(is_active=False)
+    if product.stock != active_stock:
+        product.stock = active_stock
+        product.save(update_fields=['stock', 'updated_at'])
+
 # ==============================================================================
 # VIEWS
 # ==============================================================================
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([RegisterRateThrottle])
 def register(request):
+    enforce_csrf(request)
     serializer = RegisterSerializer(data=request.data)
     if not serializer.is_valid():
         return Response(serializer.errors, status=400)
@@ -272,7 +409,9 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([LoginRateThrottle])
 def login(request):
+    enforce_csrf(request)
     email = str(request.data.get('email') or '').strip()
     password = request.data.get('password') or ''
     otp = request.data.get('otp')
@@ -309,6 +448,7 @@ def me(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def logout_view(request):
+    enforce_csrf(request)
     resp = Response({'detail': 'logged out'})
     _clear_auth_cookies(resp)
     return resp
@@ -317,6 +457,7 @@ def logout_view(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def refresh_auth(request):
+    enforce_csrf(request)
     raw_refresh = request.COOKIES.get('refresh')
     if not raw_refresh:
         return Response({'detail': 'Refresh token required'}, status=401)
@@ -353,12 +494,15 @@ def update_profile(request):
         user.first_name = data.get('name')
     if 'address' in data:
         user.address = data.get('address') or ''
+    if 'phone' in data:
+        user.phone = str(data.get('phone') or '').strip()
     user.save()
     return Response(serialize_user(user))
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def google_auth(request):
+    enforce_csrf(request)
     raw_id_token = request.data.get('id_token')
     if not raw_id_token:
         return Response({'detail': 'id_token required'}, status=400)
@@ -406,6 +550,7 @@ def google_auth(request):
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def send_otp(request):
+    enforce_csrf(request)
     # Never return a second-factor code to the same unauthenticated client.
     # A real implementation must deliver a short-lived code through a separately
     # verified channel (or use an authenticator-app enrollment flow).
@@ -414,7 +559,7 @@ def send_otp(request):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def products_list(request):
-    qs = Product.objects.all()
+    qs = Product.objects.filter(is_active=True).prefetch_related('variants', 'reviews')
     serializer = ProductSerializer(qs, many=True, context={'request': request})
     return Response(serializer.data)
 
@@ -423,7 +568,11 @@ def products_list(request):
 @parser_classes([MultiPartParser, FormParser, JSONParser])
 def product_detail(request, pk=None):
     if request.method == 'GET':
-        prod = get_object_or_404(Product, pk=pk)
+        prod = get_object_or_404(
+            Product.objects.prefetch_related('variants', 'reviews'),
+            pk=pk,
+            is_active=True,
+        )
         return Response(ProductSerializer(prod, context={'request': request}).data)
     
     if not request.user.is_authenticated or not request.user.is_admin():
@@ -431,6 +580,9 @@ def product_detail(request, pk=None):
 
     if request.method == 'POST' or request.method == 'PUT':
         data = prepare_product_data(request)
+        variants, variant_errors = _extract_variants(data)
+        if variant_errors:
+            return Response(variant_errors, status=400)
 
         if request.method == 'POST':
              data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
@@ -440,7 +592,12 @@ def product_detail(request, pk=None):
              serializer = ProductSerializer(prod, data=data, partial=True)
 
         if serializer.is_valid():
-            serializer.save()
+            try:
+                with transaction.atomic():
+                    serializer.save()
+                    _sync_product_variants(serializer.instance, variants, request.user)
+            except (DjangoValidationError, IntegrityError) as exc:
+                return Response({'variants': [str(exc)]}, status=400)
             response_status = status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK
             return Response(
                 ProductSerializer(serializer.instance, context={'request': request}).data,
@@ -577,7 +734,9 @@ def site_settings(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([ContactRateThrottle])
 def contact(request):
+    enforce_csrf(request)
     serializer = ContactMessageSerializer(data=request.data)
     if serializer.is_valid():
         serializer.save()
@@ -592,42 +751,91 @@ def admin_stats(request):
     products_count = Product.objects.count()
     orders = Order.objects.all()
     users_count = User.objects.count()
-    valid_orders = orders.exclude(status='cancelled')
-    revenue = sum([float(o.total) for o in valid_orders])
+    from .models import BespokeRequest, Payment, ProductReview, ReturnRequest
+
+    revenue = Decimal('0.00')
+    for payment in Payment.objects.filter(status__in=['paid', 'partially_refunded']):
+        refunded = Decimal(str((payment.metadata or {}).get('refunded_amount', '0')))
+        revenue += max(payment.amount - refunded, Decimal('0.00'))
     messages_count = ContactMessage.objects.filter(read=False).count()
-    return Response({'productsCount': products_count, 'ordersCount': orders.count(), 'usersCount': users_count, 'revenue': revenue, 'messagesCount': messages_count})
+    return Response({
+        'productsCount': products_count,
+        'ordersCount': orders.count(),
+        'usersCount': users_count,
+        'revenue': revenue,
+        'messagesCount': messages_count,
+        'pendingOrdersCount': orders.filter(status='pending').count(),
+        'lowStockCount': ProductVariant.objects.filter(is_active=True, stock__lte=5).count(),
+        'pendingReviewsCount': ProductReview.objects.filter(status='pending').count(),
+        'pendingReturnsCount': ReturnRequest.objects.filter(status='requested').count(),
+        'pendingBespokeCount': BespokeRequest.objects.filter(status='new').count(),
+    })
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def admin_orders(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
-    qs = Order.objects.all().order_by('-created_at')
-    return Response(OrderSerializer(qs, many=True).data)
+    from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
+
+    qs = Order.objects.select_related(
+        'user', 'address', 'shipping_method', 'coupon', 'payment',
+    ).prefetch_related('items__variant', 'events__actor').order_by('-created_at')
+    return Response(CommerceOrderSerializer(qs, many=True, context={'request': request}).data)
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def admin_update_order_status(request, pk):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
+    from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
+    from .commerce_services import CommerceError, get_order_for_user, transition_order_status
+
     status_val = request.data.get('status')
-    if status_val not in dict(Order.STATUS):
-        return Response({'detail':'invalid status'}, status=400)
+    tracking_supplied = 'tracking_code' in request.data or 'trackingCode' in request.data
+    note_supplied = 'admin_note' in request.data or 'adminNote' in request.data
+    if status_val is None and not tracking_supplied and not note_supplied:
+        return Response({'detail': 'No order changes were supplied.', 'code': 'empty_update'}, status=400)
+    if status_val is not None and status_val not in dict(Order.STATUS):
+        return Response({'detail': 'Invalid order status.', 'code': 'invalid_status'}, status=400)
+    if status_val is not None:
+        try:
+            order = transition_order_status(pk, status_val, request.user)
+        except CommerceError as exc:
+            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+    else:
+        try:
+            order = get_order_for_user(pk, request.user, include_admin=True)
+        except CommerceError as exc:
+            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
 
-    with transaction.atomic():
-        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
-        if order.status == 'cancelled' and status_val != 'cancelled':
-            return Response({'detail':'cancelled orders cannot be reopened'}, status=400)
-        if status_val == 'cancelled' and order.status != 'cancelled':
-            for item in order.items.select_related('product').all():
-                if item.product_id:
-                    Product.objects.filter(pk=item.product_id).update(
-                        stock=F('stock') + item.qty
-                    )
-        order.status = status_val
-        order.save(update_fields=['status'])
-
-    return Response(OrderSerializer(order).data)
+    update_fields = []
+    event_data = {}
+    if tracking_supplied:
+        tracking_code = str(request.data.get('tracking_code', request.data.get('trackingCode', ''))).strip()
+        if len(tracking_code) > 128:
+            return Response({'tracking_code': ['Must contain at most 128 characters.']}, status=400)
+        order.tracking_code = tracking_code
+        update_fields.append('tracking_code')
+        event_data['tracking_code'] = tracking_code
+    if note_supplied:
+        admin_note = str(request.data.get('admin_note', request.data.get('adminNote', ''))).strip()
+        if len(admin_note) > 5000:
+            return Response({'admin_note': ['Must contain at most 5000 characters.']}, status=400)
+        order.admin_note = admin_note
+        update_fields.append('admin_note')
+        event_data['admin_note_updated'] = True
+    if update_fields:
+        order.save(update_fields=[*update_fields, 'updated_at'])
+        from .models import OrderEvent
+        OrderEvent.objects.create(
+            order=order,
+            event_type='order_details_updated',
+            actor=request.user,
+            data={**event_data, 'message': 'Order fulfillment details updated'},
+        )
+        order = get_order_for_user(pk, request.user, include_admin=True)
+    return Response(CommerceOrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -665,7 +873,7 @@ def admin_products(request):
         return Response({'detail':'admin required'}, status=403)
     
     if request.method == 'GET':
-        qs = Product.objects.all()
+        qs = Product.objects.all().prefetch_related('variants', 'reviews')
         return Response(ProductSerializer(qs, many=True, context={'request': request}).data)
 
     # POST (Create)
@@ -676,13 +884,21 @@ def admin_products(request):
         pass
     # 1. Prepare data (this leaves 'image' as a File, but handles 'images' list)
     data = prepare_product_data(request)
+    variants, variant_errors = _extract_variants(data)
+    if variant_errors:
+        return Response(variant_errors, status=400)
 
     data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
     
     # 2. Pass 'image' FILE to serializer. ImageField will handle it.
     serializer = ProductSerializer(data=data, context={'request': request})
     if serializer.is_valid():
-        serializer.save()
+        try:
+            with transaction.atomic():
+                serializer.save()
+                _sync_product_variants(serializer.instance, variants, request.user)
+        except (DjangoValidationError, IntegrityError) as exc:
+            return Response({'variants': [str(exc)]}, status=400)
         return Response(
             ProductSerializer(serializer.instance, context={'request': request}).data,
             status=status.HTTP_201_CREATED,
@@ -699,7 +915,7 @@ def admin_product_detail(request, pk=None):
         return Response({'detail':'admin required'}, status=403)
 
     if request.method == 'GET':
-        prod = get_object_or_404(Product, pk=pk)
+        prod = get_object_or_404(Product.objects.prefetch_related('variants', 'reviews'), pk=pk)
         return Response(ProductSerializer(prod, context={'request': request}).data)
 
     if request.method == 'PUT':
@@ -707,10 +923,18 @@ def admin_product_detail(request, pk=None):
             prod = Product.objects.get(pk=pk)
             # Prepare data (leaves 'image' as File)
             data = prepare_product_data(request)
+            variants, variant_errors = _extract_variants(data)
+            if variant_errors:
+                return Response(variant_errors, status=400)
             
             serializer = ProductSerializer(prod, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
-                serializer.save()
+                try:
+                    with transaction.atomic():
+                        serializer.save()
+                        _sync_product_variants(serializer.instance, variants, request.user)
+                except (DjangoValidationError, IntegrityError) as exc:
+                    return Response({'variants': [str(exc)]}, status=400)
                 return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
             
             logger.warning('Product admin update error: %s', serializer.errors)
@@ -718,10 +942,18 @@ def admin_product_detail(request, pk=None):
             
         except Product.DoesNotExist:
             data = prepare_product_data(request)
+            variants, variant_errors = _extract_variants(data)
+            if variant_errors:
+                return Response(variant_errors, status=400)
             data['id'] = pk
             serializer = ProductSerializer(data=data, context={'request': request})
             if serializer.is_valid():
-                serializer.save()
+                try:
+                    with transaction.atomic():
+                        serializer.save()
+                        _sync_product_variants(serializer.instance, variants, request.user)
+                except (DjangoValidationError, IntegrityError) as exc:
+                    return Response({'variants': [str(exc)]}, status=400)
                 return Response(ProductSerializer(serializer.instance, context={'request': request}).data, status=201)
             return Response(serializer.errors, status=400)
 

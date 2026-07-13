@@ -10,6 +10,12 @@ services:
       - "127.0.0.1:${MSSQL_PORT:-1433}:1433"
     volumes:
       - mssql_data:/var/opt/mssql
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" -b -o /dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 18
+      start_period: 30s
     restart: unless-stopped
 
   backend:
@@ -17,7 +23,8 @@ services:
       context: ./backend
     container_name: reza-formal-backend
     depends_on:
-      - db
+      db:
+        condition: service_healthy
     environment:
       DEBUG: "${DJANGO_DEBUG:-True}"
       DJANGO_SECRET_KEY: "${DJANGO_SECRET_KEY:?Set DJANGO_SECRET_KEY in the root .env file}"
@@ -59,6 +66,12 @@ services:
     volumes:
       - django_media:/app/media
       - django_static:/app/staticfiles
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/api/health/ready/"]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 45s
     restart: unless-stopped
 
   frontend:
@@ -68,11 +81,18 @@ services:
         VITE_API_BASE: "${VITE_API_BASE:-/api}"
     container_name: reza-formal-frontend
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     ports:
       - "${FRONTEND_PORT:-3000}:80"
     volumes:
       - django_media:/var/www/media:ro
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/api/health/ready/"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     restart: unless-stopped
 
 volumes:

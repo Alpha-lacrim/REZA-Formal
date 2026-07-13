@@ -1,6 +1,17 @@
+from django.middleware.csrf import CsrfViewMiddleware
 from rest_framework.exceptions import AuthenticationFailed
+from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
+
+
+def enforce_csrf(request):
+    """Apply Django's CSRF validation to authenticated cookie mutations."""
+    check = CsrfViewMiddleware(lambda _request: None)
+    check.process_request(request)
+    reason = check.process_view(request, None, (), {})
+    if reason:
+        raise PermissionDenied(f'CSRF validation failed: {reason}')
 
 
 class CookieJWTAuthentication(JWTAuthentication):
@@ -18,4 +29,6 @@ class CookieJWTAuthentication(JWTAuthentication):
             # AuthenticationFailed also covers valid tokens whose user was
             # deleted or disabled.
             return None
+        if request.method not in {'GET', 'HEAD', 'OPTIONS', 'TRACE'}:
+            enforce_csrf(request)
         return user, validated_token

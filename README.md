@@ -1,6 +1,8 @@
 # REZA Formal
 
-REZA Formal is a full-stack e-commerce site for formal menswear. It combines a React/Vite storefront with a Django REST API, Microsoft SQL Server persistence, cookie-based JWT authentication, product/order administration, and local Docker support.
+REZA Formal is a full-stack Persian/RTL commerce site for formal menswear. It combines a React/Vite storefront with a Django REST API, Microsoft SQL Server persistence, CSRF-protected cookie JWT authentication, and a health-checked Docker stack.
+
+The provider-free store is functional with product variants and inventory history, saved carts and wishlists, structured addresses, server-priced quotes, coupons and shipping methods, idempotent COD/manual checkout, payment and fulfillment state, immutable order snapshots, verified-purchase reviews, returns/refunds, bespoke leads, newsletters, policy pages, and customer/staff dashboards. Real online payments, carrier labels, and transactional email/SMS remain explicit provider integrations; the site never simulates those services as successful.
 
 ## Stack
 
@@ -30,13 +32,14 @@ Open:
 
 - Storefront: http://localhost:3000
 - Product API: http://localhost:8000/api/products/
+- Readiness: http://localhost:8000/api/health/ready/
 - Django admin: http://localhost:8000/admin/
 
 Compose starts:
 
 - `db`: SQL Server 2022 Developer with persistent `mssql_data`
-- `backend`: Gunicorn/Django after database wait, optional database creation, migrations, static collection, and idempotent seed data
-- `frontend`: a production Vite build served by Nginx; `/api/` is proxied to Django and `/media/` is served from the shared read-only media volume
+- `backend`: Gunicorn/Django after database readiness, optional database creation, migrations, static collection, and first-catalog/shipping bootstrap
+- `frontend`: a route-split production Vite build with locally compiled Tailwind CSS, served by Nginx; `/api/` is proxied to Django and `/media/` is served from the shared read-only media volume
 
 The database and direct backend ports bind to `127.0.0.1`; containers communicate through the private Compose network. See [docs/DOCKER_SETUP.md](docs/DOCKER_SETUP.md) for configuration and reset instructions.
 
@@ -99,7 +102,7 @@ docker compose config --quiet
 
 The Django application depends on SQL Server, native ODBC support, uploaded-media persistence, and startup migrations. Deploy it on a persistent container/application host rather than through the old Vercel Python configuration.
 
-Cookie auth currently requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com` (a custom Vercel domain is fine). A default `project.vercel.app` frontend plus an unrelated API host will not receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; a genuinely cross-site design requires a complete CSRF-protected auth redesign and must account for browser third-party-cookie restrictions. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login additionally requires a configured backend `GOOGLE_OAUTH_CLIENT_ID` and a frontend Google Identity flow that supplies a verified ID token.
+Cookie auth includes an explicit CSRF bootstrap/header flow, but deployment still requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com`. A default `project.vercel.app` frontend plus an unrelated API host will not reliably receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; third-party-cookie deployments are intentionally unsupported. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login additionally requires a configured backend `GOOGLE_OAUTH_CLIENT_ID` and a frontend Google Identity flow that supplies a verified ID token.
 
 ## Project structure
 
@@ -120,10 +123,12 @@ REZA-Formal/
 - Uploaded media, local databases, virtual environments, Python caches, cookie jars, archives, dependencies, and build output are ignored.
 - `frontend/services/api.ts` is the primary server integration. `frontend/services/db.ts` is only a read-only emergency catalog fallback.
 - OTP delivery is intentionally disabled until a separately verified delivery/enrollment flow is implemented.
+- See [commerce operations](docs/COMMERCE_OPERATIONS.md) for payment, fulfillment, refund, backup, and launch responsibilities.
 
 ## More documentation
 
 - [Docker setup](docs/DOCKER_SETUP.md)
+- [Commerce operations](docs/COMMERCE_OPERATIONS.md)
 - [Frontend/backend connection](FRONTEND_BACKEND_CONNECTION.md)
 - [SQL Server configuration](SQL_SERVER_MIGRATION_SUMMARY.md)
 - [Codebase analysis snapshot](docs/CODEBASE_ANALYSIS_2026-06-28.md)

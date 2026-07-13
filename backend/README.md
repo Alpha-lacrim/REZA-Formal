@@ -28,9 +28,9 @@ python manage.py seed_data
 python manage.py runserver
 ```
 
-`seed_data` creates products/site settings when needed. It creates an admin only when both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` are set. Leaving both empty skips admin creation; setting only one is a configuration error.
+`seed_data` bootstraps the demo catalog only when the catalog is empty and shipping methods only when none exist, so later container restarts do not recreate individually removed records. It creates an admin only when both `DJANGO_SUPERUSER_EMAIL` and `DJANGO_SUPERUSER_PASSWORD` are set. Leaving both empty skips admin creation; setting only one is a configuration error.
 
-Before applying migration `0005`, back up an existing database. The migration normalizes emails, enforces uniqueness, and intentionally stops with user IDs if legacy accounts have blank or case-insensitive duplicate emails. Resolve those records, then rerun `migrate`. It also irreversibly clears `two_factor_secret` values created by the retired OTP-echo flow because those users were never given an authenticator enrollment secret or recovery path.
+Before applying migration `0005` to an existing production database, back it up. The migration normalizes emails, enforces uniqueness, and intentionally stops with user IDs if legacy accounts have blank or case-insensitive duplicate emails. Migrations `0006` and `0007` then add variants, addresses, shipping, coupons, payments/refunds, inventory history, order snapshots/events, carts, wishlists, reviews, returns, bespoke requests, newsletters, and notification outbox records.
 
 ## Linux/macOS virtual environment
 
@@ -58,11 +58,7 @@ Important `backend/.env` values:
 
 `backend/.env` is ignored and must never be committed.
 
-Google ID tokens are verified server-side against the configured web client ID.
-Authentication cookies intentionally accept only `SameSite=Lax` or `Strict`;
-`SameSite=None` requires a complete CSRF token/header flow that is not yet
-implemented. For HTTPS production, enable secure cookies, trusted proxy
-forwarding, redirect, and HSTS only after confirming the deployment topology.
+Google ID tokens are verified server-side against the configured web client ID. Browser mutations use the `/api/auth/csrf/` bootstrap and `X-CSRFToken`; authentication cookies intentionally accept only `SameSite=Lax` or `Strict`. For HTTPS production, enable secure cookies, trusted proxy forwarding, redirect, and HSTS only after confirming the deployment topology.
 
 ## Checks
 
@@ -72,7 +68,7 @@ Run the hermetic backend tests without connecting to the configured SQL Server:
 python manage.py test --settings=reza_backend.test_settings
 ```
 
-`reza_backend.test_settings` uses an in-memory SQLite database, fast password hashing, and test-only secrets. The suite covers authentication, public input validation, order/stock invariants, admin product validation, and idempotent seeding.
+`reza_backend.test_settings` uses an in-memory SQLite database, fast password hashing, isolated throttle rates, and test-only secrets. The suite covers authentication/CSRF, throttles, routed checkout, idempotency, variants/inventory, coupons/shipping, snapshots, payment/order/return transitions, admin operations, public input validation, and seeding.
 
 With a valid development SQL Server environment, also run:
 
@@ -81,7 +77,7 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
-Browser end-to-end tests are not currently included.
+The repository CI runs these checks plus frontend type/build checks and Compose validation. Provider sandbox/browser automation still belongs in the deployment pipeline once providers are selected.
 
 ## Docker
 

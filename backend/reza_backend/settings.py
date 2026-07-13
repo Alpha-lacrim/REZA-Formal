@@ -150,6 +150,20 @@ REST_FRAMEWORK = {
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
     ),
+    'DEFAULT_THROTTLE_CLASSES': (
+        'rest_framework.throttling.AnonRateThrottle',
+        'rest_framework.throttling.UserRateThrottle',
+    ),
+    'DEFAULT_THROTTLE_RATES': {
+        'anon': '120/min',
+        'user': '600/min',
+        'login': '10/min',
+        'register': '5/hour',
+        'contact': '10/hour',
+        'checkout': '30/hour',
+        'checkout_quote': '300/hour',
+        'newsletter': '5/hour',
+    },
     # Optional: Increase Django REST Framework specific upload limits if needed
     # (Usually falls back to Django settings, but good to know)
 }
@@ -166,8 +180,8 @@ def _same_site_setting(name, default):
     value = env(name, default=default).strip().capitalize()
     if value not in {'Lax', 'Strict'}:
         raise ImproperlyConfigured(
-            f'{name} must be Lax or Strict; SameSite=None is unsafe until '
-            'cookie-authenticated API requests enforce CSRF tokens'
+            f'{name} must be Lax or Strict; this deployment intentionally uses '
+            'same-site browser authentication and does not support third-party cookies'
         )
     return value
 

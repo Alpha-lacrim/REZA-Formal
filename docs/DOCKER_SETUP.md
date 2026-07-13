@@ -33,12 +33,17 @@ Open:
 - Frontend: http://localhost:3000
 - Backend API: http://localhost:8000/api/products/
 - Django admin: http://localhost:8000/admin/
+- Backend readiness: http://localhost:8000/api/health/ready/
 
 ## Services
 
 - `db`: SQL Server 2022 Developer with the persistent `mssql_data` volume.
 - `backend`: installs ODBC Driver 18, waits for SQL Server with `pyodbc`, optionally creates the database, applies migrations, collects static assets, seeds idempotent data, and starts Gunicorn.
 - `frontend`: builds the Vite application and serves it with Nginx. Nginx proxies `/api/` to Django and serves `/media/` from the read-only `django_media` volume shared with the backend.
+
+All three services expose health checks. SQL Server must answer a real query, backend readiness must answer a database query, and frontend readiness verifies that Nginx can proxy backend readiness. Compose starts dependent services only after the dependency is healthy.
+
+The seed command bootstraps products only when the catalog is empty and shipping methods only when none exist. Keeping `RUN_SEED_DATA=true` is convenient for development and does not recreate one intentionally deleted record while other records remain; production operators can set it to `false` after controlled bootstrap.
 
 SQL Server and the direct Django port are published only on `127.0.0.1`. The frontend is published on `FRONTEND_PORT` and containers use the private Compose network internally.
 
@@ -86,7 +91,7 @@ Common root `.env` settings:
 | `DB_WAIT_TIMEOUT` | Backend startup wait in seconds | `180` |
 | `RUN_MIGRATIONS` | Apply migrations at backend startup | `true` |
 | `RUN_COLLECTSTATIC` | Collect Django static files | `true` |
-| `RUN_SEED_DATA` | Run idempotent product/settings/admin seed | `true` |
+| `RUN_SEED_DATA` | Bootstrap empty catalog/shipping, settings, and optional admin | `true` |
 | `DB_AUTO_CREATE` | Create `DB_NAME` when absent | `true` |
 | `VITE_API_BASE` | Frontend API origin or prefix | `/api` |
 | `GOOGLE_OAUTH_CLIENT_ID` | Backend Google token audience; blank disables it | Blank |

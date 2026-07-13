@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 from django.core.validators import validate_email
 
-from shop.models import Product, SiteSettings
+from shop.models import Product, ProductVariant, ShippingMethod, SiteSettings
 
 
 PRODUCTS = [
@@ -16,11 +16,12 @@ PRODUCTS = [
         'price': 16800000,
         'currency': 'Toman',
         'images': ['/images/suit/charcoal-check.jpg'],
-        'short': 'سه تکه رسمی با پارچه پشم',
-        'description': 'کت و شلوار سه تکه با بافت ظریف، مناسب جلسات کاری و مراسم رسمی.',
+        'short': 'سه‌تکه رسمی با پارچه پشمی',
+        'description': 'کت و شلوار سه‌تکه با بافت ظریف، مناسب جلسات کاری و مراسم رسمی.',
         'category': 'suits',
         'fabric': 'پشم',
         'stock': 5,
+        'featured': True,
     },
     {
         'id': 'suit-midnight-navy',
@@ -33,6 +34,7 @@ PRODUCTS = [
         'category': 'suits',
         'fabric': 'پشم و ابریشم',
         'stock': 8,
+        'featured': True,
     },
     {
         'id': 'suit-burgundy-signature',
@@ -40,7 +42,7 @@ PRODUCTS = [
         'price': 18000000,
         'currency': 'Toman',
         'images': ['/images/suit/sp_red_suit.jpg'],
-        'short': 'انتخاب شاخص برای مراسم',
+        'short': 'انتخابی شاخص برای مراسم',
         'description': 'رنگ زرشکی عمیق با ظاهر مجلسی برای مشتریانی که به دنبال تمایز هستند.',
         'category': 'suits',
         'fabric': 'ابریشم و پشم',
@@ -57,6 +59,7 @@ PRODUCTS = [
         'category': 'shirts',
         'fabric': 'پنبه',
         'stock': 20,
+        'featured': True,
     },
     {
         'id': 'shirt-navy-premium',
@@ -99,9 +102,7 @@ PRODUCTS = [
         'name': 'دستمال جیب ابریشمی',
         'price': 450000,
         'currency': 'Toman',
-        'images': [
-            '/images/accessories/Understanding_pocket_squares_03396d68-5ee7-45cd-aaae-7f72913caa43_600x600.webp'
-        ],
+        'images': ['/images/accessories/Understanding_pocket_squares_03396d68-5ee7-45cd-aaae-7f72913caa43_600x600.webp'],
         'short': 'جزئیات ظریف برای استایل رسمی',
         'description': 'دستمال جیب با پارچه ابریشمی و نقش رسمی برای تکمیل پوشش.',
         'category': 'accessories',
@@ -111,8 +112,31 @@ PRODUCTS = [
 ]
 
 
+SHIPPING_METHODS = [
+    {
+        'code': 'STANDARD',
+        'name': 'ارسال استاندارد',
+        'description': 'ارسال با هماهنگی فروشگاه؛ زمان نهایی پس از ثبت سفارش تأیید می‌شود.',
+        'price': 150000,
+        'free_over': 20000000,
+        'estimated_days_min': 2,
+        'estimated_days_max': 5,
+        'sort_order': 10,
+    },
+    {
+        'code': 'PICKUP',
+        'name': 'تحویل حضوری',
+        'description': 'تحویل رایگان از فروشگاه پس از اعلام آماده بودن سفارش.',
+        'price': 0,
+        'estimated_days_min': 1,
+        'estimated_days_max': 2,
+        'sort_order': 20,
+    },
+]
+
+
 class Command(BaseCommand):
-    help = 'Seed optional configured superuser, catalog products, and site settings'
+    help = 'Seed optional configured superuser, catalog, variants, shipping, and site settings'
 
     def _seed_superuser(self):
         email = os.environ.get('DJANGO_SUPERUSER_EMAIL', '').strip().lower()
@@ -123,9 +147,7 @@ class Command(BaseCommand):
             self.stdout.write('Skipped superuser creation (credentials are not configured)')
             return
         if not email or not password:
-            raise CommandError(
-                'DJANGO_SUPERUSER_EMAIL and DJANGO_SUPERUSER_PASSWORD must be set together'
-            )
+            raise CommandError('DJANGO_SUPERUSER_EMAIL and DJANGO_SUPERUSER_PASSWORD must be set together')
         if not username or len(username) > 150:
             raise CommandError('DJANGO_SUPERUSER_USERNAME must contain 1 to 150 characters')
 
@@ -140,9 +162,7 @@ class Command(BaseCommand):
             if existing.is_superuser and existing.is_active:
                 self.stdout.write('Configured active superuser already exists; account was not modified')
                 return
-            raise CommandError(
-                'DJANGO_SUPERUSER_EMAIL belongs to an account that is not an active superuser'
-            )
+            raise CommandError('DJANGO_SUPERUSER_EMAIL belongs to an account that is not an active superuser')
         if User.objects.filter(username=username).exists():
             raise CommandError('DJANGO_SUPERUSER_USERNAME is already in use by another account')
 
@@ -162,16 +182,38 @@ class Command(BaseCommand):
         self._seed_superuser()
 
         created_products = 0
-        for product_data in PRODUCTS:
-            product_id = product_data['id']
-            defaults = {key: value for key, value in product_data.items() if key != 'id'}
-            _, created = Product.objects.get_or_create(id=product_id, defaults=defaults)
-            created_products += int(created)
-        self.stdout.write(f'Catalog seed complete ({created_products} products created)')
+        created_variants = 0
+        if not Product.objects.exists():
+            for product_data in PRODUCTS:
+                product_id = product_data['id']
+                defaults = {key: value for key, value in product_data.items() if key != 'id'}
+                product, created = Product.objects.get_or_create(id=product_id, defaults=defaults)
+                created_products += int(created)
+                _, variant_created = ProductVariant.objects.get_or_create(
+                    product=product,
+                    size='',
+                    color='',
+                    defaults={
+                        'sku': f'DEFAULT-{product.id}'.upper(),
+                        'stock': product.stock,
+                        'is_active': product.is_active,
+                    },
+                )
+                created_variants += int(variant_created)
+        self.stdout.write(
+            f'Catalog seed complete ({created_products} products and {created_variants} variants created)'
+        )
+
+        created_shipping = 0
+        if not ShippingMethod.objects.exists():
+            for method in SHIPPING_METHODS:
+                _, created = ShippingMethod.objects.get_or_create(code=method['code'], defaults=method)
+                created_shipping += int(created)
+        self.stdout.write(f'Shipping seed complete ({created_shipping} methods created)')
 
         if not SiteSettings.objects.exists():
             SiteSettings.objects.create(
                 about_title='داستان رضا فرمال',
-                about_description='متن پیش‌فرض درباره‌ی رضا فرمال',
+                about_description='پوشاک رسمی با تمرکز بر دوخت دقیق، پارچه باکیفیت و تجربه خرید مطمئن.',
             )
             self.stdout.write('Created default site settings')

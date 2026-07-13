@@ -1,17 +1,24 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product, User, SiteSettings } from '../types';
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import { CartLine, Product, SiteSettings, User } from '../types';
 import api from '../services/api';
 import { db } from '../services/db';
 
+export const cartLineKey = (line: Pick<CartLine, 'productId' | 'variantId'>): string =>
+    `${line.productId}::${line.variantId || ''}`;
+
+type CatalogSource = 'server' | 'fallback' | 'none';
+
 interface GlobalContextType {
-    cart: { [id: string]: number };
-    addToCart: (productId: string, qty?: number) => void;
-    removeFromCart: (productId: string) => void;
-    updateQty: (productId: string, delta: number) => void;
+    /** Aggregated legacy shape retained for Navbar and older callers. */
+    cart: { [productId: string]: number };
+    cartLines: CartLine[];
+    addToCart: (productId: string, qty?: number, variantId?: string) => void;
+    removeFromCart: (lineKeyOrProductId: string) => void;
+    updateQty: (lineKeyOrProductId: string, delta: number) => void;
     clearCart: () => void;
     isCartOpen: boolean;
     toggleCart: (open?: boolean) => void;
-    
+
     wishlist: string[];
     toggleWishlist: (productId: string) => void;
     isInWishlist: (productId: string) => boolean;
@@ -23,8 +30,9 @@ interface GlobalContextType {
     logout: () => void;
     updateUserProfile: (data: Partial<User>) => Promise<void>;
     cancelUserOrder: (orderId: string) => Promise<void>;
-    
+
     products: Product[];
+    catalogSource: CatalogSource;
     refreshProducts: () => Promise<void>;
     sendMessage: (name: string, email: string, message: string) => Promise<void>;
 
@@ -48,33 +56,78 @@ const normalizeUserForContext = (raw: any, fallbackName = ''): User => ({
     email: raw?.email || '',
     role: raw?.role || 'user',
     address: raw?.address || '',
-    createdAt: raw?.createdAt || Date.now()
+    createdAt: raw?.createdAt || Date.now(),
 });
 
-export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const [cart, setCart] = useState<{ [id: string]: number }>(() => {
-        try { return JSON.parse(localStorage.getItem('reza_cart_v1') || '{}'); } catch { return {}; }
-    });
-    
-    const [wishlist, setWishlist] = useState<string[]>(() => {
-        try { return JSON.parse(localStorage.getItem('reza_wishlist_v1') || '[]'); } catch { return []; }
-    });
+const readLocalCart = (): CartLine[] => {
+    try {
+        const stored = JSON.parse(localStorage.getItem('reza_cart_v2') || '[]');
+        if (Array.isArray(stored)) {
+            return stored
+                .filter(line => line && typeof line.productId === 'string' && Number(line.quantity) > 0)
+                .map(line => ({
+                    productId: line.productId,
+                    variantId: typeof line.variantId === 'string' && line.variantId ? line.variantId : undefined,
+                    quantity: Math.max(1, Math.floor(Number(line.quantity))),
+                }));
+        }
+    } catch {
+        // Migrate the previous product-id map below.
+    }
 
+    try {
+        const legacy = JSON.parse(localStorage.getItem('reza_cart_v1') || '{}');
+        return Object.entries(legacy)
+            .filter(([productId, quantity]) => productId && Number(quantity) > 0)
+            .map(([productId, quantity]) => ({ productId, quantity: Math.max(1, Math.floor(Number(quantity))) }));
+    } catch {
+        return [];
+    }
+};
+
+const readLocalWishlist = (): string[] => {
+    try {
+        const stored = JSON.parse(localStorage.getItem('reza_wishlist_v1') || '[]');
+        return Array.isArray(stored) ? stored.filter((id): id is string => typeof id === 'string') : [];
+    } catch {
+        return [];
+    }
+};
+
+export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const [cartLines, setCartLines] = useState<CartLine[]>(readLocalCart);
+    const [wishlist, setWishlist] = useState<string[]>(readLocalWishlist);
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
     const [products, setProducts] = useState<Product[]>([]);
+    const [catalogSource, setCatalogSource] = useState<CatalogSource>('none');
     const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
-
     const [isAuthModalOpen, setAuthModalOpen] = useState(false);
-    const [theme, setTheme] = useState<'light' | 'dark'>(() => {
-        return (localStorage.getItem('reza_theme_pref') as 'light' | 'dark') || 'light';
-    });
+    const [theme, setTheme] = useState<'light' | 'dark'>(() =>
+        (localStorage.getItem('reza_theme_pref') as 'light' | 'dark') || 'light');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
+    const cartSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const hydratedUserId = useRef<string | null>(null);
+
+    const cart = useMemo(() => cartLines.reduce<{ [productId: string]: number }>((summary, line) => {
+        summary[line.productId] = (summary[line.productId] || 0) + line.quantity;
+        return summary;
+    }, {}), [cartLines]);
+
+    const showToast = (msg: string) => {
+        setToastMessage(msg);
+        window.setTimeout(() => setToastMessage(null), 3000);
+    };
 
     useEffect(() => {
+        localStorage.setItem('reza_cart_v2', JSON.stringify(cartLines.map(({ productId, variantId, quantity }) => ({
+            productId,
+            variantId,
+            quantity,
+        }))));
         localStorage.setItem('reza_cart_v1', JSON.stringify(cart));
-    }, [cart]);
+    }, [cart, cartLines]);
 
     useEffect(() => {
         localStorage.setItem('reza_wishlist_v1', JSON.stringify(wishlist));
@@ -87,28 +140,8 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     useEffect(() => {
         localStorage.setItem('reza_theme_pref', theme);
-        const html = document.documentElement;
-        if (theme === 'dark') html.classList.add('dark');
-        else html.classList.remove('dark');
+        document.documentElement.classList.toggle('dark', theme === 'dark');
     }, [theme]);
-
-    useEffect(() => {
-        // Try to populate user from backend cookie-based session, then load products and settings
-        (async () => {
-            try {
-                const me = await api.me();
-                setUser(normalizeUserForContext(me));
-            } catch (e) {
-                // not authenticated
-            } finally {
-                setIsAuthLoading(false);
-            }
-
-            // After attempting to populate user, refresh products and settings.
-            await refreshProducts();
-            await loadSettings();
-        })();
-    }, []);
 
     const refreshProducts = async () => {
         try {
@@ -117,134 +150,203 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
                 try {
                     serverProducts = await api.adminGetProducts();
                 } catch {
-                    // The public endpoint remains useful if an admin session expires.
                     serverProducts = await api.getProducts();
                 }
             } else {
                 serverProducts = await api.getProducts();
             }
-
-            // A successful server response is authoritative, including an empty list.
-            // Local seeds are browse-only fallback data when the API is unavailable.
             setProducts(serverProducts);
-        } catch (e) {
+            setCatalogSource('server');
+        } catch {
             try {
-                const local = await db.getProducts();
-                setProducts(local);
+                setProducts(await db.getProducts());
+                setCatalogSource('fallback');
             } catch {
                 setProducts([]);
+                setCatalogSource('none');
             }
         }
     };
 
     const loadSettings = async () => {
         try {
-            const settings = await api.getSettings();
-            // The API service owns wire-format normalization.
-            setSiteSettings(settings || null);
-        } catch (e) {
+            setSiteSettings(await api.getSettings());
+        } catch {
             setSiteSettings(null);
         }
     };
 
-    const getTrackedStock = (productId: string) => {
-        const product = products.find(p => p.id === productId);
-        return product?.stock === undefined || product.stock === null ? Infinity : Number(product.stock);
+    useEffect(() => {
+        void (async () => {
+            try {
+                setUser(normalizeUserForContext(await api.me()));
+            } catch {
+                setUser(null);
+            } finally {
+                setIsAuthLoading(false);
+            }
+            await Promise.all([refreshProducts(), loadSettings()]);
+        })();
+    }, []);
+
+    useEffect(() => {
+        if (!user || hydratedUserId.current === user.id) return;
+        hydratedUserId.current = user.id;
+
+        void (async () => {
+            try {
+                const savedCart = await api.getSavedCart();
+                const localLines = readLocalCart();
+                const mergedLines = new Map<string, CartLine>();
+                [...savedCart.lines, ...localLines].forEach(({ productId, variantId, quantity }) => {
+                    const key = cartLineKey({ productId, variantId });
+                    const existing = mergedLines.get(key);
+                    mergedLines.set(key, {
+                        productId,
+                        variantId,
+                        quantity: Math.max(existing?.quantity || 0, quantity),
+                    });
+                });
+                const mergedCart = Array.from(mergedLines.values());
+                if (mergedCart.length > 0) {
+                    setCartLines(mergedCart);
+                    await api.syncSavedCart({ lines: mergedCart, currency: 'Toman' });
+                }
+            } catch {
+                // Local cart stays usable if the saved-cart service is unavailable.
+            }
+
+            try {
+                const serverProducts = await api.getWishlist();
+                const serverIds = serverProducts.map(product => product.id);
+                const localIds = readLocalWishlist();
+                const merged = Array.from(new Set([...serverIds, ...localIds]));
+                setWishlist(merged);
+                await Promise.all(localIds.filter(id => !serverIds.includes(id)).map(id => api.addToWishlist(id)));
+            } catch {
+                // Local wishlist stays usable if the account service is unavailable.
+            }
+        })();
+    }, [user?.id]);
+
+    useEffect(() => {
+        if (!user || hydratedUserId.current !== user.id) return;
+        if (cartSyncTimer.current) clearTimeout(cartSyncTimer.current);
+        cartSyncTimer.current = setTimeout(() => {
+            void api.syncSavedCart({ lines: cartLines, currency: 'Toman' }).catch(() => undefined);
+        }, 700);
+        return () => {
+            if (cartSyncTimer.current) clearTimeout(cartSyncTimer.current);
+        };
+    }, [cartLines, user?.id]);
+
+    const resolveLineStock = (productId: string, variantId?: string): number => {
+        const product = products.find(item => item.id === productId);
+        if (!product) return 0;
+        if (variantId) {
+            const variant = product.variants?.find(item => item.id === variantId);
+            return variant?.active === false ? 0 : Math.max(0, Number(variant?.stock ?? 0));
+        }
+        return product.stock === undefined || product.stock === null ? Number.POSITIVE_INFINITY : Math.max(0, Number(product.stock));
     };
 
-    const addToCart = (productId: string, qty = 1) => {
-        const requestedQty = Math.max(1, Number(qty) || 1);
-        const stock = getTrackedStock(productId);
+    const addToCart = (productId: string, qty = 1, requestedVariantId?: string) => {
+        const product = products.find(item => item.id === productId);
+        const defaultVariant = product?.variants?.find(variant => variant.active && variant.stock > 0);
+        const variantId = requestedVariantId || (product?.variants?.length ? defaultVariant?.id : undefined);
+        if (product?.variants?.length && !variantId) {
+            showToast('برای این محصول ابتدا یک گزینه موجود انتخاب کنید');
+            return;
+        }
 
+        const requestedQty = Math.max(1, Math.floor(Number(qty) || 1));
+        const stock = resolveLineStock(productId, variantId);
         if (stock <= 0) {
             showToast('این محصول ناموجود است');
             return;
         }
 
-        setCart(prev => {
-            const currentQty = prev[productId] || 0;
+        const key = cartLineKey({ productId, variantId });
+        setCartLines(previous => {
+            const existing = previous.find(line => cartLineKey(line) === key);
+            const currentQty = existing?.quantity || 0;
             const nextQty = Math.min(currentQty + requestedQty, stock);
-
             if (nextQty === currentQty) {
-                showToast('موجودی بیشتری برای این محصول در دسترس نیست');
-                return prev;
+                showToast('موجودی بیشتری برای این گزینه در دسترس نیست');
+                return previous;
             }
-
-            showToast(nextQty < currentQty + requestedQty ? 'تعداد محصول با موجودی انبار تنظیم شد' : 'به سبد خرید اضافه شد');
-            return { ...prev, [productId]: nextQty };
+            const nextLine: CartLine = { productId, variantId, quantity: nextQty };
+            showToast(nextQty < currentQty + requestedQty ? 'تعداد با موجودی انبار تنظیم شد' : 'به سبد خرید اضافه شد');
+            return existing
+                ? previous.map(line => cartLineKey(line) === key ? nextLine : line)
+                : [...previous, nextLine];
         });
         setIsCartOpen(true);
     };
 
-    const removeFromCart = (productId: string) => {
-        setCart(prev => {
-            const next = { ...prev };
-            delete next[productId];
-            return next;
-        });
+    const findMatchingLineKey = (lineKeyOrProductId: string): string | undefined => {
+        if (lineKeyOrProductId.includes('::')) return lineKeyOrProductId;
+        return cartLines.find(line => line.productId === lineKeyOrProductId)
+            ? cartLineKey(cartLines.find(line => line.productId === lineKeyOrProductId)!)
+            : undefined;
     };
 
-    const updateQty = (productId: string, delta: number) => {
-        setCart(prev => {
-            const stock = getTrackedStock(productId);
-            const newQty = Math.min((prev[productId] || 0) + delta, stock);
-            if (newQty <= 0) {
-                const next = { ...prev };
-                delete next[productId];
-                return next;
+    const removeFromCart = (lineKeyOrProductId: string) => {
+        const key = findMatchingLineKey(lineKeyOrProductId);
+        if (!key) return;
+        setCartLines(previous => previous.filter(line => cartLineKey(line) !== key));
+    };
+
+    const updateQty = (lineKeyOrProductId: string, delta: number) => {
+        const key = findMatchingLineKey(lineKeyOrProductId);
+        if (!key) return;
+        setCartLines(previous => previous.flatMap(line => {
+            if (cartLineKey(line) !== key) return [line];
+            const stock = resolveLineStock(line.productId, line.variantId);
+            const nextQty = Math.min(line.quantity + delta, stock);
+            if (nextQty <= 0) return [];
+            if (nextQty === line.quantity && delta > 0) {
+                showToast('موجودی بیشتری برای این گزینه در دسترس نیست');
+                return [line];
             }
-            if (newQty === prev[productId] && delta > 0) {
-                showToast('موجودی بیشتری برای این محصول در دسترس نیست');
-                return prev;
-            }
-            return { ...prev, [productId]: newQty };
-        });
+            return [{ ...line, quantity: nextQty }];
+        }));
     };
 
     const clearCart = () => {
-        setCart({});
+        setCartLines([]);
+        if (user) void api.clearSavedCart().catch(() => undefined);
     };
 
-    const toggleCart = (open?: boolean) => {
-        setIsCartOpen(prev => open !== undefined ? open : !prev);
-    };
+    const toggleCart = (open?: boolean) => setIsCartOpen(previous => open ?? !previous);
 
     const toggleWishlist = (productId: string) => {
-        setWishlist(prev => {
-            if (prev.includes(productId)) {
-                showToast('از علاقه‌مندی‌ها حذف شد');
-                return prev.filter(id => id !== productId);
-            } else {
-                showToast('به علاقه‌مندی‌ها اضافه شد');
-                return [...prev, productId];
-            }
-        });
+        const removing = wishlist.includes(productId);
+        setWishlist(previous => removing ? previous.filter(id => id !== productId) : [...previous, productId]);
+        showToast(removing ? 'از علاقه‌مندی‌ها حذف شد' : 'به علاقه‌مندی‌ها اضافه شد');
+        if (user) {
+            const operation = removing ? api.removeFromWishlist(productId) : api.addToWishlist(productId);
+            void operation.catch(() => showToast('تغییر محلی ذخیره شد؛ همگام‌سازی حساب انجام نشد'));
+        }
     };
 
     const isInWishlist = (productId: string) => wishlist.includes(productId);
 
     const login = async (email: string, pass: string, code?: string) => {
-        // Call login to let backend set cookies, then fetch /me to get authoritative user data (including role)
-        const resp = await api.login(email, pass, code);
+        const response = await api.login(email, pass, code);
         try {
-            const me = await api.me();
-            setUser(normalizeUserForContext(me));
-        } catch (e) {
-            // Fallback to any user payload returned by login
-            const u = resp?.user || resp;
-            setUser(normalizeUserForContext(u));
+            setUser(normalizeUserForContext(await api.me()));
+        } catch {
+            setUser(normalizeUserForContext(response?.user || response));
         }
         setAuthModalOpen(false);
-        showToast(`خوش آمدید`);
+        showToast('خوش آمدید');
     };
 
     const register = async (name: string, email: string, pass: string) => {
-        // Registration returns the new user and establishes the JWT cookies.
-        const resp = await api.register(name, email, pass);
-        const u = resp.user || resp || null;
-        if (u) {
-            setUser(normalizeUserForContext(u, name));
-        }
+        const response = await api.register(name, email, pass);
+        const newUser = response?.user || response;
+        if (newUser) setUser(normalizeUserForContext(newUser, name));
         setAuthModalOpen(false);
         showToast('حساب کاربری ایجاد شد');
     };
@@ -252,9 +354,10 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const logout = async () => {
         try {
             await api.logout();
-        } catch (e) {
-            // ignore
+        } catch {
+            // The local session must still be cleared if the server is unreachable.
         }
+        hydratedUserId.current = null;
         setUser(null);
         showToast('خروج با موفقیت انجام شد');
     };
@@ -262,11 +365,11 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const updateUserProfile = async (data: Partial<User>) => {
         if (!user) return;
         try {
-            const updated = await api.updateProfile(data);
-            setUser(updated);
-            showToast('اطلاعات با موفقیت بروز شد');
-        } catch (e) {
-            showToast('خطا در بروزرسانی');
+            setUser(await api.updateProfile(data));
+            showToast('اطلاعات با موفقیت به‌روز شد');
+        } catch (error) {
+            showToast('خطا در به‌روزرسانی اطلاعات');
+            throw error;
         }
     };
 
@@ -275,61 +378,70 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             await api.cancelOrder(orderId);
             await refreshProducts();
             showToast('سفارش لغو شد');
-        } catch (e) {
-            showToast('خطا در لغو سفارش');
+        } catch (error) {
+            showToast('این سفارش قابل لغو نیست');
+            throw error;
         }
     };
 
     const sendMessage = async (name: string, email: string, message: string) => {
-        let sendError: unknown;
         try {
             await api.contact(name, email, message);
             showToast('پیام شما با موفقیت ارسال شد');
-        } catch (e) {
-            sendError = e;
+        } catch (error) {
             showToast('خطا در ارسال پیام');
+            throw error;
         }
-        if (sendError) throw sendError;
     };
 
     const updateSiteSettings = async (settings: SiteSettings | FormData) => {
         try {
-            const saved = await api.saveSettings(settings);
-            setSiteSettings(saved);
+            setSiteSettings(await api.saveSettings(settings));
             showToast('تنظیمات سایت ذخیره شد');
-        } catch (e) {
+        } catch (error) {
             showToast('خطا در ذخیره تنظیمات');
-            throw e;
+            throw error;
         }
     };
 
-    const toggleTheme = () => {
-        setTheme(prev => prev === 'light' ? 'dark' : 'light');
+    const value: GlobalContextType = {
+        cart,
+        cartLines,
+        addToCart,
+        removeFromCart,
+        updateQty,
+        clearCart,
+        isCartOpen,
+        toggleCart,
+        wishlist,
+        toggleWishlist,
+        isInWishlist,
+        user,
+        isAuthLoading,
+        login,
+        register,
+        logout,
+        updateUserProfile,
+        cancelUserOrder,
+        products,
+        catalogSource,
+        refreshProducts,
+        sendMessage,
+        siteSettings,
+        updateSiteSettings,
+        theme,
+        toggleTheme: () => setTheme(previous => previous === 'light' ? 'dark' : 'light'),
+        isAuthModalOpen,
+        setAuthModalOpen,
+        toastMessage,
+        showToast,
     };
 
-    const showToast = (msg: string) => {
-        setToastMessage(msg);
-        setTimeout(() => setToastMessage(null), 3000);
-    };
-
-    return (
-        <GlobalContext.Provider value={{
-            cart, addToCart, removeFromCart, updateQty, clearCart, isCartOpen, toggleCart,
-            wishlist, toggleWishlist, isInWishlist,
-            user, isAuthLoading, login, register, logout, updateUserProfile, cancelUserOrder, sendMessage,
-            products, refreshProducts,
-            siteSettings, updateSiteSettings,
-            theme, toggleTheme,
-            isAuthModalOpen, setAuthModalOpen,
-            toastMessage, showToast
-        }}>
-            {children}
-        </GlobalContext.Provider>
-    );
+    return <GlobalContext.Provider value={value}>{children}</GlobalContext.Provider>;
 };
 
 export const useGlobal = () => {
     const context = useContext(GlobalContext);
-    if (!context) throw new Error("useGlobal must be used within GlobalProvider");
+    if (!context) throw new Error('useGlobal must be used within GlobalProvider');
     return context;
 };

@@ -1,248 +1,179 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Scissors, Ruler, UserCheck, Calendar, CheckCircle, Loader2 } from 'lucide-react';
+import { ArrowLeft, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
+import api from '../services/api';
 import ImageLoader from '../components/ImageLoader';
 import SEO from '../components/SEO';
 
 const BespokePage: React.FC = () => {
     const navigate = useNavigate();
-    const { showToast } = useGlobal();
+    const { showToast, user, siteSettings } = useGlobal();
     const [loading, setLoading] = useState(false);
-    const [step, setStep] = useState(1); // 1: Info, 2: Form, 3: Success
-
+    const [step, setStep] = useState<1 | 2 | 3>(1);
+    const [error, setError] = useState('');
+    const [requestId, setRequestId] = useState('');
     const [formData, setFormData] = useState({
-        name: '',
-        phone: '',
+        name: user?.name || '',
+        phone: user?.phone || '',
+        email: user?.email || '',
         date: '',
-        type: 'suit', // suit, shirt, coat
-        desc: ''
+        type: 'suit',
+        desc: '',
     });
 
+    useEffect(() => window.scrollTo(0, 0), []);
     useEffect(() => {
-        window.scrollTo(0, 0);
-    }, []);
+        if (!user) return;
+        setFormData(current => ({
+            ...current,
+            name: current.name || user.name,
+            phone: current.phone || user.phone || '',
+            email: current.email || user.email,
+        }));
+    }, [user]);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
+    const handleSubmit = async (event: React.FormEvent) => {
+        event.preventDefault();
+        setError('');
         setLoading(true);
-        
-        // Simulate API call
-        setTimeout(() => {
-            setLoading(false);
+        try {
+            const result = await api.submitBespokeRequest({
+                name: formData.name.trim(),
+                phone: formData.phone.trim(),
+                email: formData.email.trim() || undefined,
+                preferredDate: formData.date || undefined,
+                garmentType: formData.type,
+                description: formData.desc.trim() || undefined,
+            });
+            setRequestId(result.id || '');
             setStep(3);
             showToast('درخواست شما با موفقیت ثبت شد');
-        }, 1500);
+        } catch (submissionError: any) {
+            const message = submissionError?.message || 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید';
+            setError(message);
+            showToast(message);
+        } finally {
+            setLoading(false);
+        }
     };
 
     const processSteps = [
-        { icon: <UserCheck size={32} />, title: "مشاوره استایل", desc: "دیدار با طراحان ما برای انتخاب پارچه و مدل مناسب شخصیت شما." },
-        { icon: <Ruler size={32} />, title: "اندازه‌گیری دقیق", desc: "ثبت بیش از ۳۰ اندازه مختلف بدن برای ایجاد الگوی اختصاصی." },
-        { icon: <Scissors size={32} />, title: "دوخت و پرو", desc: "دوخت استادانه و انجام پروهای میانی برای رفع ایرادات جزئی." },
-        { icon: <CheckCircle size={32} />, title: "تحویل نهایی", desc: "تحویل لباس آماده شده با بالاترین استانداردهای کیفی." }
+        { icon: <UserCheck size={30} />, title: 'مشاوره استایل', desc: 'انتخاب مدل و پارچه متناسب با نیاز و سلیقه شما.' },
+        { icon: <Ruler size={30} />, title: 'اندازه‌گیری دقیق', desc: 'ثبت اندازه‌ها برای ساخت الگوی اختصاصی لباس.' },
+        { icon: <Scissors size={30} />, title: 'دوخت و پرو', desc: 'دوخت تخصصی و انجام پروهای لازم پیش از تحویل.' },
+        { icon: <CheckCircle size={30} />, title: 'تحویل نهایی', desc: 'بازبینی کیفیت و تحویل سفارش آماده‌شده.' },
     ];
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-900 pt-20">
-            <SEO 
-                title="آتلیه دوخت سفارشی" 
-                description="خدمات دوخت سفارشی (Bespoke) رضا فرمال. تجربه پوشیدن کت و شلواری که تنها برای شما ساخته شده است."
-                image="https://rezaformal.com/images/utilities/bespoke.webp"
-            />
-            
-            {/* Header */}
-            <header className="relative text-center bg-lux-black text-white py-12 overflow-hidden">
-                <div className="relative mx-auto w-full max-w-4xl px-4 z-10">
-                    <h1 className="font-serif text-3xl md:text-5xl mb-4">آتلیه دوخت سفارشی</h1>
-                    <p className="text-white/80 text-sm md:text-base font-light tracking-wide">اوج هنر خیاطی، برازنده قامت شما</p>
+            <SEO title="آتلیه دوخت اختصاصی" description="ثبت درخواست واقعی مشاوره و دوخت اختصاصی REZA Formal" />
+            <header className="relative text-center bg-lux-black text-white py-10 overflow-hidden">
+                <div className="relative mx-auto max-w-4xl px-4 z-10">
+                    <h1 className="font-serif text-3xl md:text-5xl mb-3">آتلیه دوخت اختصاصی</h1>
+                    <p className="text-white/75 text-sm md:text-base">لباسی که دقیقاً برای شما طراحی و دوخته می‌شود</p>
                 </div>
-                <div className="absolute left-1/2 top-1/2 -translate-y-1/2 -translate-x-1/2 w-[120%] h-40 bg-lux-gold/10 rounded-full blur-3xl"></div>
+                <div className="absolute inset-x-0 top-1/2 h-32 bg-lux-gold/20 blur-3xl" />
             </header>
-
             <div className="bg-lux-black px-4 pb-4">
-                 <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md hover:brightness-95 text-xs md:text-sm">
-                    <ArrowLeft size={14} />
-                    <span>بازگشت</span>
-                 </button>
+                <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md text-sm">
+                    <ArrowLeft size={14} /> بازگشت
+                </button>
             </div>
 
             <main className="container max-w-6xl mx-auto px-4 py-12">
-                
-                {/* Intro Section */}
-                <div className="flex flex-col lg:flex-row gap-12 items-center mb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-                    <div className="w-full lg:w-1/2 h-[400px] rounded-xl overflow-hidden shadow-2xl relative group">
-                        <ImageLoader 
-                            src="/images/utilities/bespoke.webp"
-                            alt="Master Tailor" 
-                            className="w-full h-full object-cover transition-transform duration-1000 group-hover:scale-105" 
+                <section className="grid grid-cols-1 lg:grid-cols-2 gap-10 items-stretch mb-16">
+                    <div className="relative min-h-[420px] rounded-xl overflow-hidden bg-zinc-800">
+                        <ImageLoader
+                            src={siteSettings?.bespokeSectionImage || '/images/utilities/bespoke.webp'}
+                            alt="آتلیه دوخت اختصاصی"
+                            className="absolute inset-0 w-full h-full"
                             loading="eager"
                         />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-                        <div className="absolute bottom-6 right-6 text-white">
-                            <p className="text-lux-gold uppercase text-xs font-bold mb-1">تجربه اختصاصی</p>
-                            <h3 className="font-serif text-2xl">هنر دست دوزندگان ماهر</h3>
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent" />
+                        <div className="absolute bottom-0 p-8 text-white">
+                            <h2 className="font-serif text-3xl mb-3">تجربه پوشاک شخصی‌دوز</h2>
+                            <p className="text-white/80 leading-7">پس از ثبت فرم، تیم آتلیه برای هماهنگی مشاوره و زمان مراجعه با شما تماس می‌گیرد.</p>
                         </div>
                     </div>
-                    <div className="w-full lg:w-1/2">
-                        <h2 className="text-3xl font-serif font-bold text-lux-black dark:text-white mb-6">
-                            چرا دوخت سفارشی؟
-                        </h2>
-                        <div className="text-gray-600 dark:text-gray-300 leading-8 text-justify text-lg font-light mb-8">
-                            لباس سفارشی (Bespoke) فراتر از یک پوشش ساده است؛ این بازتابی از شخصیت، جایگاه و سلیقه منحصر به فرد شماست. در رضا فرمال، ما با ترکیب سنت‌های دیرینه خیاطی ایتالیایی و تکنیک‌های مدرن، لباسی را خلق می‌کنیم که مانند پوست دوم بر تن شما می‌نشیند. انتخاب پارچه از میان برندهای معتبر جهانی نظیر Loro Piana و Zegna تنها شروع این سفر جذاب است.
-                        </div>
-                        <button 
-                            onClick={() => document.getElementById('reservation-form')?.scrollIntoView({ behavior: 'smooth' })}
-                            className="bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black px-8 py-3 rounded-lg font-bold hover:opacity-90 transition-all btn-ripple"
-                        >
-                            رزرو وقت مشاوره
-                        </button>
-                    </div>
-                </div>
 
-                {/* Process Steps */}
-                <div className="mb-20">
-                    <h3 className="text-center text-2xl font-serif font-bold text-lux-black dark:text-white mb-12 relative inline-block w-full">
-                        <span className="bg-lux-body dark:bg-zinc-900 px-4 relative z-10">مراحل کار</span>
-                        <span className="absolute top-1/2 left-0 w-full h-px bg-gray-200 dark:bg-zinc-700 -z-0"></span>
-                    </h3>
-                    
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-                        {processSteps.map((step, idx) => (
-                            <div key={idx} className="bg-white dark:bg-zinc-800 p-6 rounded-xl shadow-sm border border-gray-100 dark:border-zinc-700 text-center hover:-translate-y-2 transition-transform duration-300 group">
-                                <div className="w-16 h-16 mx-auto bg-gray-50 dark:bg-zinc-700 rounded-full flex items-center justify-center text-lux-gold mb-4 group-hover:bg-lux-gold group-hover:text-white transition-colors">
-                                    {step.icon}
-                                </div>
-                                <h4 className="font-bold text-lg mb-2 text-lux-black dark:text-white">{step.title}</h4>
-                                <p className="text-sm text-gray-500 dark:text-gray-400 leading-relaxed">{step.desc}</p>
-                            </div>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Reservation Form */}
-                <div id="reservation-form" className="max-w-4xl mx-auto bg-white dark:bg-zinc-800 rounded-2xl shadow-xl border border-gray-100 dark:border-zinc-700 overflow-hidden">
-                    <div className="grid grid-cols-1 md:grid-cols-2">
-                        <div className="bg-lux-black p-8 text-white flex flex-col justify-center relative overflow-hidden">
-                            <div
-                                className="absolute inset-0 bg-lux-gold/10 opacity-20"
-                                style={{
-                                    backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(197, 160, 89, 0.4) 1px, transparent 0)',
-                                    backgroundSize: '18px 18px',
-                                }}
-                            ></div>
-                            <div className="relative z-10">
-                                <h3 className="font-serif text-3xl mb-4">رزرو وقت</h3>
-                                <p className="text-gray-300 font-light mb-8 leading-relaxed">
-                                    جهت دریافت مشاوره حضوری و اندازه‌گیری، لطفاً فرم مقابل را تکمیل نمایید. کارشناسان ما در اسرع وقت با شما تماس خواهند گرفت.
-                                </p>
-                                <ul className="space-y-4 text-sm">
-                                    <li className="flex items-center gap-3">
-                                        <CheckCircle className="text-lux-gold" size={20} />
-                                        <span>مشاوره رایگان استایل</span>
-                                    </li>
-                                    <li className="flex items-center gap-3">
-                                        <CheckCircle className="text-lux-gold" size={20} />
-                                        <span>تنوع بیش از ۱۰۰۰ مدل پارچه</span>
-                                    </li>
-                                    <li className="flex items-center gap-3">
-                                        <CheckCircle className="text-lux-gold" size={20} />
-                                        <span>گارانتی مادام‌العمر دوخت</span>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-
-                        <div className="p-8">
-                            {step === 3 ? (
-                                <div className="h-full flex flex-col items-center justify-center text-center py-10 animate-in zoom-in">
-                                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center text-green-600 mb-6">
-                                        <CheckCircle size={40} />
-                                    </div>
-                                    <h4 className="text-2xl font-bold text-lux-black dark:text-white mb-2">درخواست ثبت شد</h4>
-                                    <p className="text-gray-500 dark:text-gray-400 mb-8">
-                                        با تشکر از انتخاب شما. همکاران ما به زودی با شماره تماس ثبت شده تماس خواهند گرفت.
-                                    </p>
-                                    <button 
-                                        onClick={() => navigate('/')}
-                                        className="text-lux-gold hover:underline font-bold"
-                                    >
-                                        بازگشت به صفحه اصلی
-                                    </button>
-                                </div>
-                            ) : (
-                                <form onSubmit={handleSubmit} className="space-y-5">
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">نام و نام خانوادگی</label>
-                                        <input 
-                                            type="text" 
-                                            required
-                                            value={formData.name}
-                                            onChange={e => setFormData({...formData, name: e.target.value})}
-                                            className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white focus:border-lux-gold outline-none transition-colors"
-                                            placeholder="مثال: علی محمدی"
-                                        />
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">شماره تماس</label>
-                                        <input 
-                                            type="tel" 
-                                            required
-                                            value={formData.phone}
-                                            onChange={e => setFormData({...formData, phone: e.target.value})}
-                                            className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white focus:border-lux-gold outline-none transition-colors text-left dir-ltr"
-                                            placeholder="0912..."
-                                        />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">نوع سفارش</label>
-                                            <select 
-                                                value={formData.type}
-                                                onChange={e => setFormData({...formData, type: e.target.value})}
-                                                className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white focus:border-lux-gold outline-none"
-                                            >
-                                                <option value="suit">کت و شلوار</option>
-                                                <option value="shirt">پیراهن</option>
-                                                <option value="coat">پالتو</option>
-                                                <option value="wedding">دامادی</option>
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">تاریخ پیشنهادی</label>
-                                            <div className="relative">
-                                                <input 
-                                                    type="date" 
-                                                    value={formData.date}
-                                                    onChange={e => setFormData({...formData, date: e.target.value})}
-                                                    className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white focus:border-lux-gold outline-none"
-                                                />
-                                                <Calendar className="absolute left-3 top-3 text-gray-400 pointer-events-none" size={18} />
+                    <div className="bg-white dark:bg-zinc-800 rounded-xl border border-gray-100 dark:border-zinc-700 shadow-sm p-6 md:p-8">
+                        {step === 1 && (
+                            <div className="h-full flex flex-col justify-center">
+                                <h2 className="text-2xl font-bold text-lux-black dark:text-white mb-6">مراحل سفارش</h2>
+                                <div className="space-y-5 mb-8">
+                                    {processSteps.map((item, index) => (
+                                        <div key={item.title} className="flex gap-4">
+                                            <div className="w-12 h-12 shrink-0 rounded-full bg-lux-gold/10 text-lux-gold flex items-center justify-center">{item.icon}</div>
+                                            <div>
+                                                <h3 className="font-bold dark:text-white">{index + 1}. {item.title}</h3>
+                                                <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">{item.desc}</p>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div>
-                                        <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-2">توضیحات تکمیلی (اختیاری)</label>
-                                        <textarea 
-                                            rows={3}
-                                            value={formData.desc}
-                                            onChange={e => setFormData({...formData, desc: e.target.value})}
-                                            className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white focus:border-lux-gold outline-none transition-colors"
-                                            placeholder="ساعت مناسب تماس یا توضیحات خاص..."
-                                        />
-                                    </div>
-                                    <button 
-                                        type="submit" 
-                                        disabled={loading}
-                                        className="w-full bg-lux-gold text-white py-4 rounded-lg font-bold hover:bg-lux-gold-dark transition-all shadow-lg hover:shadow-xl disabled:opacity-70 flex justify-center items-center gap-2"
-                                    >
-                                        {loading ? <Loader2 className="animate-spin" /> : 'ثبت درخواست'}
-                                    </button>
-                                </form>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                                    ))}
+                                </div>
+                                <button onClick={() => setStep(2)} className="w-full bg-lux-gold text-white py-4 rounded-lg font-bold hover:brightness-95">ثبت درخواست مشاوره</button>
+                            </div>
+                        )}
 
+                        {step === 3 ? (
+                            <div className="h-full flex flex-col justify-center items-center text-center py-10">
+                                <CheckCircle size={72} className="text-green-500 mb-5" />
+                                <h2 className="text-2xl font-bold text-lux-black dark:text-white mb-3">درخواست ثبت شد</h2>
+                                <p className="text-gray-500 dark:text-gray-400 leading-7">همکاران آتلیه برای هماهنگی با شما تماس خواهند گرفت.</p>
+                                {requestId && <p className="mt-3 text-sm text-gray-400">شناسه پیگیری: <span dir="ltr">{requestId}</span></p>}
+                                <button onClick={() => navigate('/')} className="mt-8 text-lux-gold hover:underline font-bold">بازگشت به صفحه اصلی</button>
+                            </div>
+                        ) : step === 2 ? (
+                            <form onSubmit={handleSubmit} className="space-y-4">
+                                <div className="flex items-center justify-between mb-2">
+                                    <h2 className="text-xl font-bold text-lux-black dark:text-white">اطلاعات درخواست</h2>
+                                    <button type="button" onClick={() => setStep(1)} className="text-sm text-lux-gold">مشاهده مراحل</button>
+                                </div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                    نام و نام خانوادگی
+                                    <input required value={formData.name} onChange={event => setFormData({ ...formData, name: event.target.value })} className="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white outline-none focus:border-lux-gold" />
+                                </label>
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                        شماره تماس
+                                        <input dir="ltr" type="tel" required value={formData.phone} onChange={event => setFormData({ ...formData, phone: event.target.value })} placeholder="0912..." className="mt-2 w-full p-3 text-left border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white outline-none focus:border-lux-gold" />
+                                    </label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                        ایمیل (اختیاری)
+                                        <input dir="ltr" type="email" value={formData.email} onChange={event => setFormData({ ...formData, email: event.target.value })} className="mt-2 w-full p-3 text-left border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white outline-none focus:border-lux-gold" />
+                                    </label>
+                                </div>
+                                <div className="grid sm:grid-cols-2 gap-4">
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                        نوع سفارش
+                                        <select value={formData.type} onChange={event => setFormData({ ...formData, type: event.target.value })} className="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white outline-none">
+                                            <option value="suit">کت و شلوار</option>
+                                            <option value="shirt">پیراهن</option>
+                                            <option value="coat">پالتو</option>
+                                            <option value="wedding">لباس دامادی</option>
+                                        </select>
+                                    </label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                        تاریخ پیشنهادی
+                                        <span className="relative block mt-2">
+                                            <input type="date" value={formData.date} onChange={event => setFormData({ ...formData, date: event.target.value })} className="w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white outline-none" />
+                                            <Calendar className="absolute left-3 top-3 text-gray-400 pointer-events-none" size={18} />
+                                        </span>
+                                    </label>
+                                </div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-gray-300">
+                                    توضیحات تکمیلی
+                                    <textarea rows={3} value={formData.desc} onChange={event => setFormData({ ...formData, desc: event.target.value })} placeholder="زمان مناسب تماس یا جزئیات موردنظر شما" className="mt-2 w-full p-3 border border-gray-300 rounded-lg bg-gray-50 dark:bg-zinc-700 dark:border-zinc-600 dark:text-white outline-none focus:border-lux-gold" />
+                                </label>
+                                {error && <p role="alert" className="p-3 rounded bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-300 text-sm">{error}</p>}
+                                <button type="submit" disabled={loading} className="w-full bg-lux-gold text-white py-4 rounded-lg font-bold hover:brightness-95 disabled:opacity-60 flex justify-center items-center gap-2">
+                                    {loading ? <><Loader2 className="animate-spin" size={20} /> در حال ثبت</> : 'ثبت درخواست'}
+                                </button>
+                            </form>
+                        ) : null}
+                    </div>
+                </section>
             </main>
         </div>
     );

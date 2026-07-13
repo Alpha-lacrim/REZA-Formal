@@ -314,7 +314,7 @@ class OrderInvariantTests(TestCase):
 
         self.assertEqual(self.client.post('/api/orders/ORD-FIRST/cancel/').status_code, 200)
         self.assertEqual(self.client.post('/api/orders/ORD-SECOND/cancel/').status_code, 200)
-        self.assertEqual(self.client.post('/api/orders/ORD-FIRST/cancel/').status_code, 400)
+        self.assertEqual(self.client.post('/api/orders/ORD-FIRST/cancel/').status_code, 409)
         self.product.refresh_from_db()
         self.assertEqual(self.product.stock, 5)
 

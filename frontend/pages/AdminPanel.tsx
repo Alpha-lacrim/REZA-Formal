@@ -2,30 +2,49 @@ import React, { useState, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
 import api from '../services/api';
-import { Product, Order, ContactMessage, SiteSettings, User } from '../types';
+import {
+    AdminCapabilities, BespokeRequest, ContactMessage, CouponSummary, Order, Payment,
+    Product, ProductReview, ProductVariant, ReturnRequest, ShippingMethod, SiteSettings, User,
+} from '../types';
 import { toPersianDigits, formatPrice } from '../utils';
 import { 
     LayoutDashboard, Package, ShoppingBag, Plus, Trash2, Edit2, X, Save, 
     Search, ChevronLeft, ChevronRight, AlertCircle, MessageSquare, 
     Settings as SettingsIcon, Upload, ArrowUpDown, Eye, Printer, 
     Calendar, User as UserIcon, Phone, Filter, TrendingUp, DollarSign, 
-    Users, Activity, CheckCircle2, Clock, Ban, Menu
+    Users, Activity, CheckCircle2, Clock, Ban, Menu, Tags, Truck, CreditCard,
+    Star, RotateCcw, Scissors, ShieldCheck, Loader2, RefreshCw
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SEO from '../components/SEO';
 
 const ITEMS_PER_PAGE = 8;
+type AdminTab = 'dashboard' | 'products' | 'orders' | 'commerce' | 'messages' | 'settings';
+type CommerceSection = 'capabilities' | 'coupons' | 'shipping' | 'payments' | 'reviews' | 'returns' | 'bespoke';
 
 const AdminPanel: React.FC = () => {
     const { user, products, refreshProducts, showToast, siteSettings, updateSiteSettings, theme } = useGlobal();
     const navigate = useNavigate();
 
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'products' | 'orders' | 'messages' | 'settings'>('dashboard');
+    const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
     const [stats, setStats] = useState({ productsCount: 0, ordersCount: 0, usersCount: 0, revenue: 0, messagesCount: 0 });
     const [orders, setOrders] = useState<Order[]>([]);
     const [messages, setMessages] = useState<ContactMessage[]>([]);
     const [users, setUsers] = useState<User[]>([]);
+    const [commerceSection, setCommerceSection] = useState<CommerceSection>('capabilities');
+    const [commerceLoading, setCommerceLoading] = useState(false);
+    const [commerceError, setCommerceError] = useState('');
+    const [capabilities, setCapabilities] = useState<AdminCapabilities | null>(null);
+    const [coupons, setCoupons] = useState<CouponSummary[]>([]);
+    const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
+    const [payments, setPayments] = useState<Payment[]>([]);
+    const [reviews, setReviews] = useState<ProductReview[]>([]);
+    const [returns, setReturns] = useState<ReturnRequest[]>([]);
+    const [bespokeRequests, setBespokeRequests] = useState<BespokeRequest[]>([]);
+    const [couponForm, setCouponForm] = useState<Partial<CouponSummary>>({ code: '', type: 'percent', value: 0, active: true });
+    const [shippingForm, setShippingForm] = useState<Partial<ShippingMethod>>({ name: '', price: 0, currency: 'Toman', active: true });
+    const [commerceAction, setCommerceAction] = useState<string | null>(null);
 
     // Search & Pagination & Sort
     const [searchTerm, setSearchTerm] = useState('');
@@ -115,6 +134,26 @@ const AdminPanel: React.FC = () => {
                 showToast('خطا در دریافت پیام‌ها');
             }
         }
+        if (activeTab === 'commerce') await loadCommerceData();
+    };
+
+    const loadCommerceData = async () => {
+        setCommerceLoading(true);
+        setCommerceError('');
+        const requests = await Promise.allSettled([
+            api.adminGetCapabilities(), api.adminGetCoupons(), api.adminGetShippingMethods(),
+            api.adminGetPayments(), api.adminGetReviews(), api.adminGetReturns(), api.adminGetBespokeRequests(),
+        ]);
+        if (requests[0].status === 'fulfilled') setCapabilities(requests[0].value);
+        if (requests[1].status === 'fulfilled') setCoupons(requests[1].value.results);
+        if (requests[2].status === 'fulfilled') setShippingMethods(requests[2].value.results);
+        if (requests[3].status === 'fulfilled') setPayments(requests[3].value.results);
+        if (requests[4].status === 'fulfilled') setReviews(requests[4].value.results);
+        if (requests[5].status === 'fulfilled') setReturns(requests[5].value.results);
+        if (requests[6].status === 'fulfilled') setBespokeRequests(requests[6].value.results);
+        const failed = requests.filter(result => result.status === 'rejected').length;
+        if (failed) setCommerceError(`${toPersianDigits(failed)} بخش در دسترس نیست. پس از فعال‌سازی API دوباره تلاش کنید.`);
+        setCommerceLoading(false);
     };
 
     // ... (Keep existing handlers: handleSaveProduct, handleFileUpload, etc. - logic is unchanged, just UI updates below)
@@ -132,12 +171,27 @@ const AdminPanel: React.FC = () => {
 
         formData.append('name', editingProduct.name);
         formData.append('price', String(editingProduct.price));
-        formData.append('category', editingProduct.category || 'accessories');
+        if (editingProduct.compareAtPrice !== undefined) formData.append('compare_at_price', String(editingProduct.compareAtPrice));
+        formData.append('is_active', String(editingProduct.active !== false));
+        formData.append('featured', String(Boolean(editingProduct.featured)));
+        formData.append('category', editingProduct.category || 'suits');
         formData.append('description', editingProduct.description || '');
         formData.append('currency', 'Toman');
         formData.append('short', editingProduct.short || '');
         formData.append('fabric', editingProduct.fabric || '');
         formData.append('stock', String(editingProduct.stock || 0));
+
+        if (editingProduct.variants) {
+            const variants = editingProduct.variants.map(variant => {
+                const payload = {
+                    sku: variant.sku, size: variant.size || '', color: variant.color || '',
+                    price: variant.priceOverride ?? null,
+                    stock: variant.stock, is_active: variant.active,
+                };
+                return variant.id && !variant.id.startsWith('new-') ? { id: variant.id, ...payload } : payload;
+            });
+            formData.append('variants', JSON.stringify(variants));
+        }
 
         if (editingProduct.images && editingProduct.images.length > 0) {
             formData.append('images', JSON.stringify(editingProduct.images));
@@ -212,6 +266,19 @@ const AdminPanel: React.FC = () => {
         }
     };
 
+    const handleUpdateTracking = async (order: Order) => {
+        const trackingCode = window.prompt('کد رهگیری یا مرجع ارسال را وارد کنید', order.trackingCode || '');
+        if (trackingCode === null) return;
+        try {
+            const updated = await api.adminUpdateOrder(order.id, { trackingCode: trackingCode.trim() });
+            setOrders(current => current.map(item => item.id === updated.id ? updated : item));
+            if (viewingOrder?.id === updated.id) setViewingOrder(updated);
+            showToast('کد رهگیری ذخیره شد');
+        } catch (error: any) {
+            showToast(error?.message || 'ذخیره کد رهگیری انجام نشد');
+        }
+    };
+
     const handleSaveSettings = async (e: React.FormEvent) => {
         e.preventDefault();
         try {
@@ -269,6 +336,33 @@ const AdminPanel: React.FC = () => {
         }
     };
 
+    const runCommerceAction = async (key: string, action: () => Promise<unknown>, successMessage: string) => {
+        setCommerceAction(key);
+        try {
+            await action();
+            await loadCommerceData();
+            showToast(successMessage);
+        } catch (error: any) {
+            showToast(error?.message || 'انجام عملیات ناموفق بود');
+        } finally {
+            setCommerceAction(null);
+        }
+    };
+
+    const saveCoupon = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!couponForm.code?.trim() || !couponForm.value) return showToast('کد و مقدار تخفیف الزامی است');
+        await runCommerceAction('coupon-save', () => api.adminSaveCoupon(couponForm), 'کد تخفیف ذخیره شد');
+        setCouponForm({ code: '', type: 'percent', value: 0, active: true });
+    };
+
+    const saveShippingMethod = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!shippingForm.name?.trim()) return showToast('نام روش ارسال الزامی است');
+        await runCommerceAction('shipping-save', () => api.adminSaveShippingMethod(shippingForm), 'روش ارسال ذخیره شد');
+        setShippingForm({ name: '', price: 0, currency: 'Toman', active: true });
+    };
+
     const handleAddImageUrl = () => {
         if (newImageUrl) {
             const currentImages = editingProduct.images || [];
@@ -286,6 +380,25 @@ const AdminPanel: React.FC = () => {
             ...editingProduct,
             images: currentImages.filter((_, i) => i !== index)
         });
+    };
+
+    const addVariant = () => {
+        const variant: ProductVariant = {
+            id: `new-${Date.now()}`, sku: '', size: '', color: '', attributes: {},
+            price: editingProduct.price || 0, priceOverride: null, currency: 'Toman', stock: 0, active: true,
+        };
+        setEditingProduct(current => ({ ...current, variants: [...(current.variants || []), variant] }));
+    };
+
+    const updateVariant = (index: number, changes: Partial<ProductVariant>) => {
+        setEditingProduct(current => ({
+            ...current,
+            variants: (current.variants || []).map((variant, variantIndex) => variantIndex === index ? { ...variant, ...changes } : variant),
+        }));
+    };
+
+    const removeVariant = (index: number) => {
+        setEditingProduct(current => ({ ...current, variants: (current.variants || []).filter((_, variantIndex) => variantIndex !== index) }));
     };
 
     const handleSettingsFileUpload = (field: keyof SiteSettings) => (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -334,7 +447,7 @@ const AdminPanel: React.FC = () => {
 
     const filteredOrders = orders.filter(o => {
         const customer = getCustomerDetails(o.userId);
-        const customerName = customer ? customer.name.toLowerCase() : '';
+        const customerName = (o.customer?.name || customer?.name || '').toLowerCase();
         const searchLower = searchTerm.toLowerCase();
         const matchesSearch = o.id.toLowerCase().includes(searchLower) || o.shippingAddress.toLowerCase().includes(searchLower) || customerName.includes(searchLower);
         if (!matchesSearch) return false;
@@ -366,6 +479,11 @@ const AdminPanel: React.FC = () => {
         'cancelled': { bg: 'bg-rose-100 dark:bg-rose-900/30', text: 'text-rose-700 dark:text-rose-400', icon: Ban, label: 'لغو شده' },
     };
 
+    const fallbackTransitions: Record<Order['status'], Order['status'][]> = {
+        pending: ['processing', 'cancelled'], processing: ['shipped', 'cancelled'],
+        shipped: ['delivered'], delivered: [], cancelled: [],
+    };
+
     const getStatusBadge = (status: string) => {
         const config = statusConfig[status] || statusConfig['pending'];
         const Icon = config.icon;
@@ -379,6 +497,7 @@ const AdminPanel: React.FC = () => {
 
     return (
         <div className="min-h-screen bg-lux-body dark:bg-zinc-950 pt-20 flex flex-col md:flex-row transition-colors duration-300">
+            <style>{`.admin-commerce-input{width:100%;border:1px solid #e5e7eb;border-radius:.75rem;background:#fff;padding:.625rem .75rem;font-size:.875rem;outline:none}.admin-commerce-input:focus{border-color:#c5a059}.dark .admin-commerce-input{border-color:#3f3f46;background:#27272a;color:#fff}`}</style>
             <SEO title="Admin panel" />
             
             {/* Sidebar (hidden on small screens; mobile drawer used instead) */}
@@ -416,6 +535,10 @@ const AdminPanel: React.FC = () => {
                             ) : null}
                         </button>
                     ))}
+                    <button onClick={() => setActiveTab('commerce')} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all ${activeTab === 'commerce' ? 'bg-lux-black dark:bg-white text-white dark:text-lux-black shadow-md' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'}`}>
+                        <Tags size={20} /> عملیات فروشگاه
+                        {((stats.pendingReviewsCount || 0) + (stats.pendingReturnsCount || 0) + (stats.pendingBespokeCount || 0)) > 0 && <span className="mr-auto rounded-full bg-rose-500 px-2 py-0.5 text-[10px] text-white">{toPersianDigits((stats.pendingReviewsCount || 0) + (stats.pendingReturnsCount || 0) + (stats.pendingBespokeCount || 0))}</span>}
+                    </button>
                 </nav>
                 <div className="mt-auto pt-6 border-t border-gray-100 dark:border-zinc-800">
                     <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-4 flex items-center gap-3">
@@ -464,6 +587,7 @@ const AdminPanel: React.FC = () => {
                                     <span className="relative z-10">{item.label}</span>
                                 </button>
                             ))}
+                            <button onClick={() => { setActiveTab('commerce'); setMobileSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold ${activeTab === 'commerce' ? 'bg-lux-black dark:bg-white text-white dark:text-lux-black' : 'text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-zinc-800'}`}><Tags size={18} /> عملیات فروشگاه</button>
                         </nav>
                     </aside>
                 </div>
@@ -551,7 +675,7 @@ const AdminPanel: React.FC = () => {
                                     <ArrowUpDown size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
                                 </div>
                                 <button 
-                                    onClick={() => { setEditingProduct({ images: [] }); setSelectedFile(null); setIsProductModalOpen(true); }}
+                                    onClick={() => { setEditingProduct({ images: [], variants: [], category: 'suits', active: true, featured: false }); setSelectedFile(null); setIsProductModalOpen(true); }}
                                     className="bg-lux-black dark:bg-white text-white dark:text-lux-black px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold shadow-lg shadow-lux-black/10 dark:shadow-white/10 hover:translate-y-[-2px] transition-all"
                                 >
                                     <Plus size={18} /> <span className="hidden sm:inline">افزودن</span>
@@ -706,11 +830,11 @@ const AdminPanel: React.FC = () => {
                                         <div className="flex flex-col md:flex-row justify-between md:items-start gap-6 mb-6">
                                             <div className="flex items-start gap-4">
                                                 <div className="w-12 h-12 rounded-full bg-gray-100 dark:bg-zinc-800 flex items-center justify-center text-lux-black dark:text-white font-bold text-lg">
-                                                    {getCustomerDetails(order.userId)?.name?.charAt(0).toUpperCase() || <UserIcon size={20}/>}
+                                                    {(order.customer?.name || getCustomerDetails(order.userId)?.name)?.charAt(0).toUpperCase() || <UserIcon size={20}/>}
                                                 </div>
                                                 <div>
                                                     <div className="flex items-center gap-3 mb-1">
-                                                        <h3 className="font-bold text-lg text-lux-black dark:text-white">{getCustomerDetails(order.userId)?.name || 'ناشناس'}</h3>
+                                                        <h3 className="font-bold text-lg text-lux-black dark:text-white">{order.customer?.name || getCustomerDetails(order.userId)?.name || 'ناشناس'}</h3>
                                                         <span className="font-mono text-xs text-gray-400">#{order.id.slice(-6)}</span>
                                                     </div>
                                                     <div className="flex items-center gap-4 text-xs text-gray-500 dark:text-gray-400">
@@ -746,9 +870,11 @@ const AdminPanel: React.FC = () => {
                                             </div>
                                         </div>
 
+                                        {(order.trackingCode || order.trackingUrl) && <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-xs text-indigo-800"><Truck size={15} /><span>کد رهگیری: <b dir="ltr">{order.trackingCode || '—'}</b></span>{order.trackingUrl && <a href={order.trackingUrl} target="_blank" rel="noreferrer" className="mr-auto font-bold underline">مشاهده رهگیری</a>}</div>}
+
                                         <div className="flex flex-wrap items-center justify-between gap-4 pt-4 border-t border-gray-100 dark:border-zinc-800">
                                             <div className="flex items-center gap-2 overflow-x-auto hide-scroll">
-                                                {(['pending', 'processing', 'shipped', 'delivered', 'cancelled'] as Order['status'][]).map(s => (
+                                                {(order.allowedTransitions || fallbackTransitions[order.status]).map(s => (
                                                     <button 
                                                         key={s}
                                                         onClick={() => handleUpdateOrderStatus(order.id, s)}
@@ -763,17 +889,88 @@ const AdminPanel: React.FC = () => {
                                                     </button>
                                                 ))}
                                             </div>
-                                            <button 
-                                                onClick={() => setViewingOrder(order)}
-                                                className="px-4 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:border-lux-gold text-lux-black dark:text-white text-sm font-bold rounded-xl flex items-center gap-2 transition-colors shadow-sm"
-                                            >
-                                                <Eye size={16} /> جزئیات کامل
-                                            </button>
+                                            <div className="flex flex-wrap gap-2">
+                                                <button onClick={() => void handleUpdateTracking(order)} className="px-3 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:border-lux-gold text-lux-black dark:text-white text-xs font-bold rounded-xl flex items-center gap-2 transition-colors"><Truck size={15} /> کد رهگیری</button>
+                                                <button
+                                                    onClick={() => setViewingOrder(order)}
+                                                    className="px-4 py-2 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 hover:border-lux-gold text-lux-black dark:text-white text-sm font-bold rounded-xl flex items-center gap-2 transition-colors shadow-sm"
+                                                >
+                                                    <Eye size={16} /> جزئیات کامل
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))
                             )}
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'commerce' && (
+                    <div className="animate-in fade-in space-y-6 duration-500" dir="rtl">
+                        <div className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:flex-row md:items-center md:justify-between">
+                            <div><h1 className="flex items-center gap-2 text-xl font-bold text-lux-black dark:text-white"><Tags className="text-lux-gold" /> عملیات فروشگاه</h1><p className="mt-1 text-xs text-gray-500">مدیریت ارسال، تخفیف، پرداخت، بازخورد و خدمات مشتریان</p></div>
+                            <button onClick={() => void loadCommerceData()} disabled={commerceLoading} className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-600 hover:border-lux-gold dark:border-zinc-700 dark:text-gray-300 disabled:opacity-50"><RefreshCw size={16} className={commerceLoading ? 'animate-spin' : ''} /> به‌روزرسانی</button>
+                        </div>
+
+                        {commerceError && <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertCircle size={18} /> {commerceError}</div>}
+                        <div className="flex gap-2 overflow-x-auto rounded-2xl border border-gray-100 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
+                            {([
+                                ['capabilities', 'آمادگی', ShieldCheck], ['coupons', 'تخفیف‌ها', Tags], ['shipping', 'ارسال', Truck],
+                                ['payments', 'پرداخت‌ها', CreditCard], ['reviews', 'دیدگاه‌ها', Star], ['returns', 'مرجوعی‌ها', RotateCcw],
+                                ['bespoke', 'سفارشی‌دوزی', Scissors],
+                            ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => setCommerceSection(id)} className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold ${commerceSection === id ? 'bg-lux-black text-white dark:bg-lux-gold dark:text-black' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}><Icon size={16} /> {label}</button>)}
+                        </div>
+
+                        {commerceLoading ? <div className="flex items-center justify-center gap-2 rounded-2xl bg-white py-20 text-gray-500 dark:bg-zinc-900"><Loader2 className="animate-spin text-lux-gold" /> در حال دریافت اطلاعات...</div> : (
+                            <>
+                                {commerceSection === 'capabilities' && (
+                                    <section className="space-y-5">
+                                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                                            {capabilities ? Object.entries({
+                                                'پرداخت آنلاین': capabilities.onlinePayments, 'پرداخت در محل': capabilities.cashOnDelivery,
+                                                'کد تخفیف': capabilities.coupons, 'دیدگاه محصول': capabilities.reviews,
+                                                'مرجوعی': capabilities.returns, 'علاقه‌مندی': capabilities.wishlist,
+                                                'سبد ذخیره‌شده': capabilities.savedCart, 'سفارشی‌دوزی': capabilities.bespokeRequests,
+                                                'خبرنامه': capabilities.newsletter, 'مدیریت انبار': capabilities.canManageInventory,
+                                                'مدیریت تبلیغات': capabilities.canManagePromotions, 'مدیریت کاربران': capabilities.canManageUsers,
+                                            }).map(([label, enabled]) => <div key={label} className="flex items-center justify-between rounded-2xl border border-gray-100 bg-white p-4 dark:border-zinc-800 dark:bg-zinc-900"><span className="text-sm font-bold text-gray-700 dark:text-gray-200">{label}</span><span className={`rounded-full px-2 py-1 text-xs font-bold ${enabled ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{enabled ? 'فعال' : 'غیرفعال'}</span></div>) : <p className="rounded-2xl bg-white p-8 text-center text-gray-500 dark:bg-zinc-900">اطلاعات قابلیت‌ها در دسترس نیست.</p>}
+                                        </div>
+                                        <div className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><h3 className="mb-3 font-bold dark:text-white">درگاه‌های پرداخت پیکربندی‌شده</h3>{capabilities?.paymentProviders?.length ? <div className="flex flex-wrap gap-2">{capabilities.paymentProviders.map(provider => <span key={provider} className="rounded-full bg-blue-50 px-3 py-1 text-sm font-bold text-blue-700">{provider}</span>)}</div> : <p className="text-sm leading-7 text-gray-500">درگاه آنلاین فعالی گزارش نشده است. تا زمان تنظیم و تأیید درگاه، فقط روش‌های واقعی اعلام‌شده در تسویه‌حساب نمایش داده می‌شوند.</p>}</div>
+                                    </section>
+                                )}
+
+                                {commerceSection === 'coupons' && (
+                                    <div className="grid gap-6 lg:grid-cols-5">
+                                        <form onSubmit={saveCoupon} className="space-y-3 rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-2">
+                                            <h2 className="font-bold dark:text-white">{couponForm.id ? 'ویرایش کد تخفیف' : 'کد تخفیف جدید'}</h2>
+                                            <input className="admin-commerce-input uppercase" dir="ltr" placeholder="WELCOME10" value={couponForm.code || ''} onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} required />
+                                            <div className="grid grid-cols-2 gap-2"><select className="admin-commerce-input" value={couponForm.type || 'percent'} onChange={e => setCouponForm({ ...couponForm, type: e.target.value as CouponSummary['type'] })}><option value="percent">درصدی</option><option value="fixed">مبلغ ثابت</option></select><input className="admin-commerce-input" type="number" min="0" placeholder="مقدار" value={couponForm.value || ''} onChange={e => setCouponForm({ ...couponForm, value: Number(e.target.value) })} required /></div>
+                                            <input className="admin-commerce-input" type="number" min="0" placeholder="حداقل مبلغ سفارش" value={couponForm.minimumOrderAmount || ''} onChange={e => setCouponForm({ ...couponForm, minimumOrderAmount: Number(e.target.value) || undefined })} />
+                                            <input className="admin-commerce-input" type="number" min="0" placeholder="سقف دفعات استفاده" value={couponForm.usageLimit || ''} onChange={e => setCouponForm({ ...couponForm, usageLimit: Number(e.target.value) || undefined })} />
+                                            <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"><input type="checkbox" checked={couponForm.active !== false} onChange={e => setCouponForm({ ...couponForm, active: e.target.checked })} /> فعال</label>
+                                            <div className="flex gap-2"><button disabled={commerceAction === 'coupon-save'} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-lux-gold py-2.5 font-bold text-white disabled:opacity-50"><Save size={16} /> ذخیره</button>{couponForm.id && <button type="button" onClick={() => setCouponForm({ code: '', type: 'percent', value: 0, active: true })} className="rounded-xl border px-3 dark:border-zinc-700 dark:text-white">انصراف</button>}</div>
+                                        </form>
+                                        <div className="space-y-3 lg:col-span-3">{coupons.length ? coupons.map(coupon => <div key={coupon.id || coupon.code} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex items-start justify-between gap-3"><div><code className="rounded bg-gray-100 px-2 py-1 font-bold text-lux-black dark:bg-zinc-800 dark:text-white">{coupon.code}</code><p className="mt-2 text-sm text-gray-500">{coupon.type === 'percent' ? `${toPersianDigits(coupon.value)} درصد` : formatPrice(coupon.value)} · استفاده {toPersianDigits(coupon.usageCount || 0)}{coupon.usageLimit ? ` از ${toPersianDigits(coupon.usageLimit)}` : ''}</p></div><span className={`rounded-full px-2 py-1 text-xs ${coupon.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{coupon.active ? 'فعال' : 'غیرفعال'}</span></div><div className="mt-4 flex justify-end gap-2"><button onClick={() => setCouponForm({ ...coupon })} className="rounded-lg border px-3 py-1.5 text-xs font-bold dark:border-zinc-700 dark:text-white">ویرایش</button>{coupon.id && <button onClick={() => void runCommerceAction(`coupon-${coupon.id}`, () => api.adminDeleteCoupon(coupon.id!), 'کد تخفیف حذف شد')} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">حذف</button>}</div></div>) : <CommerceEmpty text="کد تخفیفی ثبت نشده است." />}</div>
+                                    </div>
+                                )}
+
+                                {commerceSection === 'shipping' && (
+                                    <div className="grid gap-6 lg:grid-cols-5">
+                                        <form onSubmit={saveShippingMethod} className="space-y-3 rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-2"><h2 className="font-bold dark:text-white">{shippingForm.id ? 'ویرایش روش ارسال' : 'روش ارسال جدید'}</h2><input className="admin-commerce-input" placeholder="نام روش ارسال" value={shippingForm.name || ''} onChange={e => setShippingForm({ ...shippingForm, name: e.target.value })} required /><textarea className="admin-commerce-input" placeholder="توضیحات" value={shippingForm.description || ''} onChange={e => setShippingForm({ ...shippingForm, description: e.target.value })} /><input className="admin-commerce-input" type="number" min="0" placeholder="هزینه (تومان)" value={shippingForm.price || ''} onChange={e => setShippingForm({ ...shippingForm, price: Number(e.target.value) })} /><div className="grid grid-cols-2 gap-2"><input className="admin-commerce-input" type="number" min="0" placeholder="حداقل روز" value={shippingForm.estimatedDaysMin || ''} onChange={e => setShippingForm({ ...shippingForm, estimatedDaysMin: Number(e.target.value) || undefined })} /><input className="admin-commerce-input" type="number" min="0" placeholder="حداکثر روز" value={shippingForm.estimatedDaysMax || ''} onChange={e => setShippingForm({ ...shippingForm, estimatedDaysMax: Number(e.target.value) || undefined })} /></div><input className="admin-commerce-input" type="number" min="0" placeholder="ارسال رایگان از مبلغ" value={shippingForm.freeAbove || ''} onChange={e => setShippingForm({ ...shippingForm, freeAbove: Number(e.target.value) || undefined })} /><label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"><input type="checkbox" checked={shippingForm.active !== false} onChange={e => setShippingForm({ ...shippingForm, active: e.target.checked })} /> فعال</label><div className="flex gap-2"><button className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-lux-gold py-2.5 font-bold text-white"><Save size={16} /> ذخیره</button>{shippingForm.id && <button type="button" onClick={() => setShippingForm({ name: '', price: 0, currency: 'Toman', active: true })} className="rounded-xl border px-3 dark:border-zinc-700 dark:text-white">انصراف</button>}</div></form>
+                                        <div className="space-y-3 lg:col-span-3">{shippingMethods.length ? shippingMethods.map(method => <div key={method.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex items-start justify-between"><div><h3 className="font-bold dark:text-white">{method.name}</h3><p className="mt-1 text-sm text-gray-500">{formatPrice(method.price)}{method.estimatedDaysMin ? ` · ${toPersianDigits(method.estimatedDaysMin)} تا ${toPersianDigits(method.estimatedDaysMax || method.estimatedDaysMin)} روز کاری` : ''}</p></div><span className={`rounded-full px-2 py-1 text-xs ${method.active ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}`}>{method.active ? 'فعال' : 'غیرفعال'}</span></div><p className="mt-2 text-xs text-gray-500">{method.description}</p><div className="mt-4 flex justify-end gap-2"><button onClick={() => setShippingForm({ ...method })} className="rounded-lg border px-3 py-1.5 text-xs font-bold dark:border-zinc-700 dark:text-white">ویرایش</button><button onClick={() => void runCommerceAction(`shipping-${method.id}`, () => api.adminDeleteShippingMethod(method.id), 'روش ارسال حذف شد')} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">حذف</button></div></div>) : <CommerceEmpty text="روش ارسالی ثبت نشده است." />}</div>
+                                    </div>
+                                )}
+
+                                {commerceSection === 'payments' && <CommerceList empty={payments.length === 0} emptyText="رکورد پرداختی ثبت نشده است.">{payments.map(payment => <div key={payment.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold dark:text-white">پرداخت سفارش #{toPersianDigits(payment.orderId)}</h3><p className="mt-1 text-sm text-gray-500">{payment.provider || payment.method} · {formatPrice(payment.amount)}</p>{payment.transactionId && <p className="mt-1 text-xs text-gray-400" dir="ltr">{payment.transactionId}</p>}</div><select value={payment.status} onChange={e => void runCommerceAction(`payment-${payment.id}`, () => api.adminUpdatePayment(payment.id, { status: e.target.value as Payment['status'] }), 'وضعیت پرداخت به‌روزرسانی شد')} className="admin-commerce-input max-w-48"><option value="unpaid">پرداخت نشده</option><option value="pending">در انتظار</option><option value="paid">پرداخت شده</option><option value="failed">ناموفق</option><option value="cancelled">لغو شده</option><option value="partially_refunded">بازپرداخت جزئی</option><option value="refunded">بازپرداخت شده</option></select></div>{payment.failureReason && <p className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{payment.failureReason}</p>}</div>)}</CommerceList>}
+
+                                {commerceSection === 'reviews' && <CommerceList empty={reviews.length === 0} emptyText="دیدگاهی برای بررسی وجود ندارد.">{reviews.map(review => <div key={review.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold dark:text-white">{review.title || 'دیدگاه محصول'} · {review.userName}</h3><p className="mt-1 text-amber-500">{'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}</p></div><span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">{review.status === 'approved' ? 'تأییدشده' : review.status === 'rejected' ? 'ردشده' : 'در انتظار'}</span></div><p className="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-300">{review.body}</p><div className="mt-4 flex justify-end gap-2"><button onClick={() => void runCommerceAction(`review-a-${review.id}`, () => api.adminUpdateReview(review.id, { status: 'approved' }), 'دیدگاه تأیید شد')} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">تأیید</button><button onClick={() => void runCommerceAction(`review-r-${review.id}`, () => api.adminUpdateReview(review.id, { status: 'rejected' }), 'دیدگاه رد شد')} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">رد</button><button onClick={() => window.confirm('دیدگاه حذف شود؟') && void runCommerceAction(`review-d-${review.id}`, () => api.adminDeleteReview(review.id), 'دیدگاه حذف شد')} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">حذف</button></div></div>)}</CommerceList>}
+
+                                {commerceSection === 'returns' && <CommerceList empty={returns.length === 0} emptyText="درخواست مرجوعی وجود ندارد.">{returns.map(item => <div key={item.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold dark:text-white">مرجوعی سفارش #{toPersianDigits(item.orderId)}</h3><p className="mt-2 text-sm text-gray-600 dark:text-gray-300"><b>دلیل:</b> {item.reason}</p><p className="mt-1 text-xs text-gray-500">{item.details}</p>{item.adminNote && <p className="mt-2 rounded-lg bg-amber-50 p-2 text-xs text-amber-800">یادداشت: {item.adminNote}</p>}</div><select value={item.status} onChange={e => void runCommerceAction(`return-${item.id}`, () => api.adminUpdateReturn(item.id, { status: e.target.value as ReturnRequest['status'] }), 'وضعیت مرجوعی به‌روزرسانی شد')} className="admin-commerce-input max-w-44"><option value="requested">در انتظار</option><option value="approved">تأیید</option><option value="rejected">رد</option><option value="received">دریافت شده</option><option value="refunded">بازپرداخت</option><option value="cancelled">لغو</option></select></div><div className="mt-4 flex justify-end"><button onClick={() => { const note = window.prompt('یادداشت مدیر', item.adminNote || ''); if (note !== null) void runCommerceAction(`return-note-${item.id}`, () => api.adminUpdateReturn(item.id, { adminNote: note }), 'یادداشت ذخیره شد'); }} className="rounded-lg border px-3 py-1.5 text-xs font-bold dark:border-zinc-700 dark:text-white">ثبت یادداشت</button></div></div>)}</CommerceList>}
+
+                                {commerceSection === 'bespoke' && <CommerceList empty={bespokeRequests.length === 0} emptyText="درخواست سفارشی‌دوزی وجود ندارد.">{bespokeRequests.map((request, index) => <div key={request.id || index} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold dark:text-white">{request.name} · {request.garmentType}</h3><p className="mt-1 text-sm text-gray-500" dir="ltr">{request.phone} {request.email ? `· ${request.email}` : ''}</p>{request.preferredDate && <p className="mt-1 text-xs text-gray-500">تاریخ ترجیحی: {request.preferredDate}</p>}<p className="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-300">{request.description}</p></div>{request.id && <select value={request.status || 'new'} onChange={e => void runCommerceAction(`bespoke-${request.id}`, () => api.adminUpdateBespokeRequest(request.id!, { status: e.target.value as BespokeRequest['status'] }), 'وضعیت درخواست به‌روزرسانی شد')} className="admin-commerce-input max-w-44"><option value="new">جدید</option><option value="contacted">تماس گرفته شد</option><option value="scheduled">وقت تعیین شد</option><option value="completed">تکمیل شد</option><option value="cancelled">لغو شد</option></select>}</div></div>)}</CommerceList>}
+                            </>
+                        )}
                     </div>
                 )}
 
@@ -962,6 +1159,16 @@ const AdminPanel: React.FC = () => {
                                         />
                                     </div>
                                     <div className="space-y-2">
+                                        <label className="text-sm font-bold text-gray-700 dark:text-gray-300">قیمت قبل از تخفیف (اختیاری)</label>
+                                        <input
+                                            type="number"
+                                            min="0"
+                                            value={editingProduct.compareAtPrice ?? ''}
+                                            onChange={e => setEditingProduct({ ...editingProduct, compareAtPrice: e.target.value === '' ? undefined : Number(e.target.value) })}
+                                            className="w-full p-3 rounded-xl border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-800 focus:border-lux-gold outline-none dark:text-white transition-colors font-mono"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">دسته‌بندی</label>
                                         <select 
                                             value={editingProduct.category || 'suits'} 
@@ -973,6 +1180,28 @@ const AdminPanel: React.FC = () => {
                                             <option value="blazers">بلیزر</option>
                                             <option value="accessories">اکسسوری</option>
                                         </select>
+                                    </div>
+                                    <div className="md:col-span-2 flex flex-wrap gap-6 rounded-xl bg-gray-50 p-4 dark:bg-zinc-800">
+                                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200"><input type="checkbox" checked={editingProduct.active !== false} onChange={e => setEditingProduct({ ...editingProduct, active: e.target.checked })} /> قابل نمایش و فروش</label>
+                                        <label className="flex items-center gap-2 text-sm font-bold text-gray-700 dark:text-gray-200"><input type="checkbox" checked={Boolean(editingProduct.featured)} onChange={e => setEditingProduct({ ...editingProduct, featured: e.target.checked })} /> محصول ویژه</label>
+                                    </div>
+                                    <div className="md:col-span-2 space-y-3 rounded-2xl border border-gray-200 p-4 dark:border-zinc-700">
+                                        <div className="flex items-center justify-between gap-3">
+                                            <div><label className="text-sm font-bold text-gray-700 dark:text-gray-300">تنوع اندازه و رنگ</label><p className="mt-1 text-xs text-gray-500">موجودی هر ترکیب جداگانه کنترل می‌شود؛ موجودی اصلی برای کالای بدون تنوع باقی می‌ماند.</p></div>
+                                            <button type="button" onClick={addVariant} className="flex shrink-0 items-center gap-1 rounded-lg bg-lux-black px-3 py-2 text-xs font-bold text-white dark:bg-white dark:text-lux-black"><Plus size={14} /> افزودن تنوع</button>
+                                        </div>
+                                        {(editingProduct.variants || []).length === 0 ? <p className="rounded-xl bg-gray-50 py-5 text-center text-xs text-gray-500 dark:bg-zinc-800">برای این محصول تنوعی ثبت نشده است.</p> : (
+                                            <div className="space-y-3">{(editingProduct.variants || []).map((variant, index) => (
+                                                <div key={variant.id || index} className="grid grid-cols-2 gap-2 rounded-xl bg-gray-50 p-3 dark:bg-zinc-800 md:grid-cols-6">
+                                                    <input className="rounded-lg border border-gray-200 bg-white p-2 text-xs outline-none focus:border-lux-gold dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" dir="ltr" placeholder="SKU *" value={variant.sku} onChange={e => updateVariant(index, { sku: e.target.value.toUpperCase() })} required />
+                                                    <input className="rounded-lg border border-gray-200 bg-white p-2 text-xs outline-none focus:border-lux-gold dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" placeholder="اندازه" value={variant.size || ''} onChange={e => updateVariant(index, { size: e.target.value })} />
+                                                    <input className="rounded-lg border border-gray-200 bg-white p-2 text-xs outline-none focus:border-lux-gold dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" placeholder="رنگ" value={variant.color || ''} onChange={e => updateVariant(index, { color: e.target.value })} />
+                                                    <input className="rounded-lg border border-gray-200 bg-white p-2 text-xs outline-none focus:border-lux-gold dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" type="number" min="0" placeholder="موجودی" value={variant.stock} onChange={e => updateVariant(index, { stock: Number(e.target.value) })} />
+                                                    <input className="rounded-lg border border-gray-200 bg-white p-2 text-xs outline-none focus:border-lux-gold dark:border-zinc-700 dark:bg-zinc-900 dark:text-white" type="number" min="0" placeholder="قیمت اختیاری" value={variant.priceOverride ?? ''} onChange={e => updateVariant(index, { priceOverride: e.target.value === '' ? null : Number(e.target.value) })} />
+                                                    <div className="flex items-center justify-between gap-2"><label className="flex items-center gap-1 text-xs text-gray-600 dark:text-gray-300"><input type="checkbox" checked={variant.active} onChange={e => updateVariant(index, { active: e.target.checked })} /> فعال</label><button type="button" onClick={() => removeVariant(index)} className="rounded-lg p-2 text-rose-600 hover:bg-rose-50"><Trash2 size={15} /></button></div>
+                                                </div>
+                                            ))}</div>
+                                        )}
                                     </div>
                                     <div className="md:col-span-2 space-y-2">
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">گالری تصاویر</label>
@@ -1116,12 +1345,12 @@ const AdminPanel: React.FC = () => {
                                         </h4>
                                         <div className="flex items-start gap-4">
                                             <div className="w-16 h-16 rounded-2xl bg-white dark:bg-zinc-700 flex items-center justify-center text-2xl font-bold shadow-sm print:hidden">
-                                                {getCustomerDetails(viewingOrder.userId)?.name?.charAt(0).toUpperCase()}
+                                                {(viewingOrder.customer?.name || getCustomerDetails(viewingOrder.userId)?.name)?.charAt(0).toUpperCase()}
                                             </div>
                                             <div className="flex-1 space-y-2">
                                                 <div className="flex justify-between">
-                                                    <span className="font-bold text-lg">{getCustomerDetails(viewingOrder.userId)?.name || 'ناشناس'}</span>
-                                                    <span dir="ltr" className="font-mono text-gray-600 dark:text-gray-400">{getCustomerDetails(viewingOrder.userId)?.phone}</span>
+                                                    <span className="font-bold text-lg">{viewingOrder.customer?.name || getCustomerDetails(viewingOrder.userId)?.name || 'ناشناس'}</span>
+                                                    <span dir="ltr" className="font-mono text-gray-600 dark:text-gray-400">{viewingOrder.customer?.phone || getCustomerDetails(viewingOrder.userId)?.phone}</span>
                                                 </div>
                                                 <p className="text-sm text-gray-500 dark:text-gray-400 font-light leading-relaxed">
                                                     {viewingOrder.shippingAddress}
@@ -1144,6 +1373,12 @@ const AdminPanel: React.FC = () => {
                                             <span className="text-xs text-gray-400 mr-2">{new Date(viewingOrder.createdAt).toLocaleTimeString('fa-IR', {hour: '2-digit', minute:'2-digit'})}</span>
                                         </div>
                                     </div>
+                                </div>
+
+                                <div className="mb-8 grid gap-3 text-sm md:grid-cols-3">
+                                    <div className="rounded-xl bg-gray-50 p-4 dark:bg-zinc-800"><span className="block text-xs font-bold text-gray-400">پرداخت</span><b>{viewingOrder.paymentMethod || '—'} · {viewingOrder.paymentStatus}</b></div>
+                                    <div className="rounded-xl bg-gray-50 p-4 dark:bg-zinc-800"><span className="block text-xs font-bold text-gray-400">روش ارسال</span><b>{viewingOrder.shippingMethod?.name || '—'}</b></div>
+                                    <div className="rounded-xl bg-gray-50 p-4 dark:bg-zinc-800"><span className="block text-xs font-bold text-gray-400">کد رهگیری</span><b dir="ltr">{viewingOrder.trackingCode || 'ثبت نشده'}</b></div>
                                 </div>
 
                                 {/* Items Table */}
@@ -1191,5 +1426,8 @@ const AdminPanel: React.FC = () => {
         </div>
     );
 };
+
+const CommerceEmpty: React.FC<{ text: string }> = ({ text }) => <div className="rounded-2xl border border-dashed border-gray-200 bg-white py-14 text-center text-sm text-gray-500 dark:border-zinc-700 dark:bg-zinc-900">{text}</div>;
+const CommerceList: React.FC<{ empty: boolean; emptyText: string; children: React.ReactNode }> = ({ empty, emptyText, children }) => empty ? <CommerceEmpty text={emptyText} /> : <div className="space-y-3">{children}</div>;
 
 export default AdminPanel;
