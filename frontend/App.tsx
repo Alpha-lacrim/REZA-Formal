@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { GlobalProvider, useGlobal } from './contexts/GlobalContext';
 import Navbar from './components/Navbar';
@@ -7,15 +7,17 @@ import MiniCart from './components/MiniCart';
 import AuthModal from './components/AuthModal';
 import ChatWidget from './components/ChatWidget';
 import HomePage from './pages/HomePage';
-import CatalogPage from './pages/CatalogPage';
-import ProductPage from './pages/ProductPage';
-import CartPage from './pages/CartPage';
-import AdminPanel from './pages/AdminPanel';
-import UserPanel from './pages/UserPanel';
-import WishlistPage from './pages/WishlistPage';
-import AboutPage from './pages/AboutPage';
-import BespokePage from './pages/BespokePage';
 import PageLoader from './components/PageLoader';
+
+const CatalogPage = lazy(() => import('./pages/CatalogPage'));
+const ProductPage = lazy(() => import('./pages/ProductPage'));
+const CartPage = lazy(() => import('./pages/CartPage'));
+const AdminPanel = lazy(() => import('./pages/AdminPanel'));
+const UserPanel = lazy(() => import('./pages/UserPanel'));
+const WishlistPage = lazy(() => import('./pages/WishlistPage'));
+const AboutPage = lazy(() => import('./pages/AboutPage'));
+const BespokePage = lazy(() => import('./pages/BespokePage'));
+const PolicyPage = lazy(() => import('./pages/PolicyPage'));
 
 const Toast = () => {
     const { toastMessage } = useGlobal();
@@ -46,17 +48,20 @@ const AppContent = () => {
         <HashRouter>
             <div className="flex flex-col min-h-screen">
                 <Navbar />
-                <Routes>
-                    <Route path="/" element={<HomePage />} />
-                    <Route path="/catalog" element={<CatalogPage />} />
-                    <Route path="/product/:id" element={<ProductPage />} />
-                    <Route path="/cart" element={<CartPage />} />
-                    <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPanel /></ProtectedRoute>} />
-                    <Route path="/profile" element={<ProtectedRoute><UserPanel /></ProtectedRoute>} />
-                    <Route path="/wishlist" element={<WishlistPage />} />
-                    <Route path="/about" element={<AboutPage />} />
-                    <Route path="/bespoke" element={<BespokePage />} />
-                </Routes>
+                <Suspense fallback={<PageLoader />}>
+                    <Routes>
+                        <Route path="/" element={<HomePage />} />
+                        <Route path="/catalog" element={<CatalogPage />} />
+                        <Route path="/product/:id" element={<ProductPage />} />
+                        <Route path="/cart" element={<CartPage />} />
+                        <Route path="/admin" element={<ProtectedRoute adminOnly><AdminPanel /></ProtectedRoute>} />
+                        <Route path="/profile" element={<ProtectedRoute><UserPanel /></ProtectedRoute>} />
+                        <Route path="/wishlist" element={<WishlistPage />} />
+                        <Route path="/about" element={<AboutPage />} />
+                        <Route path="/bespoke" element={<BespokePage />} />
+                        <Route path="/policies/:policyId" element={<PolicyPage />} />
+                    </Routes>
+                </Suspense>
                 <Footer />
                 <MiniCart />
                 <ChatWidget />

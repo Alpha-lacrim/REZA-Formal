@@ -1,74 +1,70 @@
-import React, { useRef, useEffect } from 'react';
-import ImageLoader from './ImageLoader';
-import { X, Plus, Minus, Trash2 } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
-import { formatPrice, toPersianDigits } from '../utils';
+import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
-import { CartItem } from '../types';
+import { Minus, Plus, Trash2, X } from 'lucide-react';
+import ImageLoader from './ImageLoader';
+import { cartLineKey, useGlobal } from '../contexts/GlobalContext';
+import { formatPrice, toPersianDigits } from '../utils';
 
 const MiniCart: React.FC = () => {
-    const { isCartOpen, toggleCart, cart, updateQty, removeFromCart, products: dbProducts } = useGlobal();
+    const { isCartOpen, toggleCart, cartLines, updateQty, removeFromCart, products } = useGlobal();
     const cartRef = useRef<HTMLDivElement>(null);
 
-    // Close cart when clicking outside
     useEffect(() => {
         if (!isCartOpen) return;
-
         const handleClickOutside = (event: MouseEvent) => {
-            if (cartRef.current && !cartRef.current.contains(event.target as Node)) {
-                toggleCart(false);
-            }
+            if (cartRef.current && !cartRef.current.contains(event.target as Node)) toggleCart(false);
         };
-
-        // Add small delay to avoid closing immediately on the click that opened it
-        const timer = setTimeout(() => {
-            document.addEventListener('mousedown', handleClickOutside);
-        }, 50);
-
+        const timer = window.setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 50);
         return () => {
-            clearTimeout(timer);
+            window.clearTimeout(timer);
             document.removeEventListener('mousedown', handleClickOutside);
         };
     }, [isCartOpen, toggleCart]);
 
     if (!isCartOpen) return null;
 
-    const cartItems = Object.entries(cart).map(([id, qty]) => {
-        const product = dbProducts.find(p => p.id === id);
-        return product ? { ...product, qty } : null;
-    }).filter((item): item is CartItem => item !== null);
-
-    const total = cartItems.reduce((sum, item) => sum + (item.price * item.qty), 0);
+    const items = cartLines.flatMap(line => {
+        const product = products.find(item => item.id === line.productId);
+        if (!product) return [];
+        const variant = line.variantId ? product.variants?.find(item => item.id === line.variantId) : undefined;
+        return [{ line, product, variant, key: cartLineKey(line), price: variant?.price ?? product.price }];
+    });
+    const total = items.reduce((sum, item) => sum + item.price * item.line.quantity, 0);
 
     return (
-        <div ref={cartRef} className="fixed bottom-4 right-4 z-[9999] w-[90vw] md:w-80 max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-2xl flex flex-col overflow-hidden max-h-[80vh] animate-in slide-in-from-bottom-5 fade-in duration-300">
+        <div ref={cartRef} dir="rtl" className="fixed bottom-4 right-4 z-[9999] w-[90vw] max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-2xl flex flex-col overflow-hidden max-h-[80vh] animate-in slide-in-from-bottom-5 fade-in duration-300">
             <div className="flex justify-between items-center p-3 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900">
                 <strong className="text-lux-black dark:text-white">سبد خرید</strong>
-                <button onClick={() => toggleCart(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded">
+                <button onClick={() => toggleCart(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded" aria-label="بستن سبد خرید">
                     <X size={18} className="dark:text-white" />
                 </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-0">
-                {cartItems.length === 0 ? (
+
+            <div className="flex-1 overflow-y-auto">
+                {items.length === 0 ? (
                     <div className="p-6 text-center text-gray-500 dark:text-gray-400">سبد خرید خالی است</div>
                 ) : (
                     <div className="divide-y divide-gray-100 dark:divide-zinc-800">
-                        {cartItems.map((item) => (
-                            <div key={item.id} className="p-3 flex gap-3">
-                                <div className="w-14 h-18 rounded overflow-hidden bg-gray-100">
-                                    <ImageLoader src={item.image} alt={item.name} className="w-full h-full" loading="lazy" />
+                        {items.map(({ line, product, variant, key, price }) => (
+                            <div key={key} className="p-3 flex gap-3">
+                                <div className="w-14 h-20 shrink-0 rounded overflow-hidden bg-gray-100">
+                                    <ImageLoader src={variant?.image || product.image} alt={product.name} className="w-full h-full" loading="lazy" />
                                 </div>
                                 <div className="flex-1 min-w-0">
-                                    <h4 className="font-semibold text-sm truncate dark:text-gray-200 interactive">{item.name}</h4>
-                                    <div className="text-xs text-gray-500 dark:text-gray-400 mb-2">{formatPrice(item.price)}</div>
+                                    <h4 className="font-semibold text-sm truncate dark:text-gray-200">{product.name}</h4>
+                                    {variant && (
+                                        <p className="text-xs text-gray-500 mt-0.5">
+                                            {[variant.size && `سایز ${variant.size}`, variant.color && `رنگ ${variant.color}`].filter(Boolean).join('، ') || variant.name || variant.sku}
+                                        </p>
+                                    )}
+                                    <div className="text-xs text-lux-gold my-2">{formatPrice(price)}</div>
                                     <div className="flex items-center gap-2">
-                                        <button onClick={() => updateQty(item.id, -1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white"><Minus size={12} /></button>
-                                        <span className="text-sm w-6 text-center dark:text-white">{toPersianDigits(item.qty)}</span>
-                                        <button onClick={() => updateQty(item.id, 1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white"><Plus size={12} /></button>
+                                        <button onClick={() => updateQty(key, -1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white" aria-label="کاهش تعداد"><Minus size={12} /></button>
+                                        <span className="text-sm w-6 text-center dark:text-white">{toPersianDigits(line.quantity)}</span>
+                                        <button onClick={() => updateQty(key, 1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white" aria-label="افزایش تعداد"><Plus size={12} /></button>
                                     </div>
                                 </div>
-                                <button onClick={() => removeFromCart(item.id)} className="text-gray-400 hover:text-red-500 self-start">
+                                <button onClick={() => removeFromCart(key)} className="text-gray-400 hover:text-red-500 self-start" aria-label="حذف از سبد">
                                     <Trash2 size={16} />
                                 </button>
                             </div>
@@ -79,15 +75,11 @@ const MiniCart: React.FC = () => {
 
             <div className="p-3 bg-gray-50 dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800">
                 <div className="flex justify-between mb-3 font-bold text-lux-black dark:text-white">
-                    <span>مجموع:</span>
+                    <span>جمع کالاها:</span>
                     <span>{formatPrice(total)}</span>
                 </div>
-                <Link 
-                    to="/cart" 
-                    onClick={() => toggleCart(false)}
-                    className="block w-full text-center py-2 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black rounded-lg font-semibold hover:opacity-90 transition-opacity btn-ripple interactive focus-ring"
-                >
-                    تسویه حساب
+                <Link to="/cart" onClick={() => toggleCart(false)} className="block w-full text-center py-2 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black rounded-lg font-semibold hover:opacity-90 transition-opacity">
+                    مشاهده و تکمیل خرید
                 </Link>
             </div>
         </div>
