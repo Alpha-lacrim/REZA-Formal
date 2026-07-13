@@ -4,6 +4,51 @@ Last updated: 2026-07-13
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-07-13 - Build the complete commerce feature set
+
+### Objective and starting state
+
+- Create a dedicated branch and expand the verified storefront into a complete first production-capable shopping workflow from database models through customer/admin UI.
+- The repository started clean on `main`, aligned with `origin/main`, after the first-launch audit and Docker verification.
+
+### Changed
+
+- Created and stayed on `feature/complete-commerce`; no remote push or merge was performed.
+- Added migrations `0006` and `0007` with variants, addresses, shipping, coupons/redemptions, enriched orders and immutable item/address/shipping/coupon snapshots, payments and partial/full refund state, inventory movements, order events, persistent carts/wishlists, verified reviews, returns, bespoke requests, newsletters, and notification outbox records.
+- Added server-authoritative Decimal quotes, default paid shipping selection, user-scoped UUID idempotency, locked variant inventory, coupon limits, COD/manual payment records, strict order/payment/return transitions, COD collection on delivery, manual-payment shipment guard, cancellation/restock, multi-item returns, refund accounting, tracking/admin notes, and historical order serialization.
+- Replaced legacy shopping routes with the commerce API; added customer/staff endpoints, health/readiness, sensitive endpoint throttles, and explicit CSRF bootstrap/header enforcement for public and authenticated browser mutations.
+- Completed variant-aware customer cart/wishlist synchronization, structured checkout, coupon/shipping/payment selection, confirmation/history/addresses/returns, real ratings/reviews, bespoke/newsletter submission, and safe offline-catalog behavior.
+- Completed staff product/variant, order/tracking, coupon, shipping, payment, review, return, bespoke, message, settings, and dashboard flows.
+- Added Persian policy pages and removed the unverified trust badge. Added `docs/COMMERCE_OPERATIONS.md` for provider, fulfillment, refund, backup, and launch boundaries.
+- Replaced runtime Tailwind CDN use with audited local PostCSS/Tailwind builds, fixed Persian metadata/seed copy, added route-level code splitting, Nginx security/cache headers, chained Docker health checks, and GitHub Actions checks.
+- Created phase commits `57b8e27` (commerce schema), `f3c6fda` (transactional backend), and `db4efc5` (customer/staff frontend). A final operations/continuity commit is prepared at session close.
+
+### Verification
+
+- Django isolated system check and migration-drift check passed; all 50 backend tests passed with SQLite.
+- Frontend TypeScript check and production Vite build passed. The initial 512.81 kB bundle was split; the final shared chunk is 344.12 kB and route chunks load separately.
+- Full `npm audit`, including development dependencies, reports zero known vulnerabilities after updating PostCSS.
+- `docker compose config --quiet` passed. Backend and frontend images rebuilt successfully; SQL Server applied migrations `0006` and `0007` and seeded the two default shipping methods.
+- SQL Server, Django readiness, and Nginx-proxied readiness all report healthy. Live-container `manage.py check` passed.
+- A real Nginx/API smoke flow passed: temporary admin product with two variants, coupon, user registration, address, cart, wishlist, discounted quote, first/idempotent order creation (`201`/`200`), tracking, cancellation/restock, order snapshot after catalog deletion, bespoke request, and newsletter subscription. All temporary users and records were removed and cleanup counts were zero.
+- Headless Microsoft Edge rendered and visually verified the live product and returns-policy routes at 1440x1200 with local assets, RTL layout, variant stock, and policy content.
+- `git diff --check` and tracked secret-name review passed before final commit.
+
+### Incomplete / follow-up
+
+- COD and staff-confirmed manual payment are functional. Online payment, outbox email/SMS delivery, carrier label/tracking APIs, tax/accounting, monitoring, and durable production object storage still require provider/account choices and credentials; no fake success path was added.
+- OTP delivery/enrollment and the frontend Google Identity button remain intentionally unavailable until their real provider flows are configured.
+- Policy text, return eligibility, shipping prices/zones, currency/tax interpretation, and bespoke restrictions require owner/legal/operations approval before public launch.
+- A production backup/restore drill was not run. Per owner instruction, no backup was taken before applying these migrations to the disposable development database.
+
+### Owner actions required
+
+- Review and approve the five customer policy pages plus the default `STANDARD` (150,000 Toman; free over 20,000,000) and `PICKUP` shipping rules.
+- Create a non-default administrator when staff access is needed; no fixed admin account was left behind.
+- Choose/configure real payment, email/SMS, carrier, tax/accounting, media, and monitoring providers before production; then run their sandbox/failure/webhook and backup/restore checks from `docs/COMMERCE_OPERATIONS.md`.
+- Decide when to merge `feature/complete-commerce` into `main` and push it. This session intentionally does neither.
+- The verified development stack remains running at `http://localhost:3000` (SQL host port `11433`); use `docker compose down` to stop it without deleting data.
+
 ## 2026-07-13 - Confirm the local main merge
 
 ### Objective and starting state

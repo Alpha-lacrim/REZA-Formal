@@ -103,7 +103,10 @@ const ProductPage: React.FC = () => {
         );
     }
 
-    const hasVariants = Boolean(product.variants?.length);
+    const selectableVariants = (product.variants || []).filter(
+        variant => variant.active && Boolean(variant.size || variant.color || variant.name),
+    );
+    const hasVariants = selectableVariants.length > 0;
     const trackedStock = selectedVariant ? selectedVariant.stock : product.stock;
     const maxStock = trackedStock === undefined || trackedStock === null ? 99 : Math.max(0, trackedStock);
     const stockStatus = maxStock > 5 ? 'in_stock' : maxStock > 0 ? 'low_stock' : 'out_of_stock';
@@ -220,7 +223,7 @@ const ProductPage: React.FC = () => {
                             <div className="mb-6">
                                 <h2 className="font-bold text-sm text-lux-black dark:text-white mb-3">انتخاب گزینه</h2>
                                 <div className="grid grid-cols-2 gap-2">
-                                    {product.variants!.filter(variant => variant.active).map(variant => (
+                                    {selectableVariants.map(variant => (
                                         <button
                                             key={variant.id}
                                             onClick={() => {

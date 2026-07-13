@@ -4,7 +4,7 @@ Last verified: 2026-07-13
 
 ## Purpose and product
 
-REZA Formal is a Persian-first, RTL e-commerce site for formal menswear. It has a React storefront/admin interface, a Django REST API, Microsoft SQL Server persistence, cookie-based JWT authentication, product and stock management, orders, user profiles, contact messages, site content settings, and local Docker orchestration.
+REZA Formal is a Persian-first, RTL e-commerce site for formal menswear. It has React customer/staff interfaces, a Django REST API, Microsoft SQL Server persistence, CSRF-protected cookie JWT authentication, variant inventory, server-priced checkout, order/payment/return workflows, lead/content management, and local Docker orchestration.
 
 This file contains durable project context for later coding sessions. Put chronological work notes in `Handoff.md`, and put session behavior rules in `AGENTS.md`.
 
@@ -23,10 +23,10 @@ This file contains durable project context for later coding sessions. Put chrono
 
 - Entry: `frontend/index.html` -> `frontend/index.tsx` -> `frontend/App.tsx`.
 - Routing: `HashRouter`, so browser routes live after `#` and static hosting does not need server-side route rewrites.
-- Shared state: `frontend/contexts/GlobalContext.tsx` owns authentication state, products, cart, wishlist, theme, site settings, and toast messages.
+- Shared state: `frontend/contexts/GlobalContext.tsx` owns authentication, products, variant-aware cart, wishlist, account synchronization, catalog-source safety, theme, site settings, and toast messages.
 - API boundary: `frontend/services/api.ts` performs HTTP calls and converts Django snake_case/nested responses into the UI's models from `frontend/types.ts`.
 - Local fallback: `frontend/services/db.ts` exposes only a read-only emergency catalog based on `frontend/data.ts`. It is used only when the product API is unavailable and never reports local admin writes as server success.
-- Main feature surfaces: `frontend/pages/` for routes and `frontend/components/` for shared UI.
+- Main feature surfaces: lazy-loaded routes in `frontend/pages/` and shared UI in `frontend/components/`. Tailwind is compiled locally through PostCSS; no runtime Tailwind CDN is used.
 - Static product/site assets: `frontend/public/images/`.
 
 ### Backend
@@ -34,17 +34,17 @@ This file contains durable project context for later coding sessions. Put chrono
 - Project configuration: `backend/reza_backend/settings.py` and `backend/reza_backend/urls.py`.
 - API application: `backend/shop/`.
 - API routes: `backend/shop/urls.py`.
-- Models: custom `User`, `Product`, `Order`, `OrderItem`, `ContactMessage`, and `SiteSettings` in `backend/shop/models.py`.
-- Request logic: `backend/shop/views.py`; serialization/validation: `backend/shop/serializers.py`.
-- Authentication: HttpOnly access/refresh JWT cookies through `backend/shop/auth.py`; `POST /api/auth/refresh/` renews an expired access cookie, and protected endpoints use DRF permissions plus explicit admin checks.
+- Models: `backend/shop/models.py` contains users/products/variants, addresses, shipping/coupons, orders/items/payments/events, inventory movements, saved carts/wishlists, reviews, returns, bespoke/newsletter records, notification outbox, messages, and site settings.
+- Request logic: auth/catalog/content surfaces remain in `backend/shop/views.py`; commerce views, serializers, and transactional rules live in `commerce_views.py`, `commerce_serializers.py`, and `commerce_services.py`.
+- Authentication: HttpOnly access/refresh JWT cookies through `backend/shop/auth.py`; the frontend bootstraps `/api/auth/csrf/` and sends `X-CSRFToken` for every unsafe browser request. Header JWT clients remain usable without cookie CSRF.
 - Persistence: Microsoft SQL Server through `mssql-django` and `pyodbc` for normal runs. Any SQLite test settings are test-only and must not be confused with production configuration.
-- Seed command: `python manage.py seed_data`; it must be idempotent and must never publish or log a fixed administrator password.
-- Hermetic tests: `backend/shop/tests.py` with `backend/reza_backend/test_settings.py` use in-memory SQLite and never touch the configured SQL Server.
+- Seed command: `python manage.py seed_data`; it bootstraps catalog records only when the catalog is empty and shipping only when none exists, and never publishes or logs a fixed administrator password.
+- Hermetic tests: `backend/shop/tests.py` plus focused `test_*.py` modules use `backend/reza_backend/test_settings.py`, in-memory SQLite, and never touch configured SQL Server.
 - Uploaded files: Django media storage under `backend/media/` locally or the mounted `/app/media` volume in Docker. Runtime media is ignored by Git.
 
 ### Docker request flow
 
-The `frontend` image builds Vite assets and serves them with Nginx. Nginx proxies `/api/` to Gunicorn and serves `/media/` directly from the read-only `django_media` volume shared with the backend. The backend waits for SQL Server, optionally creates the application database, applies migrations, collects static files, and runs seed data before Gunicorn starts.
+The `frontend` image builds Vite assets and serves them with Nginx. Nginx proxies `/api/` to Gunicorn and serves `/media/` from the read-only shared volume. The backend waits for SQL Server, optionally creates the database, applies migrations, collects static files, and runs bootstrap data before Gunicorn. Compose health checks form a real dependency chain: SQL query -> Django readiness query -> Nginx-proxied readiness.
 
 The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-13. This workstation uses ignored `MSSQL_PORT=11433` because Windows rejected host port `1433`; services still connect to `db:1433` inside Compose.
 
@@ -68,8 +68,11 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `backend/shop/urls.py` | Public API surface. |
 | `backend/shop/views.py` | Authentication, products, orders, settings, contact, and admin behavior. |
 | `backend/shop/models.py` | Persistent data model and order relationships. |
+| `backend/shop/commerce_services.py` | Quotes, idempotent checkout, locking, inventory, refunds, and lifecycle transitions. |
+| `backend/shop/commerce_views.py` | Customer and staff commerce endpoints. |
+| `backend/shop/commerce_serializers.py` | Commerce validation, client aliases, and immutable response snapshots. |
 | `backend/shop/management/commands/seed_data.py` | Idempotent initial data/bootstrap behavior. |
-| `backend/shop/tests.py` | Backend authentication, validation, stock/order, admin, and seed regressions. |
+| `backend/shop/test_*.py` | Authentication/CSRF, routing, commerce, variants, lifecycle, and migration regressions. |
 | `backend/reza_backend/test_settings.py` | Isolated SQLite test settings that never contact SQL Server. |
 | `backend/shop/migrations/` | Schema history; never edit applied migrations casually. |
 | `frontend/nginx.conf` | Container API proxy plus static and shared-media serving behavior. |
@@ -79,11 +82,11 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 
 All application endpoints are under `/api/`:
 
-- `/auth/register/`, `/auth/login/`, `/auth/refresh/`, `/auth/me/`, `/auth/me/update/`, `/auth/logout/`, `/auth/send-otp/`, `/auth/google/`
-- `/products/`, `/products/<id>/`
-- `/orders/create/`, `/orders/my/`, `/orders/<id>/cancel/`
-- `/settings/`, `/contact/`
-- `/admin/stats/`, `/admin/orders/`, `/admin/users/`, `/admin/messages/`, `/admin/products/` and their detail/action routes
+- Auth/health: `/health/live/`, `/health/ready/`, `/auth/csrf/`, `/auth/register/`, `/auth/login/`, `/auth/refresh/`, `/auth/me/`, `/auth/me/update/`, `/auth/logout/`, `/auth/google/`
+- Catalog/social: `/products/`, `/products/<id>/`, `/products/<id>/reviews/`, `/wishlist/`, `/cart/`
+- Checkout/account: `/checkout/options/`, `/checkout/quote/`, `/addresses/`, `/orders/create/`, `/orders/my/`, `/orders/<id>/`, `/orders/<id>/cancel/`, `/returns/`
+- Leads/content: `/bespoke/requests/`, `/newsletter/subscribe/`, `/settings/`, `/contact/`
+- Staff: `/admin/stats/`, `/admin/capabilities/`, `/admin/orders/`, `/admin/users/`, `/admin/messages/`, `/admin/products/`, `/admin/coupons/`, `/admin/shipping-methods/`, `/admin/payments/`, `/admin/reviews/`, `/admin/returns/`, and `/admin/bespoke/` plus detail/action routes
 
 When the contract changes, update the backend route/view/serializer, `frontend/services/api.ts`, UI types/callers, tests, and this file together.
 
@@ -133,7 +136,9 @@ Use the repository's isolated test settings/command documented in `AGENTS.md` fo
 - Order creation, cancellation, and admin cancellation must keep stock changes atomic and idempotent.
 - User emails are normalized and database-unique. Migration `0005` deliberately stops on blank/duplicate legacy emails and clears unusable secrets created by the retired 2FA delivery flow.
 - Keep cookie flags and allowed origins environment-aware; production cookies must be secure.
-- Cookie auth currently permits only `SameSite=Lax` or `Strict`; use same-site frontend/API domains or add a complete CSRF token flow before considering `SameSite=None`.
+- Cookie auth permits only `SameSite=Lax` or `Strict` and has an explicit CSRF token/header flow. Keep frontend/API same-site; third-party-cookie deployment remains intentionally unsupported.
+- Checkout supports real provider-free `cod` and `manual` methods. Online payment, email/SMS delivery, carrier labels, and tax/accounting require owner-selected providers and credentials and must never be simulated as successful.
+- Order, payment, return, and inventory state plus immutable snapshots are separate. Use transition functions in `commerce_services.py`; never update these states ad hoc.
 - OTP delivery/enrollment and the frontend Google Identity flow are intentionally disabled until real providers are configured; the backend never echoes an OTP or trusts an unsigned Google token.
 - Validate uploaded files and keep the Nginx/Django upload-size limits aligned.
 - Use bundled `frontend/public/images/` assets for default UI imagery; fresh installs must not depend on remote placeholder-image services.

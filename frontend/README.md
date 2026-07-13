@@ -1,6 +1,6 @@
 # REZA Formal frontend
 
-React 19 + TypeScript storefront built with Vite. The Django API is the primary data source; localStorage remains only for cart, wishlist, theme, and selected fallback behavior.
+React 19 + TypeScript storefront built with Vite, route-level code splitting, and locally compiled Tailwind CSS. The Django API is authoritative; localStorage provides offline cart/wishlist/theme continuity, while writes synchronize to the authenticated account when available.
 
 ## Local development
 
@@ -24,6 +24,8 @@ npm.cmd run preview
 ```
 
 Build output is written to `dist/` and is ignored by Git.
+
+Checkout is disabled whenever only the emergency offline catalog is available. The browser never submits an offline order or treats an unavailable payment provider as successful.
 
 ## API configuration
 

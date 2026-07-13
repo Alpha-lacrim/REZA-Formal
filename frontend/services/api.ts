@@ -168,7 +168,8 @@ function normalizeVariant(raw: any, fallbackCurrency = 'Toman'): ProductVariant 
       : (raw?.priceOverride ?? raw?.price_override) === null
         ? null
         : toNumber(raw?.priceOverride ?? raw?.price_override),
-    compareAtPrice: raw?.compareAtPrice === undefined && raw?.compare_at_price === undefined
+    compareAtPrice: (raw?.compareAtPrice ?? raw?.compare_at_price) === null
+      || (raw?.compareAtPrice === undefined && raw?.compare_at_price === undefined)
       ? undefined
       : toNumber(raw?.compareAtPrice ?? raw?.compare_at_price),
     currency: raw?.currency || fallbackCurrency,
@@ -194,7 +195,8 @@ function normalizeProduct(raw: any): Product {
     name: raw?.name ?? '',
     name_fa: raw?.name_fa,
     price: toNumber(raw?.price),
-    compareAtPrice: raw?.compareAtPrice === undefined && raw?.compare_at_price === undefined
+    compareAtPrice: (raw?.compareAtPrice ?? raw?.compare_at_price) === null
+      || (raw?.compareAtPrice === undefined && raw?.compare_at_price === undefined)
       ? undefined
       : toNumber(raw?.compareAtPrice ?? raw?.compare_at_price),
     currency,
