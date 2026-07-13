@@ -21,7 +21,7 @@ This is the chronological continuity log for the repository. Keep the newest ses
 - Completed staff product/variant, order/tracking, coupon, shipping, payment, review, return, bespoke, message, settings, and dashboard flows.
 - Added Persian policy pages and removed the unverified trust badge. Added `docs/COMMERCE_OPERATIONS.md` for provider, fulfillment, refund, backup, and launch boundaries.
 - Replaced runtime Tailwind CDN use with audited local PostCSS/Tailwind builds, fixed Persian metadata/seed copy, added route-level code splitting, Nginx security/cache headers, chained Docker health checks, and GitHub Actions checks.
-- Created phase commits `57b8e27` (commerce schema), `f3c6fda` (transactional backend), and `db4efc5` (customer/staff frontend). A final operations/continuity commit is prepared at session close.
+- Created phase commits `57b8e27` (commerce schema), `f3c6fda` (transactional backend), `db4efc5` (customer/staff frontend), and `eb2b972` (operations, CI, documentation, and browser-found fixes).
 
 ### Verification
 
