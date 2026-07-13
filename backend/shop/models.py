@@ -272,6 +272,8 @@ class Order(models.Model):
         ('pending', 'Pending'),
         ('paid', 'Paid'),
         ('failed', 'Failed'),
+        ('cancelled', 'Cancelled'),
+        ('partially_refunded', 'Partially refunded'),
         ('refunded', 'Refunded'),
     )
 
@@ -304,7 +306,7 @@ class Order(models.Model):
     currency = models.CharField(max_length=16, default='Toman')
     status = models.CharField(max_length=16, choices=STATUS, default='pending')
     payment_method = models.CharField(max_length=16, choices=PAYMENT_METHODS, default='cod')
-    payment_status = models.CharField(max_length=16, choices=PAYMENT_STATUSES, default='unpaid')
+    payment_status = models.CharField(max_length=24, choices=PAYMENT_STATUSES, default='unpaid')
     coupon = models.ForeignKey(Coupon, related_name='orders', on_delete=models.SET_NULL, blank=True, null=True)
     shipping_method = models.ForeignKey(
         ShippingMethod,
@@ -410,12 +412,13 @@ class Payment(models.Model):
         ('paid', 'Paid'),
         ('failed', 'Failed'),
         ('cancelled', 'Cancelled'),
+        ('partially_refunded', 'Partially refunded'),
         ('refunded', 'Refunded'),
     )
 
     order = models.OneToOneField(Order, related_name='payment', on_delete=models.CASCADE)
     method = models.CharField(max_length=16, choices=METHODS, default='cod')
-    status = models.CharField(max_length=16, choices=STATUSES, default='initialized')
+    status = models.CharField(max_length=24, choices=STATUSES, default='initialized')
     amount = models.DecimalField(max_digits=MONEY_MAX_DIGITS, decimal_places=MONEY_DECIMAL_PLACES)
     currency = models.CharField(max_length=16, default='Toman')
     provider = models.CharField(max_length=64, blank=True)
@@ -607,6 +610,7 @@ class BespokeRequest(models.Model):
         ('new', 'New'),
         ('contacted', 'Contacted'),
         ('quoted', 'Quoted'),
+        ('scheduled', 'Scheduled'),
         ('confirmed', 'Confirmed'),
         ('completed', 'Completed'),
         ('cancelled', 'Cancelled'),

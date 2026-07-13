@@ -1,7 +1,10 @@
 from django.urls import path
-from . import views
+from . import commerce_views, health, views
 
 urlpatterns = [
+    path('health/live/', health.live),
+    path('health/ready/', health.ready),
+    path('auth/csrf/', views.csrf_token),
     path('auth/register/', views.register),
     path('auth/login/', views.login),
     path('auth/refresh/', views.refresh_auth),
@@ -12,10 +15,23 @@ urlpatterns = [
     path('auth/google/', views.google_auth),
 
     path('products/', views.products_list),
+    path('products/<str:product_id>/reviews/', commerce_views.product_reviews),
     path('products/<str:pk>/', views.product_detail),
+
+    path('checkout/options/', commerce_views.checkout_options),
+    path('checkout/quote/', commerce_views.checkout_quote),
+    path('addresses/', commerce_views.addresses),
+    path('addresses/<int:pk>/', commerce_views.address_detail),
+    path('cart/', commerce_views.saved_cart),
+    path('wishlist/', commerce_views.wishlist),
+    path('wishlist/<str:product_id>/', commerce_views.wishlist_item),
+    path('returns/', commerce_views.returns),
+    path('bespoke/requests/', commerce_views.bespoke_requests),
+    path('newsletter/subscribe/', commerce_views.newsletter_subscribe),
 
     # Admin endpoints
     path('admin/stats/', views.admin_stats),
+    path('admin/capabilities/', commerce_views.admin_capabilities),
     path('admin/orders/', views.admin_orders),
     path('admin/orders/<str:pk>/status/', views.admin_update_order_status),
     path('admin/users/', views.admin_users),
@@ -23,10 +39,23 @@ urlpatterns = [
     path('admin/messages/<str:pk>/mark-read/', views.admin_mark_message_read),
     path('admin/products/', views.admin_products),
     path('admin/products/<str:pk>/', views.admin_product_detail),
+    path('admin/coupons/', commerce_views.admin_coupons),
+    path('admin/coupons/<int:pk>/', commerce_views.admin_coupon_detail),
+    path('admin/shipping-methods/', commerce_views.admin_shipping_methods),
+    path('admin/shipping-methods/<int:pk>/', commerce_views.admin_shipping_method_detail),
+    path('admin/payments/', commerce_views.admin_payments),
+    path('admin/payments/<int:pk>/', commerce_views.admin_payment_detail),
+    path('admin/reviews/', commerce_views.admin_reviews),
+    path('admin/reviews/<int:pk>/', commerce_views.admin_review_detail),
+    path('admin/returns/', commerce_views.admin_returns),
+    path('admin/returns/<int:pk>/', commerce_views.admin_return_detail),
+    path('admin/bespoke/', commerce_views.admin_bespoke_requests),
+    path('admin/bespoke/<int:pk>/', commerce_views.admin_bespoke_detail),
 
-    path('orders/create/', views.create_order),
-    path('orders/my/', views.my_orders),
-    path('orders/<str:pk>/cancel/', views.cancel_order),
+    path('orders/create/', commerce_views.create_order),
+    path('orders/my/', commerce_views.my_orders),
+    path('orders/<str:pk>/', commerce_views.order_detail),
+    path('orders/<str:pk>/cancel/', commerce_views.cancel_order),
 
     path('settings/', views.site_settings),
     path('contact/', views.contact),
