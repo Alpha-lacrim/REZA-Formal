@@ -18,21 +18,26 @@ This is the chronological continuity log for the repository. Keep the newest ses
 - Preserved the user-authored program document and its roadmap/rules, corrected the proposed baseline tag name, and added Git bootstrap metadata and evidence in `docs/CODEX_PROGRAM.md`. An exact original backup remains at `..\CODEX_PROGRAM.batch-0.original.md` outside the repository.
 - Created `codex/remediation-program` directly from verified origin baseline `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` and the annotated tag `pre-codex-remediation-2026-09-10` at that baseline.
 - Safely deleted the local `feature/complete-commerce` branch after switching to integration and proving it was fully merged. No application files changed; no `main` history was modified.
+- Created and pushed bootstrap commit `b638e63813c972fe096a7830131a233a69606416` (`docs(codex): initialize remediation program`) and the annotated baseline tag; set the integration upstream. Deleted only the authorized commerce remote branch after rechecking its tip.
+- Added the subsequent documentation-only verification record. `docs/CODEX_PROGRAM.md` records the exact bootstrap SHA and a stable lookup for this final Batch 0 commit without attempting a self-referential SHA.
 
 ### Verification
 
 - Read repository instructions, project context, prior handoff, program document, and `.gitignore`; inspected the Git root, status, branches, history, worktrees, and sanitized origin configuration.
 - `git fetch --prune origin` and remote heads/tags inspection succeeded. Commerce ancestry returned 0; main/commerce unique-commit counts were `1 0`; tree diff was empty. GitHub PR #1 reports the same merged head and baseline merge SHA as Git history.
 - The baseline tag is annotated and resolves to the verified baseline. The program document's SHA-256 matched its original backup before edits. Detailed evidence is in `docs/CODEX_PROGRAM.md`.
+- Post-push status, verbose/all branches, last 30 graph/decorated commits, and remote heads/tags inspection confirmed clean integration at the published bootstrap SHA, configured matching upstream, unchanged main, matching annotated tag object/target, and successful local/remote commerce deletion.
+- `git diff --check`, staged checks, and the complete baseline-to-bootstrap whitespace check passed. Full diff/path review showed only this handoff and the program document. Local `main`, `dev`, and stash SHAs remain unchanged; no application checks were run for this documentation-only batch.
 
 ### Incomplete / follow-up
 
-- Documentation commit, remote publication/deletion, and final verification are pending.
+- Batch 0 bootstrap is complete. The final verification record is committed and published after these observed results are recorded; its publication and final clean/upstream state are reported in the session's final response.
+- Existing stash contents were preserved without review. The obsolete historical instruction below to merge/push commerce is resolved by the independently verified PR #1 merge and this authorized branch cleanup.
 - Earlier unresolved application and deployment items remain in the prior entries; none are reassessed in Batch 0.
 
 ### Owner actions required
 
-- After bootstrap completion, start Batch 1 on `codex/batch-01-forensic-audit` from `codex/remediation-program`; Batch 1 is not started here.
+- Start Batch 1 on `codex/batch-01-forensic-audit` from `codex/remediation-program`; Batch 1 is not started here. No bootstrap push/delete owner actions remain from the verified operations above.
 
 ## 2026-07-13 - Build the complete commerce feature set
 

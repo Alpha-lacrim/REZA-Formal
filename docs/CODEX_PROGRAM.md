@@ -6,21 +6,21 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Initialized locally; remote publication pending |
+| Program status | Initialized and published; ready for Batch 1 |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 0 - Git/bootstrap |
-| Batch status | In progress |
+| Batch status | Complete |
 | Batch branch | `codex/remediation-program` (one-time bootstrap) |
 | Batch start commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
-| Integration branch SHA | Baseline above; bootstrap commit pending |
-| Program bootstrap commit | Pending documentation commit |
-| Final batch commit | Pending verification record |
+| Integration branch SHA | `b638e63813c972fe096a7830131a233a69606416` at the verified bootstrap push; final Batch 0 tip is the verification-record commit resolved below |
+| Program bootstrap commit | `b638e63813c972fe096a7830131a233a69606416` - `docs(codex): initialize remediation program` |
+| Final batch commit | The verification-record commit immediately following the bootstrap commit; resolve its exact SHA with the command below |
 | Integration merge commit | Not applicable: Batch 0 commits directly to integration; no merge into `main` |
 | Audit IDs handled | None; no application audit or refactoring in Batch 0 |
 | Verification performed | Git checks and PR metadata listed below |
-| Remaining risks | Remote publication/deletion pending; existing stash contents not reviewed |
+| Remaining risks | Existing stash contents not reviewed; prior application/deployment risks remain outside Batch 0 |
 | Next batch | Batch 1 - Forensic audit (pending) |
 
 ## Batch 0 - Git/bootstrap
@@ -47,11 +47,27 @@ pre-codex-remediation-2026-09-10
 | Item | Result |
 | --- | --- |
 | Local commerce branch | Deleted safely with `git branch -d feature/complete-commerce` after switching to integration |
-| Remote commerce branch | Pending authorized deletion |
-| Baseline tag | Created locally; annotated type and target verified; push pending |
-| Integration branch | Created directly from verified baseline; documentation commit and push pending |
+| Remote commerce branch | Deleted with `git push origin --delete feature/complete-commerce` after rechecking the exact tip; absence confirmed by remote heads inspection |
+| Baseline tag | Pushed; local/remote tag object `f239cf0af592ddb81c8b0b1ad4873082a61a1568` peels to the verified baseline |
+| Integration branch | Pushed at bootstrap SHA `b638e63813c972fe096a7830131a233a69606416`; upstream is `origin/codex/remediation-program` |
 | Unrelated user work | Local `main`, `dev`, existing stash, and ignored files preserved; no unrelated work included |
-| Unresolved Git issues | Remote push and deletion not yet verified |
+| Unresolved Git issues | None at bootstrap verification; local `main` intentionally remains six commits behind origin |
+
+### Completion verification and commit lookup
+
+- Post-push `git status --short --branch`, `git branch -vv`, `git branch -a`, and the last 30 graph/decorated commits confirmed a clean integration worktree, matching upstream, the baseline ancestry, and absence of the local commerce branch and its remote-tracking ref.
+- `git ls-remote --heads --tags origin` confirmed integration at the bootstrap SHA above, remote `main` still at the baseline, the exact annotated tag object and peeled commit, and no commerce branch.
+- `git cat-file -t` returned `tag`; `git rev-parse pre-codex-remediation-2026-09-10^{commit}` returned the baseline; `git ls-tree codex/remediation-program docs/CODEX_PROGRAM.md` confirmed the program file is committed.
+- `git diff --check`, staged whitespace checks, and `git diff --check 99a1ea5d1a5d3444d4063ad6c9ac29303830f14e HEAD` passed. Review of the full bootstrap diff and changed-path list confirmed only `Handoff.md` and `docs/CODEX_PROGRAM.md` changed.
+- Local `main`, `dev`, and the existing stash still resolve to their recorded starting SHAs. No unrelated uncommitted work remains in the repository; the original program backup remains outside it.
+
+This final verification record follows the published bootstrap commit. A commit cannot embed its own literal SHA; the final Batch 0 integration SHA is the first descendant of the bootstrap commit on integration, resolved by:
+
+```powershell
+git rev-list --reverse --first-parent b638e63813c972fe096a7830131a233a69606416..codex/remediation-program | Select-Object -First 1
+```
+
+The expected subject is `docs(codex): record Batch 0 verification`. The successful publication documented above concerns the bootstrap commit; publication and clean/upstream checks for this final record are performed after committing it and reported in the session's final response.
 
 Batch 0 changes are limited to this document and the session entry required by `AGENTS.md` in `Handoff.md`. Application checks are not run because application files do not change. Prior application/deployment follow-ups in `Handoff.md` remain open for the appropriate future batches.
 
@@ -59,7 +75,7 @@ After Batch 0 is complete, start Batch 1 on `codex/batch-01-forensic-audit`, cre
 
 ## Status
 
-- [ ] Batch 0 — Git/bootstrap
+- [x] Batch 0 — Git/bootstrap
 - [ ] Batch 1 — Forensic audit
 - [ ] Batch 2 — Critical correctness
 - [ ] Batch 3 — Tests and CI
@@ -98,6 +114,10 @@ None.
 Record decisions here that Codex cannot safely make itself.
 
 ## Completed batches
+
+| Batch | Status | Branch | Start | Bootstrap | Final | Merge | Audit IDs | Next |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| 0 - Git/bootstrap | Complete | `codex/remediation-program` | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` | `b638e63813c972fe096a7830131a233a69606416` | Verification-record lookup above | Not applicable | None | Batch 1 pending |
 
 Record:
 - Batch
