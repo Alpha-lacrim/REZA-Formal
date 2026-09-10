@@ -1,8 +1,38 @@
 # Session Handoff
 
-Last updated: 2026-07-13
+Last updated: 2026-09-10
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-09-10 - Batch 0 Git bootstrap
+
+### Objective and starting state
+
+- Establish the Git foundation for the REZA-Formal Codex Remediation program; application audit and remediation are out of scope.
+- Active Git root: `C:\Users\Pouyan\REZA_Formal_Website\REZA-Formal`.
+- Started on `feature/complete-commerce` at `dc225f5f344389afdbe9448537e56589ac861f1a`, tracking the matching cached remote branch. The only untracked file was the user-authored `docs/CODEX_PROGRAM.md`; no tracked or staged changes existed.
+- Local `main` was `449c5a1`, six commits behind `origin/main`; local `dev` and an existing stash were present. All remain unchanged.
+
+### Changed
+
+- Preserved the user-authored program document and its roadmap/rules, corrected the proposed baseline tag name, and added Git bootstrap metadata and evidence in `docs/CODEX_PROGRAM.md`. An exact original backup remains at `..\CODEX_PROGRAM.batch-0.original.md` outside the repository.
+- Created `codex/remediation-program` directly from verified origin baseline `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` and the annotated tag `pre-codex-remediation-2026-09-10` at that baseline.
+- Safely deleted the local `feature/complete-commerce` branch after switching to integration and proving it was fully merged. No application files changed; no `main` history was modified.
+
+### Verification
+
+- Read repository instructions, project context, prior handoff, program document, and `.gitignore`; inspected the Git root, status, branches, history, worktrees, and sanitized origin configuration.
+- `git fetch --prune origin` and remote heads/tags inspection succeeded. Commerce ancestry returned 0; main/commerce unique-commit counts were `1 0`; tree diff was empty. GitHub PR #1 reports the same merged head and baseline merge SHA as Git history.
+- The baseline tag is annotated and resolves to the verified baseline. The program document's SHA-256 matched its original backup before edits. Detailed evidence is in `docs/CODEX_PROGRAM.md`.
+
+### Incomplete / follow-up
+
+- Documentation commit, remote publication/deletion, and final verification are pending.
+- Earlier unresolved application and deployment items remain in the prior entries; none are reassessed in Batch 0.
+
+### Owner actions required
+
+- After bootstrap completion, start Batch 1 on `codex/batch-01-forensic-audit` from `codex/remediation-program`; Batch 1 is not started here.
 
 ## 2026-07-13 - Build the complete commerce feature set
 
