@@ -1,8 +1,70 @@
 # Session Handoff
 
-Last updated: 2026-09-10
+Last updated: 2026-09-13
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-09-13 - Resume Batch 1 forensic audit
+
+### Objective and starting state
+
+- Resume the documentation-only audit after interruption. Active branch is `codex/batch-01-forensic-audit`, still at `94d665881e3e929c41121d057385c28f822002fe`.
+- Preserved the existing Batch 1 drafts: modified `Handoff.md`, untracked `docs/audit/` and `docs/ROADMAP.md`. No tracked application changes exist.
+
+### Changed
+
+- Completed the ten requested audit documents: `docs/audit/AUDIT_INDEX.md`, `ARCHITECTURE_AUDIT.md`, `BACKEND_AUDIT.md`, `FRONTEND_AUDIT.md`, `DATABASE_AUDIT.md`, `SECURITY_AUDIT.md`, `PERFORMANCE_AUDIT.md`, `TESTING_CI_AUDIT.md`, `UX_A11Y_SEO_AUDIT.md` and `DEAD_CODE_DEBT.md`.
+- Created `docs/ROADMAP.md` with remediation batches, dependencies, migration safeguards and owner decisions. Updated `docs/CODEX_PROGRAM.md` with Batch 1 results and commit/merge lookups.
+- Updated only stable missing facts in `Codex.md`: audit/program navigation, live versus legacy order routing, native Django admin as a separate writer, and product/variant stock authority. `AGENTS.md` is unchanged.
+- Recorded 43 findings (P0 0, P1 8, P2 33, P3 2), all Open, and qualified verdicts for all 18 hypotheses. The P1 set contains five reproduced backend defects, one reproduced upload validation defect, an unverified SQL concurrency risk and a SQL coverage gap. No application defect was fixed.
+- Removed the ignored disposable probe script; its reproducible code remains in the testing audit. No application, dependency, migration, deployment or persistent-data changes are included.
+
+### Verification
+
+- Re-read operating/continuity records and reviewed all audit drafts against the application baseline. The September 10 application checks below are preserved with their original execution date; unchanged source did not justify repeating them on September 13.
+- Programmatic document review confirmed exactly 43 canonical records, all required attributes, matching index severity/confidence/status/batch, all 18 hypothesis rows, valid source paths and local document links/anchors. The embedded Python probe parses successfully.
+- Current-tree signature scan across 117 text files, including the new documentation, found zero private-key/common-token/credential-URL/JWT matches. Ignored environment values were not read or copied. This does not certify historical secrets or external rotation.
+- `git diff --check`, full documentation/path review, and preservation checks passed before committing. Local `main`, `dev`, stash and baseline-tag targets still match the recorded Batch 0 SHAs. Final staged checks and clean-worktree/merge-parent verification follow this record's commit.
+- Main commit subject: `docs(audit): establish remediation baseline`; authorized merge subject: `Merge Batch 1 forensic audit`. Exact self/subsequent commit hashes resolve using the fixed-start commands in `docs/CODEX_PROGRAM.md`; observed commit/merge results are reported in the session final response. No remote push is included.
+
+### Incomplete / follow-up
+
+- Batch 1 audit/documentation is complete; its local Git commit/merge is the final step after this record. Batch 2 is not started. All findings remain open for their scheduled remediation/evidence gates.
+- No SQL Server concurrency/live schema test, browser/a11y run, live Docker deployment check, load test, restore drill or provider verification was performed in this batch. Python advisory status remains unknown; npm has six affected package entries as of September 10.
+- Preserve earlier historical notes below. Their old application-completion and zero-advisory statements are dated evidence, superseded where the current audit demonstrates gaps.
+
+### Owner actions required
+
+- No decision is required for this documentation merge. Before relevant later fixes/launch, decide refund allocation and manual confirmation, cancellation/return/bespoke policies, guest/account merge semantics, staff capability, provider accounts, identity/session policy and production hosting/TLS/SQL/media/recovery. See `docs/ROADMAP.md` for the exact gates.
+- Previous development-secret replacement is documented historically; revocation in other environments and repository-history cleanup remain unverified. No rotation or history rewrite was performed. No migration or deployment action is required by Batch 1.
+
+## 2026-09-10 - Batch 1 forensic codebase audit
+
+### Objective and starting state
+
+- Analysis and documentation only: establish the remediation baseline, trace system workflows, verify the 18 supplied hypotheses, and attempt the repository baseline checks. Do not change application code or repair defects.
+- Started from clean `codex/remediation-program` at `94d6658`; created `codex/batch-01-forensic-audit`. Local `main`, `dev`, existing stash, and ignored runtime files are preserved.
+
+### Changed
+
+- Traced the backend/frontend/database/infrastructure and drafted the audit register, workflow maps and roadmap. Reproduced findings using synthetic in-memory SQLite and mocked Node transport/storage; no live commerce records were used.
+- Documentation completion and local Git integration continue in the September 13 entry above; no application files changed.
+
+### Verification
+
+- Confirmed the nested Git root, clean starting status and repository guidance.
+- From `backend/`: `.\.venv\Scripts\python.exe manage.py check --settings=reza_backend.test_settings` passed; `.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings` reported no changes; `.\.venv\Scripts\python.exe manage.py test --settings=reza_backend.test_settings` passed all 50 tests in 5.794 seconds and destroyed the test database.
+- From `frontend/`: `npm.cmd run typecheck` passed. `npm.cmd run build` initially failed on sandbox parent-directory/Vite config access; an approved retry passed (Vite 6.4.3, 1,738 modules, 4.91 seconds).
+- From the repository root: `docker compose config --quiet` passed with two global Docker-config access warnings; expanded configuration was not printed. `backend/.venv/Scripts/python.exe -m pip check` passed; `backend/.venv/Scripts/python.exe -m pip_audit --version` reported the module unavailable.
+- `npm.cmd audit --json` from `frontend/` first failed on sandbox network/cache access; an approved retry completed with exit 1 and six affected package entries (five high, one moderate). No dependency was changed. Advisory applicability and exact proof scripts/results are in `docs/audit/TESTING_CI_AUDIT.md` and `SECURITY_AUDIT.md`.
+
+### Incomplete / follow-up
+
+- Audit drafts and baseline/probe evidence were retained across interruption. September 13 completes the document consistency/secret review and authorized local Git completion.
+
+### Owner actions required
+
+- No input required to continue the audit. Prior unresolved launch/provider/credential-history obligations remain pending reassessment.
 
 ## 2026-09-10 - Batch 0 Git bootstrap
 
