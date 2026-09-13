@@ -6,22 +6,53 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Initialized and published; ready for Batch 1 |
+| Program status | Batch 1 audit baseline established; next planned work is Batch 2 |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 0 - Git/bootstrap |
-| Batch status | Complete |
-| Batch branch | `codex/remediation-program` (one-time bootstrap) |
-| Batch start commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
-| Integration branch SHA | `b638e63813c972fe096a7830131a233a69606416` at the verified bootstrap push; final Batch 0 tip is the verification-record commit resolved below |
+| Current batch | Batch 1 - Forensic audit |
+| Batch status | Audit complete; commit/merge provenance resolved by the Batch 1 commands below |
+| Batch branch | `codex/batch-01-forensic-audit` |
+| Batch start commit | `94d665881e3e929c41121d057385c28f822002fe` |
+| Integration branch SHA | Batch 1 merge lookup below; Batch 0 ended at `94d665881e3e929c41121d057385c28f822002fe` |
 | Program bootstrap commit | `b638e63813c972fe096a7830131a233a69606416` - `docs(codex): initialize remediation program` |
-| Final batch commit | The verification-record commit immediately following the bootstrap commit; resolve its exact SHA with the command below |
-| Integration merge commit | Not applicable: Batch 0 commits directly to integration; no merge into `main` |
-| Audit IDs handled | None; no application audit or refactoring in Batch 0 |
-| Verification performed | Git checks and PR metadata listed below |
-| Remaining risks | Existing stash contents not reviewed; prior application/deployment risks remain outside Batch 0 |
-| Next batch | Batch 1 - Forensic audit (pending) |
+| Final batch commit | Batch 1 audit commit lookup below; subject `docs(audit): establish remediation baseline` |
+| Integration merge commit | Local non-fast-forward merge into `codex/remediation-program`, resolved below; no `main` merge or remote push in Batch 1 |
+| Audit IDs handled | 43 recorded, all Open; none remediated. [Canonical register](audit/AUDIT_INDEX.md) |
+| Verification performed | Isolated Django check/drift/50 tests, frontend typecheck/build, Compose config, disposable probes and documentation review; exact results in [testing audit](audit/TESTING_CI_AUDIT.md) |
+| Remaining risks | Eight P1 records, SQL Server/browser/deployment evidence gaps, dependency advisories and unresolved provider/policy/history obligations |
+| Next batch | Batch 2 - Critical correctness; not started in Batch 1 |
+
+## Batch 1 - Forensic audit
+
+### Scope and results
+
+- Started September 10, 2026 from the clean Batch 0 integration tip above. Resumed September 13 on the same branch/commit with the audit drafts preserved. All application files, dependencies, migrations, local `main`/`dev`, the existing stash and baseline tag are unchanged.
+- Created all ten requested `docs/audit/` documents and [ROADMAP.md](ROADMAP.md); updated this program and Handoff. `Codex.md` receives only durable navigation/authority facts; `AGENTS.md` is unchanged.
+- Traced authentication, catalog/variants, cart/wishlist, quotes/checkout, order cancellation, payments/refunds/returns, staff/native admin, uploads/content, SQL schema/migrations, Docker/Nginx, CI and deployment assumptions.
+- Recorded **43 stable findings: P0 0, P1 8, P2 33, P3 2** and verdicts for all 18 supplied hypotheses. Five backend defects and one upload validation defect are reproduced at P1; DB-002 is an unverified SQL concurrency risk and TEST-003 is a coverage gap. Architecture size/coupling is maintenance debt, not a confirmed application defect.
+- September 10 checks: isolated Django check/drift and 50 tests passed; frontend typecheck and production build passed (build required an approved sandbox-access retry); Compose config passed with an unreadable global Docker-config warning. npm audit completed with six affected package entries; Python advisory tooling was unavailable. The dates/results are preserved, not represented as September 13 reruns.
+- No production SQL/data access, SQL Server concurrency test, live Docker launch, browser/a11y run, restore drill or external provider/credential-history verification was performed. The [testing audit](audit/TESTING_CI_AUDIT.md) includes exact commands and all disposable proof scripts.
+
+### Git completion and immutable lookup
+
+The documentation-only merge is authorized by the Batch 1 request and follows consistency, scope and secret review. This record is included in the audit commit itself, so its own SHA and the subsequent merge SHA cannot be literal self-references. Resolve them from the fixed start point:
+
+```powershell
+# Audit commit (first branch descendant; expected subject below).
+git log --reverse --format='%H %s' 94d665881e3e929c41121d057385c28f822002fe..codex/batch-01-forensic-audit
+
+# Batch 1 integration merge (first first-parent merge after the fixed start).
+git rev-list --reverse --first-parent --merges 94d665881e3e929c41121d057385c28f822002fe..codex/remediation-program | Select-Object -First 1
+```
+
+Expected subjects: `docs(audit): establish remediation baseline` and `Merge Batch 1 forensic audit`. Merge execution and final clean-worktree checks happen after committing this record; the session final response reports the observed hashes/result. Preserve these branch references for later provenance. No remote publication is part of this batch.
+
+Quality gates: all 43 canonical records have the required attributes and matching register classification; all 18 hypothesis verdicts and roadmap assignments are present; local document links/anchors resolve; whitespace, complete diff and secret review pass; changed paths are only the requested Markdown documentation and stable project map. No finding is closed by this documentation merge.
+
+### Remaining risks and next work
+
+The [roadmap](ROADMAP.md) is the detailed batch schedule and owner-decision register. Batch 2 prioritizes stock authority/native admin writes, financial refund accounting, atomic order updates, gallery upload containment and the SQL evidence needed for its fixes. Defect-specific regression tests must accompany Batch 2; the broader testing foundation remains Batch 3. Do not begin Batch 2 in this continuation.
 
 ## Batch 0 - Git/bootstrap
 
@@ -71,12 +102,12 @@ The expected subject is `docs(codex): record Batch 0 verification`. The successf
 
 Batch 0 changes are limited to this document and the session entry required by `AGENTS.md` in `Handoff.md`. Application checks are not run because application files do not change. Prior application/deployment follow-ups in `Handoff.md` remain open for the appropriate future batches.
 
-After Batch 0 is complete, start Batch 1 on `codex/batch-01-forensic-audit`, created from `codex/remediation-program`. Do not start Batch 1 during this session.
+The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-audit`, created from `codex/remediation-program`, for a separate session. That follow-up is fulfilled by the Batch 1 record above.
 
 ## Status
 
 - [x] Batch 0 — Git/bootstrap
-- [ ] Batch 1 — Forensic audit
+- [x] Batch 1 — Forensic audit
 - [ ] Batch 2 — Critical correctness
 - [ ] Batch 3 — Tests and CI
 - [ ] Batch 4 — Backend architecture
@@ -107,17 +138,18 @@ After Batch 0 is complete, start Batch 1 on `codex/batch-01-forensic-audit`, cre
 
 ## Current blockers
 
-None.
+No blocker to completing the documentation-only Batch 1 merge. Production readiness remains unproven; the open audit findings and evidence gates apply before affected workflows can be relied on.
 
 ## Owner decisions
 
-Record decisions here that Codex cannot safely make itself.
+See [roadmap owner decisions](ROADMAP.md#owner-decisions-and-evidence-still-needed): refund allocation/reference policy, cancellation/returns/bespoke rules, guest/account merge semantics, effective staff capability, production hosting/TLS/SQL/media/recovery, providers, identity/session policy, public URL migration, and external credential/history evidence. None is required to record this audit; do not invent financial history or provider success while awaiting later decisions.
 
 ## Completed batches
 
 | Batch | Status | Branch | Start | Bootstrap | Final | Merge | Audit IDs | Next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| 0 - Git/bootstrap | Complete | `codex/remediation-program` | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` | `b638e63813c972fe096a7830131a233a69606416` | Verification-record lookup above | Not applicable | None | Batch 1 pending |
+| 0 - Git/bootstrap | Complete | `codex/remediation-program` | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` | `b638e63813c972fe096a7830131a233a69606416` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | None | Batch 1 audit complete |
+| 1 - Forensic audit | Audit complete | `codex/batch-01-forensic-audit` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | Batch 1 audit lookup above | Batch 1 merge lookup above | All 43 recorded; none fixed | Batch 2 pending |
 
 Record:
 - Batch

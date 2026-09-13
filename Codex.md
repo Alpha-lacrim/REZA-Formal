@@ -1,12 +1,14 @@
 # Codex Project Context
 
-Last verified: 2026-07-13
+Last verified: 2026-09-13 (source/documentation review; runtime evidence is dated separately in Handoff)
 
 ## Purpose and product
 
 REZA Formal is a Persian-first, RTL e-commerce site for formal menswear. It has React customer/staff interfaces, a Django REST API, Microsoft SQL Server persistence, CSRF-protected cookie JWT authentication, variant inventory, server-priced checkout, order/payment/return workflows, lead/content management, and local Docker orchestration.
 
 This file contains durable project context for later coding sessions. Put chronological work notes in `Handoff.md`, and put session behavior rules in `AGENTS.md`.
+
+The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.md](docs/audit/AUDIT_INDEX.md). [docs/ROADMAP.md](docs/ROADMAP.md) owns batch sequencing and decision gates; [docs/CODEX_PROGRAM.md](docs/CODEX_PROGRAM.md) owns program/Git provenance. Keep detailed findings out of this project map.
 
 ## Repository boundaries
 
@@ -36,6 +38,7 @@ This file contains durable project context for later coding sessions. Put chrono
 - API routes: `backend/shop/urls.py`.
 - Models: `backend/shop/models.py` contains users/products/variants, addresses, shipping/coupons, orders/items/payments/events, inventory movements, saved carts/wishlists, reviews, returns, bespoke/newsletter records, notification outbox, messages, and site settings.
 - Request logic: auth/catalog/content surfaces remain in `backend/shop/views.py`; commerce views, serializers, and transactional rules live in `commerce_views.py`, `commerce_serializers.py`, and `commerce_services.py`.
+- Active order URLs resolve to `commerce_views.py`; similarly named legacy order handlers in `views.py` remain importable but are not routed. Native Django `/admin/` is a separate model-editing surface from REST `/api/admin/`; inspect `shop/admin.py` when changing write invariants.
 - Authentication: HttpOnly access/refresh JWT cookies through `backend/shop/auth.py`; the frontend bootstraps `/api/auth/csrf/` and sends `X-CSRFToken` for every unsafe browser request. Header JWT clients remain usable without cookie CSRF.
 - Persistence: Microsoft SQL Server through `mssql-django` and `pyodbc` for normal runs. Any SQLite test settings are test-only and must not be confused with production configuration.
 - Seed command: `python manage.py seed_data`; it bootstraps catalog records only when the catalog is empty and shipping only when none exists, and never publishes or logs a fixed administrator password.
@@ -66,7 +69,7 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `frontend/types.ts` | Canonical UI data shapes. |
 | `backend/reza_backend/settings.py` | Django, SQL Server, CORS, JWT, static, and media configuration. |
 | `backend/shop/urls.py` | Public API surface. |
-| `backend/shop/views.py` | Authentication, products, orders, settings, contact, and admin behavior. |
+| `backend/shop/views.py` | Authentication, products, settings, contact and older staff endpoints; retains unrouted legacy order handlers. |
 | `backend/shop/models.py` | Persistent data model and order relationships. |
 | `backend/shop/commerce_services.py` | Quotes, idempotent checkout, locking, inventory, refunds, and lifecycle transitions. |
 | `backend/shop/commerce_views.py` | Customer and staff commerce endpoints. |
@@ -133,6 +136,7 @@ Use the repository's isolated test settings/command documented in `AGENTS.md` fo
 
 - Preserve UTF-8 Persian copy and RTL layout.
 - The backend is authoritative for price, total, stock, roles, and order status. Never trust client-submitted totals or privileges.
+- Variant stock is used by commerce checkout; `Product.stock` is normally an active-variant sum, but single default-variant/legacy paths still accept it as input. Review all writers and projection/ledger effects together; the current implementation does not enforce this authority universally.
 - Order creation, cancellation, and admin cancellation must keep stock changes atomic and idempotent.
 - User emails are normalized and database-unique. Migration `0005` deliberately stops on blank/duplicate legacy emails and clears unusable secrets created by the retired 2FA delivery flow.
 - Keep cookie flags and allowed origins environment-aware; production cookies must be secure.
