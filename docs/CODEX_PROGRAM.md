@@ -6,18 +6,18 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 1 audit baseline established; next planned work is Batch 2 |
+| Program status | Batch 1 audit baseline established and published; next planned work is Batch 2 |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 1 - Forensic audit |
-| Batch status | Audit complete; commit/merge provenance resolved by the Batch 1 commands below |
+| Batch status | Complete; required checks rerun and branches published on 2026-09-13 |
 | Batch branch | `codex/batch-01-forensic-audit` |
 | Batch start commit | `94d665881e3e929c41121d057385c28f822002fe` |
-| Integration branch SHA | Batch 1 merge lookup below; Batch 0 ended at `94d665881e3e929c41121d057385c28f822002fe` |
+| Integration branch SHA | Published audit merge `fc17a0788aa973f1626c876be29619c76ab3f98b`; the following documentation-only publication record is identified below |
 | Program bootstrap commit | `b638e63813c972fe096a7830131a233a69606416` - `docs(codex): initialize remediation program` |
-| Final batch commit | Batch 1 audit commit lookup below; subject `docs(audit): establish remediation baseline` |
-| Integration merge commit | Local non-fast-forward merge into `codex/remediation-program`, resolved below; no `main` merge or remote push in Batch 1 |
+| Final batch commit | `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322` - `docs(audit): establish remediation baseline` |
+| Integration merge commit | `fc17a0788aa973f1626c876be29619c76ab3f98b` - `Merge Batch 1 forensic audit`; published to origin after the owner's follow-up request; no `main` merge |
 | Audit IDs handled | 43 recorded, all Open; none remediated. [Canonical register](audit/AUDIT_INDEX.md) |
 | Verification performed | Isolated Django check/drift/50 tests, frontend typecheck/build, Compose config, disposable probes and documentation review; exact results in [testing audit](audit/TESTING_CI_AUDIT.md) |
 | Remaining risks | Eight P1 records, SQL Server/browser/deployment evidence gaps, dependency advisories and unresolved provider/policy/history obligations |
@@ -34,9 +34,9 @@ pre-codex-remediation-2026-09-10
 - September 10 checks: isolated Django check/drift and 50 tests passed; frontend typecheck and production build passed (build required an approved sandbox-access retry); Compose config passed with an unreadable global Docker-config warning. npm audit completed with six affected package entries; Python advisory tooling was unavailable. The dates/results are preserved, not represented as September 13 reruns.
 - No production SQL/data access, SQL Server concurrency test, live Docker launch, browser/a11y run, restore drill or external provider/credential-history verification was performed. The [testing audit](audit/TESTING_CI_AUDIT.md) includes exact commands and all disposable proof scripts.
 
-### Git completion and immutable lookup
+### Git completion and publication
 
-The documentation-only merge is authorized by the Batch 1 request and follows consistency, scope and secret review. This record is included in the audit commit itself, so its own SHA and the subsequent merge SHA cannot be literal self-references. Resolve them from the fixed start point:
+The documentation-only merge followed consistency, scope and secret review. Audit commit `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322` is the second parent of integration merge `fc17a0788aa973f1626c876be29619c76ab3f98b`; its first parent is the recorded Batch 0 tip. The initial handoff was local-only. On September 13 the owner requested a completion recheck and conditional push. All six required checks passed again, and the atomic push published both audit and integration branches with matching upstreams. These commands independently resolve the original audit provenance:
 
 ```powershell
 # Audit commit (first branch descendant; expected subject below).
@@ -46,7 +46,9 @@ git log --reverse --format='%H %s' 94d665881e3e929c41121d057385c28f822002fe..cod
 git rev-list --reverse --first-parent --merges 94d665881e3e929c41121d057385c28f822002fe..codex/remediation-program | Select-Object -First 1
 ```
 
-Expected subjects: `docs(audit): establish remediation baseline` and `Merge Batch 1 forensic audit`. Merge execution and final clean-worktree checks happen after committing this record; the session final response reports the observed hashes/result. Preserve these branch references for later provenance. No remote publication is part of this batch.
+Expected subjects: `docs(audit): establish remediation baseline` and `Merge Batch 1 forensic audit`. Preserve these branch references for later provenance. This subsequent publication record follows the observed push and uses subject `docs(audit): record completion recheck and publication`; resolve its SHA as the first first-parent descendant after `fc17a0788aa973f1626c876be29619c76ab3f98b`. Its own push and final remote-tip verification follow its commit and are reported in the session response.
+
+September 13 recheck: the isolated system/drift checks passed; all 50 backend tests passed in 5.950 seconds; typecheck passed; production build passed in 3.75 seconds after an approved sandbox-access retry; Compose config passed with the documented global-config warnings. All 43 records/18 hypotheses and their links, source paths and required fields passed consistency review. The [testing audit](audit/TESTING_CI_AUDIT.md) preserves the September 10 evidence and separately records this rerun. Dependency scans/probes and SQL/browser/deployment checks were not rerun by the publication check.
 
 Quality gates: all 43 canonical records have the required attributes and matching register classification; all 18 hypothesis verdicts and roadmap assignments are present; local document links/anchors resolve; whitespace, complete diff and secret review pass; changed paths are only the requested Markdown documentation and stable project map. No finding is closed by this documentation merge.
 
@@ -138,7 +140,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 
 ## Current blockers
 
-No blocker to completing the documentation-only Batch 1 merge. Production readiness remains unproven; the open audit findings and evidence gates apply before affected workflows can be relied on.
+No Batch 1 completion or publication blocker remains. Production readiness remains unproven; the open audit findings and evidence gates apply before affected workflows can be relied on.
 
 ## Owner decisions
 
@@ -149,7 +151,7 @@ See [roadmap owner decisions](ROADMAP.md#owner-decisions-and-evidence-still-need
 | Batch | Status | Branch | Start | Bootstrap | Final | Merge | Audit IDs | Next |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 - Git/bootstrap | Complete | `codex/remediation-program` | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` | `b638e63813c972fe096a7830131a233a69606416` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | None | Batch 1 audit complete |
-| 1 - Forensic audit | Audit complete | `codex/batch-01-forensic-audit` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | Batch 1 audit lookup above | Batch 1 merge lookup above | All 43 recorded; none fixed | Batch 2 pending |
+| 1 - Forensic audit | Complete and published | `codex/batch-01-forensic-audit` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322` | `fc17a0788aa973f1626c876be29619c76ab3f98b` | All 43 recorded; none fixed | Batch 2 pending |
 
 Record:
 - Batch

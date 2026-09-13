@@ -4,6 +4,19 @@ Last updated: 2026-09-13
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-09-13 - Revalidate and publish Batch 1
+
+- Objective: independently check Batch 1 against the original requirements and publish only after confirming completion, as explicitly requested after the local-only handoff.
+- Starting state: clean `codex/remediation-program` at `fc17a0788aa973f1626c876be29619c76ab3f98b`, two commits ahead of its cached upstream; audit branch at `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322`.
+- Re-read repository guidance and confirmed both local branch tips. All ten audit documents, the roadmap, program and handoff are present. Rechecked 43 canonical records for every required attribute, matching index classification/batch, all 18 hypotheses, source paths and local links. No document validation errors were found.
+- Reran the six required checks: isolated Django system check and migration drift passed; all 50 backend tests passed in 5.950 seconds; frontend typecheck passed; production build passed in 3.75 seconds after the same sandbox filesystem failure and approved retry; Compose config passed with two global Docker-config access warnings. Exact commands/results are appended to `docs/audit/TESTING_CI_AUDIT.md`.
+- Confirmed the audit merge contains only the 14 intended Markdown paths; application files and `AGENTS.md` are unchanged. The full baseline-to-merge whitespace check passed. No application fix, migration, dependency change or Batch 2 work was introduced.
+- Completion conclusion: Batch 1 is complete for its analysis/documentation scope. The open defects, SQL Server/browser/production evidence gaps and dated dependency results remain explicit later-batch work; no finding was closed during this recheck.
+- The first sandbox `git ls-remote --heads origin refs/heads/codex/remediation-program refs/heads/codex/batch-01-forensic-audit` failed with Windows credential access unavailable. The initial outside-sandbox read was interrupted by the user's request to recheck completion; no push had occurred at that point.
+- After the completion checks, `git push --atomic --set-upstream origin codex/batch-01-forensic-audit codex/remediation-program` succeeded outside the sandbox. Origin acknowledged the new audit branch at `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322` and integration advancement from `94d6658` to `fc17a0788aa973f1626c876be29619c76ab3f98b`. Both upstreams are configured.
+- This documentation-only verification record updates `Handoff.md`, `docs/CODEX_PROGRAM.md` and `docs/audit/TESTING_CI_AUDIT.md` after that observed publication. Its follow-up commit is pushed to integration; final remote-tip and clean-worktree verification are reported in the session response.
+- No new owner action is required for Batch 1 publication. Existing policy/provider/recovery/credential-history obligations in the roadmap remain unchanged. No production data, volume, secret store, `main` or `dev` was changed.
+
 ## 2026-09-13 - Resume Batch 1 forensic audit
 
 ### Objective and starting state

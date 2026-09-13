@@ -1,6 +1,6 @@
 # Testing, CI and operations audit
 
-The baseline commands and probes below ran on September 10, 2026 on Windows/PowerShell in the nested repository. Documentation was reviewed again on September 13 against unchanged application files; this is not a claim of rerunning those application checks. Isolated Django settings use in-memory SQLite and were asserted again in the probes. No test used the configured SQL Server or live commerce data. Build output is ignored and not committed.
+The original baseline commands and probes below ran on September 10, 2026 on Windows/PowerShell in the nested repository. Documentation was reviewed on September 13 against unchanged application files. After the initial completion handoff, the owner requested a fresh completion check before publication; those six repeated checks are recorded separately below. Isolated Django settings use in-memory SQLite and were asserted again in the original probes. No test used the configured SQL Server or live commerce data. Build output is ignored and not committed.
 
 ## Exact baseline commands and results
 
@@ -22,6 +22,22 @@ The baseline commands and probes below ran on September 10, 2026 on Windows/Powe
 Required baseline checks pass after the build access retry. A nonzero dependency advisory result is an audit finding, not a repaired or silently waived vulnerability. Documentation-only merge gates are completeness, consistency, secret review and an unchanged application tree; production launch gates remain open.
 
 Installed backend versions: Django 5.2.16, DRF 3.17.1, SimpleJWT 5.5.1, mssql-django 1.7.3, pyodbc 5.3.0, Pillow 12.3.0, pyotp 2.10.0, google-auth 2.55.2, Gunicorn 23.0.0 and WhiteNoise 6.12.0. These local resolutions are not a reproducible lock.
+
+## September 13 completion recheck before publication
+
+All six required checks were rerun after the owner's explicit request to verify that Batch 1 was complete. Application source, configuration and dependencies were unchanged from the audited tree.
+
+| Working directory | Exact command | Observed result |
+| --- | --- | --- |
+| backend | `.\.venv\Scripts\python.exe manage.py check --settings=reza_backend.test_settings` | PASS, exit 0; no issues (0 silenced) |
+| backend | `.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings` | PASS, exit 0; no changes detected |
+| backend | `.\.venv\Scripts\python.exe manage.py test --settings=reza_backend.test_settings` | PASS, exit 0; 50 tests in 5.950s; test DB destroyed; expected invalid-product validation warning |
+| frontend | `npm.cmd run typecheck` | PASS, exit 0; tsc --noEmit |
+| frontend | `npm.cmd run build` (sandbox) | FAIL, exit 1; esbuild parent-directory access denied and vite.config.ts resolution failed |
+| frontend | `npm.cmd run build` (approved execution outside sandbox) | PASS, exit 0; Vite 6.4.3, 1,738 modules, 3.75s; main JS 344.28 kB, admin 80.65 kB, CSS 54.98 kB |
+| root | `docker compose config --quiet` | PASS, exit 0; two unreadable global .docker/config.json warnings; interpolated config was not printed |
+
+Document checks confirmed all ten requested audit files, roadmap/program/handoff, 43 canonical records with every required attribute, matching register classification/batches, all 18 hypothesis rows, and valid local links/anchors/source paths. Git review confirmed 14 intended Markdown changes only and an unchanged application/AGENTS tree; the baseline-to-merge whitespace check passed. The audit is complete for analysis/documentation scope. Existing defects remain Open, and SQL Server/browser/production evidence remains a recorded future gate. Dependency scans and disposable probes were not rerun during this publication recheck.
 
 ## Existing test coverage inventory
 
