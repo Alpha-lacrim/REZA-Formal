@@ -76,7 +76,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | BE-007 | P2 | High | Open - confirmed defect | [Input validation falls through to database errors](BACKEND_AUDIT.md#be-007) | 4 (prioritize unsafe write cases in 2) |
 | BE-008 | P2 | High | Open - confirmed defect | [Newsletter repeat/reactivation path is rejected by serializer uniqueness](BACKEND_AUDIT.md#be-008) | 4 |
 | BE-009 | P2 | High | Open - confirmed defect | [Customer cancellation capability describes staff transitions](BACKEND_AUDIT.md#be-009) | 5 |
-| FE-001 | P2 | High | Open - confirmed defect | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 5 |
+| FE-001 | P2 | High | Fixed - Batch 2; explicit priority | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 2 |
 | FE-002 | P2 | High | Open - confirmed defect | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 7 (SEC-001 containment in 2) |
 | FE-003 | P2 | High | Open - confirmed defect | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
 | FE-004 | P2 | High | Open - confirmed defect | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |

@@ -25,7 +25,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; explicit user priority |
+| Batch 2 revalidation/fix | 2026-09-14: mounted React tests reproduced an admin startup loading only active public products, and missing login/logout catalog transitions. Catalog loading now derives from resolved session state in its own effect; results are owned by session identity and request generation. Late admin results cannot reappear after logout, and admin failures no longer masquerade as a complete public catalog. Node test runner plus React Testing Library/jsdom: six tests pass for anonymous/customer/admin startup, logout with an outstanding admin request, failed admin catalog and later admin login. No timing workaround or state framework was introduced. |
 | Evidence | Static closure proof: setUser schedules a render; the ongoing empty-dependency effect still uses render-one refreshProducts. Load an admin session with an inactive product and inspect initial /api/products/ request. |
 | File/function references | frontend/contexts/GlobalContext.tsx:146,179,188,335,354; frontend/pages/AdminPanel.tsx:109 |
 | Current behaviour | Mount effect captures user=null, awaits me/setUser, then invokes the captured refreshProducts. Login/logout do not independently reload catalog by identity/role; admin loadData does not load products. |
