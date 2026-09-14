@@ -584,10 +584,12 @@ def _cancel_locked_order(order, actor):
     old_status = order.status
     order.status = 'cancelled'
     order.cancelled_at = timezone.now()
-    order.save(update_fields=['status', 'cancelled_at', 'updated_at'])
     if payment and payment.status in {'initialized', 'pending'}:
         payment.status = 'cancelled'
         payment.save(update_fields=['status', 'updated_at'])
+    if payment:
+        order.payment_status = payment.status
+    order.save(update_fields=['status', 'cancelled_at', 'payment_status', 'updated_at'])
     CouponRedemption.objects.filter(order=order).delete()
     OrderEvent.objects.create(
         order=order,
@@ -664,6 +666,30 @@ def transition_order_status(order_id, new_status, actor):
                 to_status=new_status,
                 actor=actor,
                 data={'message': f'Order status changed to {new_status}'},
+            )
+    return _order_queryset().get(pk=order_id)
+
+
+def update_staff_order(order_id, new_status, actor, details):
+    """Commit a validated staff request, including transition side effects, as one unit."""
+    with transaction.atomic():
+        try:
+            order = Order.objects.select_for_update().get(pk=order_id)
+        except Order.DoesNotExist as exc:
+            raise CommerceError('order_not_found', 'Order not found.', 404) from exc
+        if new_status is not None:
+            order = transition_order_status(order_id, new_status, actor)
+        if details:
+            for field, value in details.items():
+                setattr(order, field, value)
+            order.save(update_fields=[*details, 'updated_at'])
+            OrderEvent.objects.create(
+                order=order, event_type='order_details_updated', actor=actor,
+                data={
+                    **({'tracking_code': details['tracking_code']} if 'tracking_code' in details else {}),
+                    **({'admin_note_updated': True} if 'admin_note' in details else {}),
+                    'message': 'Order fulfillment details updated',
+                },
             )
     return _order_queryset().get(pk=order_id)
 

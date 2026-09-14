@@ -789,7 +789,7 @@ def admin_update_order_status(request, pk):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
-    from .commerce_services import CommerceError, get_order_for_user, transition_order_status
+    from .commerce_services import CommerceError, update_staff_order
 
     status_val = request.data.get('status')
     tracking_supplied = 'tracking_code' in request.data or 'trackingCode' in request.data
@@ -798,43 +798,27 @@ def admin_update_order_status(request, pk):
         return Response({'detail': 'No order changes were supplied.', 'code': 'empty_update'}, status=400)
     if status_val is not None and status_val not in dict(Order.STATUS):
         return Response({'detail': 'Invalid order status.', 'code': 'invalid_status'}, status=400)
-    if status_val is not None:
-        try:
-            order = transition_order_status(pk, status_val, request.user)
-        except CommerceError as exc:
-            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
-    else:
-        try:
-            order = get_order_for_user(pk, request.user, include_admin=True)
-        except CommerceError as exc:
-            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
-
-    update_fields = []
-    event_data = {}
+    details = {}
     if tracking_supplied:
-        tracking_code = str(request.data.get('tracking_code', request.data.get('trackingCode', ''))).strip()
+        tracking_code = request.data.get('tracking_code', request.data.get('trackingCode', ''))
+        if not isinstance(tracking_code, str):
+            return Response({'tracking_code': ['Expected a string.']}, status=400)
+        tracking_code = tracking_code.strip()
         if len(tracking_code) > 128:
             return Response({'tracking_code': ['Must contain at most 128 characters.']}, status=400)
-        order.tracking_code = tracking_code
-        update_fields.append('tracking_code')
-        event_data['tracking_code'] = tracking_code
+        details['tracking_code'] = tracking_code
     if note_supplied:
-        admin_note = str(request.data.get('admin_note', request.data.get('adminNote', ''))).strip()
+        admin_note = request.data.get('admin_note', request.data.get('adminNote', ''))
+        if not isinstance(admin_note, str):
+            return Response({'admin_note': ['Expected a string.']}, status=400)
+        admin_note = admin_note.strip()
         if len(admin_note) > 5000:
             return Response({'admin_note': ['Must contain at most 5000 characters.']}, status=400)
-        order.admin_note = admin_note
-        update_fields.append('admin_note')
-        event_data['admin_note_updated'] = True
-    if update_fields:
-        order.save(update_fields=[*update_fields, 'updated_at'])
-        from .models import OrderEvent
-        OrderEvent.objects.create(
-            order=order,
-            event_type='order_details_updated',
-            actor=request.user,
-            data={**event_data, 'message': 'Order fulfillment details updated'},
-        )
-        order = get_order_for_user(pk, request.user, include_admin=True)
+        details['admin_note'] = admin_note
+    try:
+        order = update_staff_order(pk, status_val, request.user, details)
+    except CommerceError as exc:
+        return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
     return Response(CommerceOrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET'])

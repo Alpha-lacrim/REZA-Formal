@@ -1,8 +1,15 @@
 # Session Handoff
 
-Last updated: 2026-09-13
+Last updated: 2026-09-14
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-09-14 - Batch 2 critical correctness remediation
+
+- Objective: revalidate Batch 1 P0/P1 findings, add regression coverage, implement scoped correctness fixes, and merge only after relevant checks. Explicitly inspect authentication bootstrap and the complete product media path.
+- Starting state: clean `codex/remediation-program` at `8d867c2017f627c69d533de5d5dfacd9dd70a4f8`; created `codex/batch-02-critical-correctness`. Read AGENTS, Codex, Handoff and Batch 1 audit before edits. No production database or secret values accessed.
+- Scope: BE-001..BE-005 and SEC-001; FE-001/FE-002 are included because the Batch 2 request explicitly calls them out despite their original P2 classification. DB-002/TEST-003 remain evidence gaps unless SQL Server verification establishes more.
+- Work and verification: in progress. Preserve existing data; no broad architecture, routing, state framework, database redesign or Redis changes.
 
 ## 2026-09-13 - Revalidate and publish Batch 1
 

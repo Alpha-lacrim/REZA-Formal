@@ -119,7 +119,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-005 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; isolated regression verified |
+| Batch 2 revalidation/fix | 2026-09-14: new API regressions failed before the fix (400 after transition and event failure after restock). Validate details before mutation; update_staff_order owns one transaction including transition, details, events and stock. shop.test_order_atomicity plus shop.test_commerce_routes: 6 tests pass. SQL Server concurrency remains TEST-003. |
 | Evidence | P07: pending order PUT with status=processing and 129-character tracking_code returns 400, but persisted status is processing. Cancellation has the same control-flow ordering. |
 | File/function references | backend/shop/views.py:788,801,814,828 |
 | Current behaviour | transition_order_status completes its own transaction before tracking/admin-note validation and later saves/events. |
@@ -141,7 +142,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-006 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; cancellation invariant |
+| Batch 2 revalidation/fix | The BE-005 cancellation regression also reproduced unpaid Order versus cancelled Payment. The same atomic cancellation now copies the final Payment status into Order; valid cancellation/retry regression proves matching state and no second restock. |
 | Evidence | P06: cancelled order has Payment.status=cancelled but Order.payment_status=unpaid (manual begins pending). |
 | File/function references | backend/shop/commerce_services.py:540,584,588; backend/shop/commerce_serializers.py:231 |
 | Current behaviour | Cancelling initialized/pending payment changes Payment.status but not Order.payment_status. |
