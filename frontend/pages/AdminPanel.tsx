@@ -267,6 +267,21 @@ const AdminPanel: React.FC = () => {
         }
     };
 
+    const handlePaymentStatus = async (payment: Payment, status: Payment['status']) => {
+        const changes: Parameters<typeof api.adminUpdatePayment>[1] = { status };
+        if (status === 'partially_refunded' || status === 'refunded') {
+            const amount = window.prompt('مبلغ این بازپرداخت را وارد کنید (نه مجموع بازپرداخت‌ها)');
+            if (amount === null) return;
+            const reference = window.prompt('مرجع یکتای انتقال وجه؛ برای تلاش مجدد همان مرجع را وارد کنید');
+            if (!reference?.trim()) return;
+            const reason = window.prompt('دلیل بازپرداخت');
+            if (!reason?.trim()) return;
+            if (!window.confirm(`بازپرداخت ${amount} ${payment.currency} با مرجع ${reference} انجام شده است؟ این ثبت، انتقال وجه انجام نمی‌دهد.`)) return;
+            Object.assign(changes, { refund_amount: amount, currency: payment.currency, reference: reference.trim(), reason: reason.trim(), confirmed: true });
+        }
+        await runCommerceAction(`payment-${payment.id}`, () => api.adminUpdatePayment(payment.id, changes), 'وضعیت پرداخت به‌روزرسانی شد');
+    };
+
     const handleUpdateTracking = async (order: Order) => {
         const trackingCode = window.prompt('کد رهگیری یا مرجع ارسال را وارد کنید', order.trackingCode || '');
         if (trackingCode === null) return;
@@ -963,7 +978,7 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                 )}
 
-                                {commerceSection === 'payments' && <CommerceList empty={payments.length === 0} emptyText="رکورد پرداختی ثبت نشده است.">{payments.map(payment => <div key={payment.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold dark:text-white">پرداخت سفارش #{toPersianDigits(payment.orderId)}</h3><p className="mt-1 text-sm text-gray-500">{payment.provider || payment.method} · {formatPrice(payment.amount)}</p>{payment.transactionId && <p className="mt-1 text-xs text-gray-400" dir="ltr">{payment.transactionId}</p>}</div><select value={payment.status} onChange={e => void runCommerceAction(`payment-${payment.id}`, () => api.adminUpdatePayment(payment.id, { status: e.target.value as Payment['status'] }), 'وضعیت پرداخت به‌روزرسانی شد')} className="admin-commerce-input max-w-48"><option value="unpaid">پرداخت نشده</option><option value="pending">در انتظار</option><option value="paid">پرداخت شده</option><option value="failed">ناموفق</option><option value="cancelled">لغو شده</option><option value="partially_refunded">بازپرداخت جزئی</option><option value="refunded">بازپرداخت شده</option></select></div>{payment.failureReason && <p className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{payment.failureReason}</p>}</div>)}</CommerceList>}
+                                {commerceSection === 'payments' && <CommerceList empty={payments.length === 0} emptyText="رکورد پرداختی ثبت نشده است.">{payments.map(payment => <div key={payment.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold dark:text-white">پرداخت سفارش #{toPersianDigits(payment.orderId)}</h3><p className="mt-1 text-sm text-gray-500">{payment.provider || payment.method} · {formatPrice(payment.amount)}</p>{payment.transactionId && <p className="mt-1 text-xs text-gray-400" dir="ltr">{payment.transactionId}</p>}</div><select value={payment.status} onChange={e => void handlePaymentStatus(payment, e.target.value as Payment['status'])} className="admin-commerce-input max-w-48"><option value="unpaid">پرداخت نشده</option><option value="pending">در انتظار</option><option value="paid">پرداخت شده</option><option value="failed">ناموفق</option><option value="cancelled">لغو شده</option><option value="partially_refunded">بازپرداخت جزئی</option><option value="refunded">بازپرداخت شده</option></select></div>{payment.failureReason && <p className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{payment.failureReason}</p>}</div>)}</CommerceList>}
 
                                 {commerceSection === 'reviews' && <CommerceList empty={reviews.length === 0} emptyText="دیدگاهی برای بررسی وجود ندارد.">{reviews.map(review => <div key={review.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold dark:text-white">{review.title || 'دیدگاه محصول'} · {review.userName}</h3><p className="mt-1 text-amber-500">{'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}</p></div><span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">{review.status === 'approved' ? 'تأییدشده' : review.status === 'rejected' ? 'ردشده' : 'در انتظار'}</span></div><p className="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-300">{review.body}</p><div className="mt-4 flex justify-end gap-2"><button onClick={() => void runCommerceAction(`review-a-${review.id}`, () => api.adminUpdateReview(review.id, { status: 'approved' }), 'دیدگاه تأیید شد')} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">تأیید</button><button onClick={() => void runCommerceAction(`review-r-${review.id}`, () => api.adminUpdateReview(review.id, { status: 'rejected' }), 'دیدگاه رد شد')} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">رد</button><button onClick={() => window.confirm('دیدگاه حذف شود؟') && void runCommerceAction(`review-d-${review.id}`, () => api.adminDeleteReview(review.id), 'دیدگاه حذف شد')} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">حذف</button></div></div>)}</CommerceList>}
 

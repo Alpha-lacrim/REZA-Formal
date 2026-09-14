@@ -77,7 +77,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-003 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; historical reconciliation remains explicit |
+| Batch 2 revalidation/fix | 2026-09-14: regression reproduced gross 100 refund entitlement for a net 50 item. Owner selected proportional net merchandise refunds excluding shipping. Checkout stores per-line allocations in existing Payment metadata; historical orders derive them solely from validated immutable order/item amounts. Largest-remainder line allocation and cumulative quantity rounding conserve cents. Shared refund recording rejects excess rather than capping it; zero-value returns record no invented money. API preview uses the same calculation. 12 refund/route tests pass, including catalog edits, shipping, split/zero refunds, legacy allocation and event rollback. |
 | Evidence | P11: two units at 100 with 50% coupon cost 100 total; return one unit and progress approved/received/refunded: refunded_amount=100 and payment status=refunded. |
 | File/function references | backend/shop/commerce_services.py:769; backend/shop/commerce_serializers.py:383; backend/shop/models.py:OrderItem |
 | Current behaviour | Refund amount is gross unit price times return quantity; only cumulative metadata total is capped by Payment.amount. Per-refund entries still store the uncapped amount. |
@@ -99,7 +100,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-004 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; historical reconciliation remains explicit |
+| Batch 2 revalidation/fix | Regression reproduced status-only partial/full refunds with no amount. Manual refund API/UI now require amount, currency, reason, unique per-payment reference and explicit offline-transfer confirmation. Manual and return refunds share cumulative metadata entries plus immutable events and order/payment locks. Identical reference replay is idempotent; mismatched replay, invalid amounts/currency, status mismatch and excess are rejected. Missing/inconsistent historical partial-refund amounts block new refunds for reconciliation, without inventing prior transfers. Covered by shop.test_refund_accounting; 12 refund/route tests pass. |
 | Evidence | P12: paid -> partially_refunded succeeds while refunded_amount is absent. UI offers this transition through the status dropdown. |
 | File/function references | backend/shop/commerce_serializers.py:427; backend/shop/commerce_services.py:671,696; backend/shop/views.py:756; frontend/pages/AdminPanel.tsx:965 |
 | Current behaviour | PaymentUpdateSerializer accepts only status. Transition to partially_refunded records no amount/reference; stats subtract metadata.refunded_amount, which remains absent. |

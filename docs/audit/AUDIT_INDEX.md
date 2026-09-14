@@ -69,8 +69,8 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | ARCH-004 | P3 | High | Open - maintenance debt | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
 | BE-001 | P1 | High | Fixed - Batch 2; SQL evidence open | [Stale product saves can overwrite sold stock](BACKEND_AUDIT.md#be-001) | 2 |
 | BE-002 | P1 | High | Fixed - Batch 2 | [Native Django admin bypasses inventory and lifecycle services](BACKEND_AUDIT.md#be-002) | 2 |
-| BE-003 | P1 | High | Open - confirmed defect | [Return refunds ignore discounts and overstate item entitlement](BACKEND_AUDIT.md#be-003) | 2 |
-| BE-004 | P1 | High | Open - confirmed defect | [Manual partial refunds change status without recording money](BACKEND_AUDIT.md#be-004) | 2 |
+| BE-003 | P1 | High | Fixed - Batch 2 | [Return refunds ignore discounts and overstate item entitlement](BACKEND_AUDIT.md#be-003) | 2 |
+| BE-004 | P1 | High | Fixed - Batch 2 | [Manual partial refunds change status without recording money](BACKEND_AUDIT.md#be-004) | 2 |
 | BE-005 | P1 | High | Fixed - Batch 2 | [Staff order update commits before validating the full request](BACKEND_AUDIT.md#be-005) | 2 |
 | BE-006 | P2 | High | Fixed - Batch 2 | [Cancellation leaves the order payment projection stale](BACKEND_AUDIT.md#be-006) | 2 |
 | BE-007 | P2 | High | Open - confirmed defect | [Input validation falls through to database errors](BACKEND_AUDIT.md#be-007) | 4 (prioritize unsafe write cases in 2) |

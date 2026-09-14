@@ -589,7 +589,8 @@ def admin_payment_detail(request, pk):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        payment = transition_payment(pk, serializer.validated_data['status'], request.user)
+        values = dict(serializer.validated_data)
+        payment = transition_payment(pk, values.pop('status'), request.user, **values)
     except CommerceError as exc:
         return _commerce_error(exc)
     return Response(PaymentSerializer(payment).data)
