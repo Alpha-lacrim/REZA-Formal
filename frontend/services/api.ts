@@ -209,6 +209,7 @@ function normalizeProduct(raw: any): Product {
     category: raw?.category ?? '',
     fabric: raw?.fabric || undefined,
     stock: explicitStock ?? (variants ? variants.reduce((sum: number, variant: ProductVariant) => sum + variant.stock, 0) : undefined),
+    inventoryVersion: raw?.inventory_version ?? raw?.inventoryVersion,
     variants,
     rating: raw?.rating === null || raw?.rating === undefined ? undefined : toNumber(raw.rating),
     reviewCount: raw?.reviewCount === undefined && raw?.review_count === undefined

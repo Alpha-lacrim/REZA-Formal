@@ -36,6 +36,7 @@ from django.db import IntegrityError, transaction
 from django.db.models import F
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
+from rest_framework.exceptions import APIException
 import os
 import json
 import logging
@@ -290,7 +291,27 @@ def _extract_variants(data):
     return serializer.validated_data, None
 
 
-def _sync_product_variants(product, variants, actor):
+class InventoryConflict(APIException):
+    status_code = 409
+    default_detail = {'code': 'inventory_conflict', 'detail': 'Inventory changed. Reload the product before saving.'}
+
+
+def _save_product(serializer, variants, actor):
+    with transaction.atomic():
+        if serializer.instance is not None:
+            serializer.instance = Product.objects.select_for_update().get(pk=serializer.instance.pk)
+            if 'stock' in serializer.validated_data or variants is not None:
+                expected = serializer.initial_data.get('inventory_version')
+                current = serializer.get_inventory_version(serializer.instance)
+                if not expected or expected != current:
+                    raise InventoryConflict()
+        serializer.save()
+        _sync_product_variants(
+            serializer.instance, variants, actor, update_stock='stock' in serializer.validated_data,
+        )
+
+
+def _sync_product_variants(product, variants, actor, *, update_stock=False):
     """Keep SKU inventory auditable and maintain legacy Product.stock as a projection."""
     if variants is None:
         current = list(product.variants.select_for_update())
@@ -314,11 +335,12 @@ def _sync_product_variants(product, variants, actor):
             )
             created = True
         old_stock = variant.stock
-        if not created and (variant.stock != product.stock or variant.is_active != product.is_active):
-            variant.stock = product.stock
+        if not created and ((update_stock and variant.stock != product.stock) or variant.is_active != product.is_active):
+            if update_stock:
+                variant.stock = product.stock
             variant.is_active = product.is_active
             variant.save(update_fields=['stock', 'is_active', 'updated_at'])
-        delta = product.stock if created else product.stock - old_stock
+        delta = variant.stock if created else variant.stock - old_stock
         if delta:
             InventoryMovement.objects.create(
                 variant=variant,
@@ -329,14 +351,21 @@ def _sync_product_variants(product, variants, actor):
                 reason='initial' if created else 'adjustment',
                 reference=f'PRODUCT-{product.pk}',
             )
+        projected_stock = variant.stock if variant.is_active else 0
+        if product.stock != projected_stock:
+            product.stock = projected_stock
+            product.save(update_fields=['stock', 'updated_at'])
         return
 
     existing = {str(item.id): item for item in product.variants.select_for_update()}
     retained = set()
     active_stock = 0
     for values in variants:
+        values = dict(values)
         variant_id = str(values.pop('id', ''))
         variant = existing.get(variant_id) if variant_id else None
+        if variant_id and (variant is None or variant_id in retained):
+            raise DjangoValidationError('Variant IDs must be distinct and belong to this product.')
         if variant is None:
             variant = ProductVariant(product=product)
             old_stock = 0
@@ -594,8 +623,7 @@ def product_detail(request, pk=None):
         if serializer.is_valid():
             try:
                 with transaction.atomic():
-                    serializer.save()
-                    _sync_product_variants(serializer.instance, variants, request.user)
+                    _save_product(serializer, variants, request.user)
             except (DjangoValidationError, IntegrityError) as exc:
                 return Response({'variants': [str(exc)]}, status=400)
             response_status = status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK
@@ -879,8 +907,7 @@ def admin_products(request):
     if serializer.is_valid():
         try:
             with transaction.atomic():
-                serializer.save()
-                _sync_product_variants(serializer.instance, variants, request.user)
+                _save_product(serializer, variants, request.user)
         except (DjangoValidationError, IntegrityError) as exc:
             return Response({'variants': [str(exc)]}, status=400)
         return Response(
@@ -915,8 +942,7 @@ def admin_product_detail(request, pk=None):
             if serializer.is_valid():
                 try:
                     with transaction.atomic():
-                        serializer.save()
-                        _sync_product_variants(serializer.instance, variants, request.user)
+                        _save_product(serializer, variants, request.user)
                 except (DjangoValidationError, IntegrityError) as exc:
                     return Response({'variants': [str(exc)]}, status=400)
                 return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
@@ -934,8 +960,7 @@ def admin_product_detail(request, pk=None):
             if serializer.is_valid():
                 try:
                     with transaction.atomic():
-                        serializer.save()
-                        _sync_product_variants(serializer.instance, variants, request.user)
+                        _save_product(serializer, variants, request.user)
                 except (DjangoValidationError, IntegrityError) as exc:
                     return Response({'variants': [str(exc)]}, status=400)
                 return Response(ProductSerializer(serializer.instance, context={'request': request}).data, status=201)

@@ -1,9 +1,11 @@
 from decimal import Decimal
+import hashlib
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Avg
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import ContactMessage, Order, OrderItem, Product, ProductVariant, SiteSettings
@@ -83,10 +85,29 @@ class ProductSerializer(serializers.ModelSerializer):
     variants = ProductVariantSerializer(many=True, read_only=True)
     rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
+    inventory_version = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_inventory_version(self, obj):
+        rows = sorted(
+            (str(v.pk), v.stock, v.is_active, v.updated_at.isoformat())
+            for v in obj.variants.all()
+        )
+        state = (obj.stock, obj.updated_at.isoformat(), rows)
+        return hashlib.sha256(repr(state).encode()).hexdigest()
+
+    def update(self, instance, validated_data):
+        # Reload inside the transaction: a caller may have validated a stale instance.
+        with transaction.atomic():
+            instance = Product.objects.select_for_update().get(pk=instance.pk)
+            for field, value in validated_data.items():
+                setattr(instance, field, value)
+            instance.save(update_fields=[*validated_data, 'updated_at'])
+        return instance
 
     def get_rating(self, obj):
         value = obj.reviews.filter(status='approved').aggregate(value=Avg('rating'))['value']

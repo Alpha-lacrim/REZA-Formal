@@ -31,7 +31,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-001 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; SQL concurrency evidence still open |
+| Batch 2 revalidation/fix | 2026-09-14: regression reproduced stock 8 becoming 10 after a stale descriptive serializer save. Product updates reload under lock and save supplied fields; default stock synchronization requires explicit stock intent. Existing inventory writes require inventory_version matching the locked product/variant snapshot; the frontend carries this token and displays conflicts. Foreign/duplicate variant IDs are rejected. 7 inventory/variant tests pass, including stale updates on both REST routes, fresh adjustment ledger and failure rollback. TEST-003/DB-002 are not closed by SQLite. |
 | Evidence | P08: load product at stock 10, checkout two units (8), save a name-only serializer from stale instance and call the actual synchronization helper: variant becomes 10. Deterministic interleaving, not a SQL concurrency test. |
 | File/function references | backend/shop/views.py:591,923,930,293; backend/shop/serializers.py:82; backend/shop/commerce_services.py:467 |
 | Current behaviour | Product instances are read before atomic mutation and ModelSerializer.save writes their loaded fields. Default-variant synchronization then treats stale Product.stock as authoritative. |

@@ -21,6 +21,7 @@ export interface ProductVariant {
 
 export interface Product {
   id: string;
+  inventoryVersion?: string;
   name: string;
   name_fa?: string;
   price: number;

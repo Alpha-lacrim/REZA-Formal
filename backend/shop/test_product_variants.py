@@ -40,6 +40,7 @@ class ProductVariantApiTests(TestCase):
         updated = self.client.put(
             f'/api/admin/products/{product.id}/',
             {
+                'inventory_version': created.data['inventory_version'],
                 'variants': [
                     {
                         'id': str(retained.id),

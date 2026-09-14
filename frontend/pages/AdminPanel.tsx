@@ -167,6 +167,7 @@ const AdminPanel: React.FC = () => {
         
         if (editingProduct.id) {
             formData.append('id', editingProduct.id);
+            if (editingProduct.inventoryVersion) formData.append('inventory_version', editingProduct.inventoryVersion);
         }
 
         formData.append('name', editingProduct.name);
@@ -211,7 +212,7 @@ const AdminPanel: React.FC = () => {
             showToast('محصول با موفقیت ذخیره شد');
         } catch (e: any) {
             console.error('Save failed:', e);
-            showToast('خطا در ذخیره محصول');
+            showToast(e?.status === 409 ? 'موجودی تغییر کرده است؛ محصول را دوباره باز کنید و تغییرات را اعمال کنید' : 'خطا در ذخیره محصول');
         }
     };
 
