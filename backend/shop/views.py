@@ -219,7 +219,7 @@ def _save_product(serializer, variants, actor):
     try:
         with transaction.atomic():
             if serializer.instance is not None:
-                serializer.instance = Product.objects.select_for_update().get(pk=serializer.instance.pk)
+                serializer.instance = get_object_or_404(Product.objects.select_for_update(), pk=serializer.instance.pk)
                 if 'stock' in serializer.validated_data or variants is not None:
                     expected = serializer.initial_data.get('inventory_version')
                     current = serializer.get_inventory_version(serializer.instance)
@@ -867,19 +867,7 @@ def admin_product_detail(request, pk=None):
             return Response(serializer.errors, status=400)
             
         except Product.DoesNotExist:
-            data = prepare_product_data(request)
-            variants, variant_errors = _extract_variants(data)
-            if variant_errors:
-                return Response(variant_errors, status=400)
-            data['id'] = pk
-            serializer = ProductSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                try:
-                    _save_product(serializer, variants, request.user)
-                except (DjangoValidationError, IntegrityError) as exc:
-                    return Response({'variants': [str(exc)]}, status=400)
-                return Response(ProductSerializer(serializer.instance, context={'request': request}).data, status=201)
-            return Response(serializer.errors, status=400)
+            return Response({'detail': 'Product not found.'}, status=404)
 
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)

@@ -87,3 +87,16 @@ class InventoryAuthorityTests(TestCase):
         self.product.refresh_from_db()
         self.variant.refresh_from_db()
         self.assertEqual((self.product.name, self.product.stock, self.variant.stock), ('Suit', 10, 10))
+
+    def test_edit_cannot_recreate_a_deleted_product(self):
+        self.product.delete()
+        response = self.client.put(self.url, {'name': 'Stale form', 'price': '100', 'stock': 10}, format='json')
+        self.assertEqual(response.status_code, 404, response.data)
+        self.assertFalse(Product.objects.filter(pk='stock-product').exists())
+
+    def test_same_id_edit_succeeds_but_changing_identity_is_rejected(self):
+        response = self.client.put(self.url, {'id': self.product.pk, 'name': 'Edited'}, format='json')
+        self.assertEqual(response.status_code, 200, response.data)
+        response = self.client.put(self.url, {'id': 'new-identity', 'name': 'Wrong'}, format='json')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(Product.objects.count(), 1)
