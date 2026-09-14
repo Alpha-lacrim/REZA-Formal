@@ -158,3 +158,15 @@ class RefundAccountingTests(TestCase):
         order.payment.refresh_from_db()
         self.assertEqual(order.payment.metadata['refunded_amount'], '50.00')
         self.assertEqual(order.payment.metadata['item_refund_allocations'][str(request.order_item_id)], '100.00')
+
+    def test_legacy_full_refund_without_amount_cannot_be_reopened_by_zero_value_return(self):
+        order = self.purchase(prices=('0', '100'), quantities=(1, 1), discount='0')
+        payment = order.payment
+        payment.status = 'refunded'
+        payment.metadata = {}
+        payment.save(update_fields=['status', 'metadata'])
+        request = self.received_return(order, order.items.get(price=0))
+        response = self.client.put(f'/api/admin/returns/{request.pk}/', {'status': 'refunded'}, format='json')
+        self.assertEqual(response.status_code, 409, response.data)
+        payment.refresh_from_db()
+        self.assertEqual(payment.status, 'refunded')

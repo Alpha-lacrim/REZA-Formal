@@ -73,6 +73,8 @@ def record_refund(payment, actor, *, amount, currency, reason, reference, confir
         prior = money(metadata.get('refunded_amount', '0'))
         recorded = sum((money(refund['amount']) for refund in refunds), Decimal('0.00'))
         valid_history = (prior.is_finite() and recorded == prior and 0 <= prior <= payment.amount
+                         and (payment.status != 'paid' or prior == 0)
+                         and (payment.status != 'refunded' or prior == payment.amount)
                          and (payment.status != 'partially_refunded' or 0 < prior < payment.amount))
     except (InvalidOperation, TypeError, ValueError, KeyError):
         valid_history = False

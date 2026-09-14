@@ -102,6 +102,7 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | Severity | P1 |
 | Confidence | High |
 | Status | Fixed - Batch 2; historical reconciliation remains explicit |
+| Final review extension | A legacy fully-refunded payment without recorded amounts must also be reconciled, even for a zero-value item return. A dedicated failing-then-passing regression prevents reopening it as paid. Status and recorded totals now agree for paid, partial and full states; ten refund-accounting tests pass. |
 | Batch 2 revalidation/fix | Regression reproduced status-only partial/full refunds with no amount. Manual refund API/UI now require amount, currency, reason, unique per-payment reference and explicit offline-transfer confirmation. Manual and return refunds share cumulative metadata entries plus immutable events and order/payment locks. Identical reference replay is idempotent; mismatched replay, invalid amounts/currency, status mismatch and excess are rejected. Missing/inconsistent historical partial-refund amounts block new refunds for reconciliation, without inventing prior transfers. Covered by shop.test_refund_accounting; 12 refund/route tests pass. |
 | Evidence | P12: paid -> partially_refunded succeeds while refunded_amount is absent. UI offers this transition through the status dropdown. |
 | File/function references | backend/shop/commerce_serializers.py:427; backend/shop/commerce_services.py:671,696; backend/shop/views.py:756; frontend/pages/AdminPanel.tsx:965 |
