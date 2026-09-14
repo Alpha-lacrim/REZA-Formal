@@ -502,6 +502,7 @@ def create_checkout_order(user, validated_data):
                     coupon=quote['coupon'], user=user, order=order, amount=quote['discount_total'],
                 )
 
+            from .refunds import item_allocations
             Payment.objects.create(
                 order=order,
                 method=payment_method,
@@ -509,6 +510,7 @@ def create_checkout_order(user, validated_data):
                 amount=quote['total'],
                 currency=quote['currency'],
                 provider='offline',
+                metadata={'item_refund_allocations': item_allocations(order)},
             )
             OrderEvent.objects.create(
                 order=order,
@@ -584,10 +586,12 @@ def _cancel_locked_order(order, actor):
     old_status = order.status
     order.status = 'cancelled'
     order.cancelled_at = timezone.now()
-    order.save(update_fields=['status', 'cancelled_at', 'updated_at'])
     if payment and payment.status in {'initialized', 'pending'}:
         payment.status = 'cancelled'
         payment.save(update_fields=['status', 'updated_at'])
+    if payment:
+        order.payment_status = payment.status
+    order.save(update_fields=['status', 'cancelled_at', 'payment_status', 'updated_at'])
     CouponRedemption.objects.filter(order=order).delete()
     OrderEvent.objects.create(
         order=order,
@@ -668,12 +672,46 @@ def transition_order_status(order_id, new_status, actor):
     return _order_queryset().get(pk=order_id)
 
 
-def transition_payment(payment_id, new_status, actor):
+def update_staff_order(order_id, new_status, actor, details):
+    """Commit a validated staff request, including transition side effects, as one unit."""
     with transaction.atomic():
         try:
-            payment = Payment.objects.select_for_update().select_related('order').get(pk=payment_id)
+            order = Order.objects.select_for_update().get(pk=order_id)
+        except Order.DoesNotExist as exc:
+            raise CommerceError('order_not_found', 'Order not found.', 404) from exc
+        if new_status is not None:
+            order = transition_order_status(order_id, new_status, actor)
+        if details:
+            for field, value in details.items():
+                setattr(order, field, value)
+            order.save(update_fields=[*details, 'updated_at'])
+            OrderEvent.objects.create(
+                order=order, event_type='order_details_updated', actor=actor,
+                data={
+                    **({'tracking_code': details['tracking_code']} if 'tracking_code' in details else {}),
+                    **({'admin_note_updated': True} if 'admin_note' in details else {}),
+                    'message': 'Order fulfillment details updated',
+                },
+            )
+    return _order_queryset().get(pk=order_id)
+
+
+def transition_payment(payment_id, new_status, actor, **refund_data):
+    with transaction.atomic():
+        try:
+            order_id = Payment.objects.values_list('order_id', flat=True).get(pk=payment_id)
+            order = Order.objects.select_for_update().get(pk=order_id)
+            payment = Payment.objects.select_for_update().get(pk=payment_id)
+            payment.order = order
         except Payment.DoesNotExist as exc:
             raise CommerceError('payment_not_found', 'Payment not found.', 404) from exc
+        if new_status in {'partially_refunded', 'refunded'}:
+            from .refunds import record_refund
+            record_refund(payment, actor, amount=refund_data.get('refund_amount'),
+                          currency=refund_data.get('currency'), reason=refund_data.get('reason'),
+                          reference=refund_data.get('reference'), confirmed=refund_data.get('confirmed'),
+                          requested_status=new_status)
+            return payment
         if new_status not in PAYMENT_TRANSITIONS.get(payment.status, set()):
             raise CommerceError(
                 'invalid_payment_transition',
@@ -687,14 +725,6 @@ def transition_payment(payment_id, new_status, actor):
             payment.paid_at = timezone.now()
             fields.append('paid_at')
             payment.order.payment_status = 'paid'
-            payment.order.save(update_fields=['payment_status', 'updated_at'])
-        elif new_status == 'refunded':
-            payment.refunded_at = timezone.now()
-            fields.append('refunded_at')
-            payment.order.payment_status = 'refunded'
-            payment.order.save(update_fields=['payment_status', 'updated_at'])
-        elif new_status == 'partially_refunded':
-            payment.order.payment_status = 'partially_refunded'
             payment.order.save(update_fields=['payment_status', 'updated_at'])
         elif new_status == 'failed':
             payment.order.payment_status = 'failed'
@@ -715,9 +745,12 @@ def transition_payment(payment_id, new_status, actor):
 def transition_return(return_id, new_status, actor, admin_note=''):
     with transaction.atomic():
         try:
+            order_id = ReturnRequest.objects.values_list('order_id', flat=True).get(pk=return_id)
+            order = Order.objects.select_for_update().get(pk=order_id)
             return_request = ReturnRequest.objects.select_for_update().select_related(
                 'order', 'order_item__variant', 'order_item__product', 'user',
             ).get(pk=return_id)
+            return_request.order = order
         except ReturnRequest.DoesNotExist as exc:
             raise CommerceError('return_not_found', 'Return request not found.', 404) from exc
         if new_status not in RETURN_TRANSITIONS.get(return_request.status, set()):
@@ -760,32 +793,11 @@ def transition_return(return_id, new_status, actor, admin_note=''):
                 payment = Payment.objects.select_for_update().get(order=return_request.order)
             except Payment.DoesNotExist as exc:
                 raise CommerceError('payment_not_found', 'The order has no payment record.', 409) from exc
-            if payment.status not in {'paid', 'partially_refunded'}:
-                raise CommerceError(
-                    'payment_not_refundable',
-                    'The payment must be paid before a return can be marked refunded.',
-                    409,
-                )
-            refund_amount = money(return_request.order_item.price * return_request.quantity)
-            metadata = dict(payment.metadata or {})
-            prior_total = money(metadata.get('refunded_amount', '0'))
-            refunded_total = money(min(prior_total + refund_amount, payment.amount))
-            refunds = list(metadata.get('refunds') or [])
-            refunds.append({
-                'return_id': return_request.pk,
-                'amount': str(refund_amount),
-                'recorded_at': timezone.now().isoformat(),
-            })
-            metadata.update({'refunded_amount': str(refunded_total), 'refunds': refunds})
-            payment.metadata = metadata
-            payment.status = 'refunded' if refunded_total >= payment.amount else 'partially_refunded'
-            payment_fields = ['metadata', 'status', 'updated_at']
-            if payment.status == 'refunded':
-                payment.refunded_at = timezone.now()
-                payment_fields.append('refunded_at')
-            payment.save(update_fields=payment_fields)
-            return_request.order.payment_status = payment.status
-            return_request.order.save(update_fields=['payment_status', 'updated_at'])
+            from .refunds import record_refund, return_refund_amount
+            payment.order = order
+            record_refund(payment, actor, amount=return_refund_amount(return_request, payment),
+                          currency=payment.currency, reason=return_request.reason,
+                          reference=f'RETURN-{return_request.pk}', confirmed=True, return_request=return_request)
 
         old_status = return_request.status
         return_request.status = new_status

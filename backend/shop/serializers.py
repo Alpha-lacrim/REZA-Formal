@@ -1,12 +1,15 @@
 from decimal import Decimal
+import hashlib
 
 from django.contrib.auth import get_user_model
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db.models import Avg
+from django.db import transaction
 from rest_framework import serializers
 
 from .models import ContactMessage, Order, OrderItem, Product, ProductVariant, SiteSettings
+from .product_media import MAX_GALLERY_IMAGES, ProductGalleryField, ProductImageField
 
 
 User = get_user_model()
@@ -78,15 +81,49 @@ class ProductVariantInputSerializer(serializers.Serializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
+    image = ProductImageField(required=False, allow_null=True)
+    images = ProductGalleryField(required=False)
+    gallery_files = serializers.ListField(child=ProductImageField(), required=False, write_only=True, max_length=MAX_GALLERY_IMAGES)
     price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'))
     stock = serializers.IntegerField(min_value=0)
     variants = ProductVariantSerializer(many=True, read_only=True)
     rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
+    inventory_version = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
         fields = '__all__'
+        read_only_fields = ['created_at', 'updated_at']
+
+    def get_inventory_version(self, obj):
+        rows = sorted(
+            (str(v.pk), v.stock, v.is_active, v.updated_at.isoformat())
+            for v in obj.variants.all()
+        )
+        state = (obj.stock, obj.updated_at.isoformat(), rows)
+        return hashlib.sha256(repr(state).encode()).hexdigest()
+
+    def validate(self, attrs):
+        if self.instance and 'id' in attrs:
+            if attrs['id'] != self.instance.pk:
+                raise serializers.ValidationError({'id': 'A product ID cannot be changed.'})
+            attrs.pop('id')
+        gallery = attrs.get('images', self.fields['images'].to_representation(self.instance.images) if self.instance else [])
+        if len(gallery) + len(attrs.get('gallery_files', [])) > MAX_GALLERY_IMAGES:
+            raise serializers.ValidationError({'images': 'At most 12 gallery images are allowed.'})
+        if attrs.get('gallery_files') and 'images' not in attrs:
+            attrs['images'] = self.fields['images'].to_internal_value(gallery)
+        return attrs
+
+    def update(self, instance, validated_data):
+        # Reload inside the transaction: a caller may have validated a stale instance.
+        with transaction.atomic():
+            instance = Product.objects.select_for_update().get(pk=instance.pk)
+            for field, value in validated_data.items():
+                setattr(instance, field, value)
+            instance.save(update_fields=[*validated_data, 'updated_at'])
+        return instance
 
     def get_rating(self, obj):
         value = obj.reviews.filter(status='approved').aggregate(value=Avg('rating'))['value']

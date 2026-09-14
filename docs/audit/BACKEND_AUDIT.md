@@ -1,6 +1,6 @@
 # Backend audit
 
-See [architecture workflow traces](ARCHITECTURE_AUDIT.md), [database](DATABASE_AUDIT.md), [security](SECURITY_AUDIT.md) and [verification/probes](TESTING_CI_AUDIT.md). This is a documentation-only baseline; no service or application defect was repaired.
+See [architecture workflow traces](ARCHITECTURE_AUDIT.md), [database](DATABASE_AUDIT.md), [security](SECURITY_AUDIT.md) and [verification/probes](TESTING_CI_AUDIT.md). Descriptive observations are the historical Batch 1 baseline; canonical entries include dated Batch 2 fixes and regression results.
 
 ## Verified strengths and boundaries
 
@@ -31,7 +31,9 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-001 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; SQL concurrency evidence still open |
+| Final review extension | A further regression proved that a stale PUT after deletion returned 201 and recreated stock. Updates now return 404 when the product is missing, including the locked reload. Same-ID edits remain valid; identity changes are rejected. Seven inventory-authority tests cover these guards. |
+| Batch 2 revalidation/fix | 2026-09-14: regression reproduced stock 8 becoming 10 after a stale descriptive serializer save. Product updates reload under lock and save supplied fields; default stock synchronization requires explicit stock intent. Existing inventory writes require inventory_version matching the locked product/variant snapshot; the frontend carries this token and displays conflicts. Foreign/duplicate variant IDs are rejected. 7 inventory/variant tests pass, including stale updates on both REST routes, fresh adjustment ledger and failure rollback. TEST-003/DB-002 are not closed by SQLite. |
 | Evidence | P08: load product at stock 10, checkout two units (8), save a name-only serializer from stale instance and call the actual synchronization helper: variant becomes 10. Deterministic interleaving, not a SQL concurrency test. |
 | File/function references | backend/shop/views.py:591,923,930,293; backend/shop/serializers.py:82; backend/shop/commerce_services.py:467 |
 | Current behaviour | Product instances are read before atomic mutation and ModelSerializer.save writes their loaded fields. Default-variant synchronization then treats stale Product.stock as authoritative. |
@@ -53,7 +55,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-002 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; native mutation containment |
+| Batch 2 revalidation/fix | 2026-09-14: actual native POST changed a return directly to refunded and allowed product/payment deletion. Product, variant, order, payment and return native admins/inlines are now inspection-only, including add/change/delete and bulk deletion; staff mutations remain available through service-backed REST/UI. 12 native/model tests pass, covering superusers and delegated model permissions, preserved snapshots and ledger. No historical records were changed or deleted. |
 | Evidence | P09: payment and return forms contain writable status. P10: ProductVariantAdmin.save_model sets variant stock 99 while Product.stock stays 10 and creates zero movements. |
 | File/function references | backend/shop/admin.py:49,61,87,172,287; backend/reza_backend/urls.py:7 |
 | Current behaviour | Variant stock, Payment status/method (including order inline) and ReturnRequest status remain writable through default ModelAdmin saving. No service hooks reconcile them. |
@@ -75,7 +78,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-003 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; historical reconciliation remains explicit |
+| Batch 2 revalidation/fix | 2026-09-14: regression reproduced gross 100 refund entitlement for a net 50 item. Owner selected proportional net merchandise refunds excluding shipping. Checkout stores per-line allocations in existing Payment metadata; historical orders derive them solely from validated immutable order/item amounts. Largest-remainder line allocation and cumulative quantity rounding conserve cents. Shared refund recording rejects excess rather than capping it; zero-value returns record no invented money. API preview uses the same calculation. 12 refund/route tests pass, including catalog edits, shipping, split/zero refunds, legacy allocation and event rollback. |
 | Evidence | P11: two units at 100 with 50% coupon cost 100 total; return one unit and progress approved/received/refunded: refunded_amount=100 and payment status=refunded. |
 | File/function references | backend/shop/commerce_services.py:769; backend/shop/commerce_serializers.py:383; backend/shop/models.py:OrderItem |
 | Current behaviour | Refund amount is gross unit price times return quantity; only cumulative metadata total is capped by Payment.amount. Per-refund entries still store the uncapped amount. |
@@ -97,7 +101,9 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-004 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; historical reconciliation remains explicit |
+| Final review extension | A legacy fully-refunded payment without recorded amounts must also be reconciled, even for a zero-value item return. A dedicated failing-then-passing regression prevents reopening it as paid. Status and recorded totals now agree for paid, partial and full states; ten refund-accounting tests pass. |
+| Batch 2 revalidation/fix | Regression reproduced status-only partial/full refunds with no amount. Manual refund API/UI now require amount, currency, reason, unique per-payment reference and explicit offline-transfer confirmation. Manual and return refunds share cumulative metadata entries plus immutable events and order/payment locks. Identical reference replay is idempotent; mismatched replay, invalid amounts/currency, status mismatch and excess are rejected. Missing/inconsistent historical partial-refund amounts block new refunds for reconciliation, without inventing prior transfers. Covered by shop.test_refund_accounting; 12 refund/route tests pass. |
 | Evidence | P12: paid -> partially_refunded succeeds while refunded_amount is absent. UI offers this transition through the status dropdown. |
 | File/function references | backend/shop/commerce_serializers.py:427; backend/shop/commerce_services.py:671,696; backend/shop/views.py:756; frontend/pages/AdminPanel.tsx:965 |
 | Current behaviour | PaymentUpdateSerializer accepts only status. Transition to partially_refunded records no amount/reference; stats subtract metadata.refunded_amount, which remains absent. |
@@ -119,7 +125,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-005 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; isolated regression verified |
+| Batch 2 revalidation/fix | 2026-09-14: new API regressions failed before the fix (400 after transition and event failure after restock). Validate details before mutation; update_staff_order owns one transaction including transition, details, events and stock. shop.test_order_atomicity plus shop.test_commerce_routes: 6 tests pass. SQL Server concurrency remains TEST-003. |
 | Evidence | P07: pending order PUT with status=processing and 129-character tracking_code returns 400, but persisted status is processing. Cancellation has the same control-flow ordering. |
 | File/function references | backend/shop/views.py:788,801,814,828 |
 | Current behaviour | transition_order_status completes its own transaction before tracking/admin-note validation and later saves/events. |
@@ -141,7 +148,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-006 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; cancellation invariant |
+| Batch 2 revalidation/fix | The BE-005 cancellation regression also reproduced unpaid Order versus cancelled Payment. The same atomic cancellation now copies the final Payment status into Order; valid cancellation/retry regression proves matching state and no second restock. |
 | Evidence | P06: cancelled order has Payment.status=cancelled but Order.payment_status=unpaid (manual begins pending). |
 | File/function references | backend/shop/commerce_services.py:540,584,588; backend/shop/commerce_serializers.py:231 |
 | Current behaviour | Cancelling initialized/pending payment changes Payment.status but not Order.payment_status. |

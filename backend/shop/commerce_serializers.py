@@ -381,7 +381,12 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
         return [str(obj.order_item_id)] if obj.order_item_id else []
 
     def get_refund_amount(self, obj):
-        return obj.order_item.price * obj.quantity if obj.order_item else Decimal('0.00')
+        from .commerce_services import CommerceError
+        from .refunds import return_refund_amount
+        try:
+            return return_refund_amount(obj, obj.order.payment)
+        except (CommerceError, Payment.DoesNotExist):
+            return None
 
 
 class BespokeRequestSerializer(AliasedModelSerializer):
@@ -426,6 +431,18 @@ class NewsletterSerializer(serializers.ModelSerializer):
 
 class PaymentUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=[choice[0] for choice in Payment.STATUSES])
+    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0.01'), required=False)
+    currency = serializers.CharField(max_length=16, required=False)
+    reason = serializers.CharField(max_length=500, required=False)
+    reference = serializers.CharField(max_length=128, required=False)
+    confirmed = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if attrs['status'] in {'partially_refunded', 'refunded'}:
+            missing = [field for field in ('refund_amount', 'currency', 'reason', 'reference', 'confirmed') if field not in attrs]
+            if missing or attrs.get('confirmed') is not True:
+                raise serializers.ValidationError('Refund amount, currency, reason, reference and confirmation are required.')
+        return attrs
 
 
 class ReviewAdminUpdateSerializer(serializers.Serializer):

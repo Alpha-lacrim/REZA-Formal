@@ -1,5 +1,7 @@
 # Security audit
 
+Historical analysis below describes Batch 1. SEC-001 includes the dated Batch 2 product-upload fix; other security findings and production media-serving verification remain open.
+
 Audit scope is current tracked application/configuration plus isolated fixtures. No credential values were read from ignored environment files or recorded. No exploit against a deployed system was attempted. A current-tree signature scan for private keys, token formats and credential-bearing URLs produced no matches; that is not proof that all secrets or Git history are clean.
 
 ## Existing controls and trust boundaries
@@ -44,7 +46,8 @@ Handoff records a previously committed SQL password and obsolete Gemini key expo
 | ID | SEC-001 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed validation defect |
+| Status | Fixed - Batch 2 upload containment; existing-media deployment review remains |
+| Batch 2 revalidation/fix | 2026-09-14: API tests reproduced HTML/SVG acceptance, rejected-write orphans and appended active content. Product primary/gallery files now share decoded/re-encoded still-image validation (PNG/JPEG/WebP/GIF; 10 MiB per file, 8000 px per side, 20 million pixels, 12 gallery entries), MIME/extension checks, URL/shape validation and transaction-owned storage cleanup. Newly written files are removed on validation/DB/storage failure; existing referenced files are retained. Both REST mutation surfaces are covered and native catalog writes are read-only. Nginx media adds restrictive CSP sandbox for legacy active content; live Nginx serving remains unverified because Docker is unavailable. Eight media tests pass; combined media/inventory/variant suite: 15. No historical media was deleted or quarantined. |
 | Evidence | P04: harmless .html upload accepted with 201 and saved. P05: invalid negative-price request returns 400 but leaves a .txt file. Nginx serves media by extension without attachment/sandbox policy. |
 | File/function references | backend/shop/views.py:139,182,214; backend/reza_backend/settings.py:DATA_UPLOAD_MAX_MEMORY_SIZE; frontend/nginx.conf:30 |
 | Current behaviour | Gallery files keep the submitted extension and are read/stored directly without image decoding, type allowlist, dimension/file-count/explicit byte checks. Files save before product validation/transaction. JSON gallery URLs are also unrestricted. |

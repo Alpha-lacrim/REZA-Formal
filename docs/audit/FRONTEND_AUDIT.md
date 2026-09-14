@@ -1,5 +1,7 @@
 # Frontend audit
 
+The descriptive analysis below preserves Batch 1 observations. Dated Batch 2 results in FE-001/FE-002 supersede their original behavior; broader frontend work remains open.
+
 The frontend has React 19, TypeScript 5.8 and Vite 6, with locally compiled Tailwind/PostCSS and lazy route chunks. [Baseline typecheck/build](TESTING_CI_AUDIT.md) pass. Those checks do not exercise effects, concurrent requests, accessibility or wire-data validation.
 
 ## State, loading and API boundaries
@@ -25,7 +27,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; explicit user priority |
+| Batch 2 revalidation/fix | 2026-09-14: mounted React tests reproduced an admin startup loading only active public products, and missing login/logout catalog transitions. Catalog loading now derives from resolved session state in its own effect; results are owned by session identity and request generation. Late admin results cannot reappear after logout, and admin failures no longer masquerade as a complete public catalog. Node test runner plus React Testing Library/jsdom: six tests pass for anonymous/customer/admin startup, logout with an outstanding admin request, failed admin catalog and later admin login. No timing workaround or state framework was introduced. |
 | Evidence | Static closure proof: setUser schedules a render; the ongoing empty-dependency effect still uses render-one refreshProducts. Load an admin session with an inactive product and inspect initial /api/products/ request. |
 | File/function references | frontend/contexts/GlobalContext.tsx:146,179,188,335,354; frontend/pages/AdminPanel.tsx:109 |
 | Current behaviour | Mount effect captures user=null, awaits me/setUser, then invokes the captured refreshProducts. Login/logout do not independently reload catalog by identity/role; admin loadData does not load products. |
@@ -47,7 +50,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; explicit user priority |
+| Batch 2 revalidation/fix | 2026-09-14: traced and tested File -> pending browser state -> object-URL preview -> FormData -> validated storage -> API -> subsequent edit. New previews are separate from persisted product fields; all selected files are sent as binary parts, removal drops the associated File, and URLs are revoked on removal/close. Gallery JSON is always a list and explicit clearing works. The backend converts verified legacy inline images to stored files on edit while retaining existing URLs/files. Three mounted AdminPanel tests plus a real API-adapter transport test pass; backend media round-trip and legacy preservation tests also pass. |
 | Evidence | P03 reproduces multipart form behavior: HTTP 201, stored images type=str containing data:image/, same inline content in response. A harmless sentinel proves persistence; primary PNG passes ImageField. |
 | File/function references | frontend/pages/AdminPanel.tsx:160,196,218; frontend/services/api.ts:936; backend/shop/views.py:182; backend/shop/models.py:Product.images |
 | Current behaviour | FileReader Data URLs enter editingProduct.images; save JSON-stringifies them while separately uploading the first raw File. Backend JSONField accepts the string without gallery normalization. |

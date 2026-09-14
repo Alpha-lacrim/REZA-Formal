@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-09-13 (source/documentation review; runtime evidence is dated separately in Handoff)
+Last verified: 2026-09-14 (Batch 2; isolated regression/baseline results in Handoff)
 
 ## Purpose and product
 
@@ -26,6 +26,7 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Entry: `frontend/index.html` -> `frontend/index.tsx` -> `frontend/App.tsx`.
 - Routing: `HashRouter`, so browser routes live after `#` and static hosting does not need server-side route rewrites.
 - Shared state: `frontend/contexts/GlobalContext.tsx` owns authentication, products, variant-aware cart, wishlist, account synchronization, catalog-source safety, theme, site settings, and toast messages.
+- Catalog requests derive from resolved session state; catalog results belong to that identity. Admin catalog failures expose no partial public catalog, and logout invalidates outstanding admin loads.
 - API boundary: `frontend/services/api.ts` performs HTTP calls and converts Django snake_case/nested responses into the UI's models from `frontend/types.ts`.
 - Local fallback: `frontend/services/db.ts` exposes only a read-only emergency catalog based on `frontend/data.ts`. It is used only when the product API is unavailable and never reports local admin writes as server success.
 - Main feature surfaces: lazy-loaded routes in `frontend/pages/` and shared UI in `frontend/components/`. Tailwind is compiled locally through PostCSS; no runtime Tailwind CDN is used.
@@ -44,6 +45,9 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Seed command: `python manage.py seed_data`; it bootstraps catalog records only when the catalog is empty and shipping only when none exists, and never publishes or logs a fixed administrator password.
 - Hermetic tests: `backend/shop/tests.py` plus focused `test_*.py` modules use `backend/reza_backend/test_settings.py`, in-memory SQLite, and never touch configured SQL Server.
 - Uploaded files: Django media storage under `backend/media/` locally or the mounted `/app/media` volume in Docker. Runtime media is ignored by Git.
+- Product uploads use `shop/product_media.py`: decoded/re-encoded still images, bounded files/dimensions/gallery count, URL validation and cleanup of newly staged files on failed product writes. Safe inline legacy galleries convert to files on edit; existing files are retained for historical references.
+- Native Django product/variant/order/payment/return screens are inspection-only. Their write operations use the existing service-backed REST/staff UI, including stock ledger and lifecycle guards.
+- Refund allocations/entries use existing Payment metadata plus OrderEvent records through `shop/refunds.py`; no new schema. Net item allocations derive from immutable purchase amounts, exclude shipping/tax, and reconcile rounding. Manual refunds require amount, currency, reason, per-payment reference and explicit offline-transfer confirmation. Inconsistent legacy refund history requires reconciliation.
 
 ### Docker request flow
 
@@ -72,6 +76,9 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `backend/shop/views.py` | Authentication, products, settings, contact and older staff endpoints; retains unrouted legacy order handlers. |
 | `backend/shop/models.py` | Persistent data model and order relationships. |
 | `backend/shop/commerce_services.py` | Quotes, idempotent checkout, locking, inventory, refunds, and lifecycle transitions. |
+| `backend/shop/refunds.py` | Net item allocation, remaining refund bounds, reference replay and recorded financial totals. |
+| `backend/shop/product_media.py` | Shared product image validation, gallery normalization and storage staging. |
+| `frontend/tests/` | Mounted React auth/media and API transport regressions using Node's test runner, React Testing Library and jsdom. |
 | `backend/shop/commerce_views.py` | Customer and staff commerce endpoints. |
 | `backend/shop/commerce_serializers.py` | Commerce validation, client aliases, and immutable response snapshots. |
 | `backend/shop/management/commands/seed_data.py` | Idempotent initial data/bootstrap behavior. |
@@ -116,6 +123,7 @@ docker compose up --build
 # Frontend
 cd frontend
 npm.cmd ci
+npm.cmd test
 npm.cmd run typecheck
 npm.cmd run build
 npm.cmd run dev
@@ -136,7 +144,7 @@ Use the repository's isolated test settings/command documented in `AGENTS.md` fo
 
 - Preserve UTF-8 Persian copy and RTL layout.
 - The backend is authoritative for price, total, stock, roles, and order status. Never trust client-submitted totals or privileges.
-- Variant stock is used by commerce checkout; `Product.stock` is normally an active-variant sum, but single default-variant/legacy paths still accept it as input. Review all writers and projection/ledger effects together; the current implementation does not enforce this authority universally.
+- Variant stock is used by checkout; `Product.stock` is its active-variant projection. Default-variant stock can be adjusted explicitly through the product API. Existing stock/variant writes require the latest `inventory_version` (frontend `inventoryVersion`); stale or absent versions return 409. Missing-product updates return 404, and product IDs cannot change. SQL Server concurrency/lock-order evidence remains DB-002/TEST-003.
 - Order creation, cancellation, and admin cancellation must keep stock changes atomic and idempotent.
 - User emails are normalized and database-unique. Migration `0005` deliberately stops on blank/duplicate legacy emails and clears unusable secrets created by the retired 2FA delivery flow.
 - Keep cookie flags and allowed origins environment-aware; production cookies must be secure.

@@ -4,6 +4,8 @@ Source/probe baseline established 2026-09-10 by Batch 1, with documentation comp
 
 ## Priority and execution rules
 
+Batch 2 update (2026-09-14): BE-001..BE-006, SEC-001 and explicitly requested FE-001/FE-002 are addressed with regression coverage. The owner selected proportional net item refunds with shipping excluded and penny reconciliation. All 81 backend tests, 10 frontend tests and relevant baseline checks pass. DB-002/TEST-003 remain open: Docker daemon was unavailable, so this batch does not establish SQL Server concurrency safety or production readiness. No broad Batch 3+ work is included.
+
 Address P1 integrity/security issues before architectural cleanup. Eight P1 records include five reproduced backend defects, one confirmed upload validation defect, one unverified SQL concurrency risk and one SQL coverage gap. There are no established P0 findings. A passing SQLite suite/build does not close these findings.
 
 Keep one dedicated branch/session per batch, created from `codex/remediation-program`. Do not change human-owned main without separate authorization. Preserve applied migrations and unrelated work. Every fix requires meaningful regression coverage, and every architectural change must preserve characterized behavior. Update canonical finding status, evidence, index, roadmap, program and Handoff after each batch.
@@ -39,7 +41,7 @@ Batch 2 must include the defect-specific tests needed to prove its fixes, includ
 
 | Decision/evidence | Needed before | Safe current assumption |
 | --- | --- | --- |
-| Discount allocation, rounding, refundable shipping/tax, manual refund amount/reference and confirmation | BE-003/BE-004 final design | Never record more money than verified remaining entitlement; do not infer a transfer from status alone |
+| Discount allocation selected in Batch 2: proportional net items, shipping excluded, reconciled pennies. Tax remains zero in checkout; future tax/shipping refund policy is separate | Future policy/provider changes | Manual refund entries require amount/currency/reason/reference and explicit offline-transfer confirmation; inconsistent historical amounts require reconciliation |
 | Customer/staff cancellation, return windows/condition, bespoke rules, failed/refused delivery | Lifecycle/policy changes and public launch | Preserve current explicit rules until approved; document mismatches instead of expanding permissions |
 | Guest/account cart merge and logout/shared-device semantics | FE-004/FE-007 | Prevent cross-account writes and stale overwrite; preserve recoverable guest data |
 | Effective staff permissions versus custom role | FE-008/BE-002 | Backend remains authoritative; do not mass-elevate users to make UI checks pass |
@@ -50,6 +52,8 @@ Batch 2 must include the defect-specific tests needed to prove its fixes, includ
 | Public URL/canonical domain and redirect strategy | UX-002 | Keep current links usable until a deliberate routing rollout |
 
 ## Migration and rollout safeguards
+
+Batch 2 introduces no schema migration or bulk data cleanup. Deploy frontend/backend together for the required inventory-version and explicit refund contracts; rebuild/reload Nginx for the media CSP. Use the staff UI/API for service-owned writes because native commerce admin screens are read-only. Existing safe inline images convert only on edit; files already referenced by historical orders are retained. Audit/quarantine older uploads with backup and verify media headers on the actual serving deployment. Reconcile any legacy refund discrepancies using verified financial records before further refunds.
 
 No migration is introduced by Batch 1. Likely later data work includes gallery string/list/Data-URL normalization, stock projection reconciliation, net item/refund allocations, legacy-payment handling and optional constraints/session records. Back up SQL and media, preflight existing values and stage SQL Server migration execution. Do not repair stock, payment or historical financial truth by guessing. Do not edit 0005/0006 to conceal incompatibilities already deployed.
 

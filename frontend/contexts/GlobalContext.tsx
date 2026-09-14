@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { CartLine, Product, SiteSettings, User } from '../types';
 import api from '../services/api';
 import { db } from '../services/db';
@@ -100,8 +100,14 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [isCartOpen, setIsCartOpen] = useState(false);
     const [user, setUser] = useState<User | null>(null);
     const [isAuthLoading, setIsAuthLoading] = useState(true);
-    const [products, setProducts] = useState<Product[]>([]);
-    const [catalogSource, setCatalogSource] = useState<CatalogSource>('none');
+    const catalogKey = isAuthLoading ? 'resolving' : JSON.stringify([user?.id ?? null, user?.role ?? null]);
+    const [catalog, setCatalog] = useState<{ owner: string; products: Product[]; source: CatalogSource }>({
+        owner: '', products: [], source: 'none',
+    });
+    const products = catalog.owner === catalogKey ? catalog.products : [];
+    const catalogSource = catalog.owner === catalogKey ? catalog.source : 'none';
+    const catalogIdentity = useRef<string | null>(null);
+    const catalogRequest = useRef(0);
     const [siteSettings, setSiteSettings] = useState<SiteSettings | null>(null);
     const [isAuthModalOpen, setAuthModalOpen] = useState(false);
     const [theme, setTheme] = useState<'light' | 'dark'>(() =>
@@ -143,30 +149,38 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         document.documentElement.classList.toggle('dark', theme === 'dark');
     }, [theme]);
 
-    const refreshProducts = async () => {
-        try {
-            let serverProducts: Product[];
-            if (user?.role === 'admin') {
-                try {
-                    serverProducts = await api.adminGetProducts();
-                } catch {
-                    serverProducts = await api.getProducts();
-                }
-            } else {
-                serverProducts = await api.getProducts();
+    const refreshProducts = useCallback(async () => {
+        if (isAuthLoading || catalogIdentity.current !== catalogKey) return;
+        const requestId = ++catalogRequest.current;
+        const commit = (products: Product[], source: CatalogSource) => {
+            if (catalogIdentity.current === catalogKey && catalogRequest.current === requestId) {
+                setCatalog({ owner: catalogKey, products, source });
             }
-            setProducts(serverProducts);
-            setCatalogSource('server');
+        };
+        try {
+            const serverProducts = user?.role === 'admin' ? await api.adminGetProducts() : await api.getProducts();
+            commit(serverProducts, 'server');
         } catch {
+            if (user?.role === 'admin') {
+                commit([], 'none');
+                return;
+            }
             try {
-                setProducts(await db.getProducts());
-                setCatalogSource('fallback');
+                commit(await db.getProducts(), 'fallback');
             } catch {
-                setProducts([]);
-                setCatalogSource('none');
+                commit([], 'none');
             }
         }
-    };
+    }, [catalogKey, isAuthLoading, user?.role]);
+
+    useEffect(() => {
+        catalogIdentity.current = catalogKey;
+        void refreshProducts();
+        return () => {
+            catalogIdentity.current = null;
+            catalogRequest.current += 1;
+        };
+    }, [catalogKey, refreshProducts]);
 
     const loadSettings = async () => {
         try {
@@ -177,16 +191,19 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     useEffect(() => {
+        let cancelled = false;
+        void loadSettings();
         void (async () => {
             try {
-                setUser(normalizeUserForContext(await api.me()));
+                const resolvedUser = await api.me();
+                if (!cancelled) setUser(resolvedUser ? normalizeUserForContext(resolvedUser) : null);
             } catch {
-                setUser(null);
+                if (!cancelled) setUser(null);
             } finally {
-                setIsAuthLoading(false);
+                if (!cancelled) setIsAuthLoading(false);
             }
-            await Promise.all([refreshProducts(), loadSettings()]);
         })();
+        return () => { cancelled = true; };
     }, []);
 
     useEffect(() => {

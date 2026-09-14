@@ -61,8 +61,19 @@ const AdminPanel: React.FC = () => {
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
     
-    // NEW: We need to store the raw FILE object to send to Django
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
+    const persistedImages = Array.from(new Set([editingProduct.image, ...(editingProduct.images || [])].filter(Boolean)));
+
+    useEffect(() => {
+        const previews = selectedFiles.map(file => URL.createObjectURL(file));
+        setUploadPreviews(previews);
+        return () => previews.forEach(preview => URL.revokeObjectURL(preview));
+    }, [selectedFiles]);
+
+    useEffect(() => {
+        if (!isProductModalOpen) setSelectedFiles([]);
+    }, [isProductModalOpen]);
     
     const [newImageUrl, setNewImageUrl] = useState('');
     const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; productId: string | null }>({
@@ -167,6 +178,7 @@ const AdminPanel: React.FC = () => {
         
         if (editingProduct.id) {
             formData.append('id', editingProduct.id);
+            if (editingProduct.inventoryVersion) formData.append('inventory_version', editingProduct.inventoryVersion);
         }
 
         formData.append('name', editingProduct.name);
@@ -193,46 +205,29 @@ const AdminPanel: React.FC = () => {
             formData.append('variants', JSON.stringify(variants));
         }
 
-        if (editingProduct.images && editingProduct.images.length > 0) {
-            formData.append('images', JSON.stringify(editingProduct.images));
-        }
-
-        if (selectedFile) {
-            formData.append('image', selectedFile); 
-        }
+        formData.append('images', JSON.stringify(selectedFiles.length && editingProduct.image ? persistedImages : editingProduct.images || []));
+        if (selectedFiles.length) formData.append('image', selectedFiles[0]);
+        else if (editingProduct.image === '') formData.append('image', '');
+        selectedFiles.slice(1).forEach(file => formData.append('images[]', file));
 
         try {
             await api.adminSaveProduct(formData);
             await refreshProducts();
             setIsProductModalOpen(false);
             setEditingProduct({});
-            setSelectedFile(null);
+            setSelectedFiles([]);
             setNewImageUrl('');
             showToast('محصول با موفقیت ذخیره شد');
         } catch (e: any) {
             console.error('Save failed:', e);
-            showToast('خطا در ذخیره محصول');
+            showToast(e?.status === 409 ? 'موجودی تغییر کرده است؛ محصول را دوباره باز کنید و تغییرات را اعمال کنید' : 'خطا در ذخیره محصول');
         }
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            const mainFile = files[0];
-            setSelectedFile(mainFile);
-            Array.from(files).forEach((file: File) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const result = reader.result as string;
-                    setEditingProduct(prev => ({
-                        ...prev,
-                        images: [...(prev.images || []), result],
-                        image: result 
-                    }));
-                };
-                reader.readAsDataURL(file);
-            });
-        }
+        const files = Array.from(e.target.files || []);
+        setSelectedFiles(previous => [...previous, ...files]);
+        e.target.value = '';
     };
 
     const handleDeleteProduct = (id: string) => {
@@ -264,6 +259,21 @@ const AdminPanel: React.FC = () => {
         } catch (e) {
             showToast('خطا در بروزرسانی وضعیت سفارش');
         }
+    };
+
+    const handlePaymentStatus = async (payment: Payment, status: Payment['status']) => {
+        const changes: Parameters<typeof api.adminUpdatePayment>[1] = { status };
+        if (status === 'partially_refunded' || status === 'refunded') {
+            const amount = window.prompt('مبلغ این بازپرداخت را وارد کنید (نه مجموع بازپرداخت‌ها)');
+            if (amount === null) return;
+            const reference = window.prompt('مرجع یکتای انتقال وجه؛ برای تلاش مجدد همان مرجع را وارد کنید');
+            if (!reference?.trim()) return;
+            const reason = window.prompt('دلیل بازپرداخت');
+            if (!reason?.trim()) return;
+            if (!window.confirm(`بازپرداخت ${amount} ${payment.currency} با مرجع ${reference} انجام شده است؟ این ثبت، انتقال وجه انجام نمی‌دهد.`)) return;
+            Object.assign(changes, { refund_amount: amount, currency: payment.currency, reference: reference.trim(), reason: reason.trim(), confirmed: true });
+        }
+        await runCommerceAction(`payment-${payment.id}`, () => api.adminUpdatePayment(payment.id, changes), 'وضعیت پرداخت به‌روزرسانی شد');
     };
 
     const handleUpdateTracking = async (order: Order) => {
@@ -375,10 +385,12 @@ const AdminPanel: React.FC = () => {
     };
 
     const handleRemoveImage = (index: number) => {
+        const removed = persistedImages[index];
         const currentImages = editingProduct.images || [];
         setEditingProduct({
             ...editingProduct,
-            images: currentImages.filter((_, i) => i !== index)
+            image: editingProduct.image === removed ? '' : editingProduct.image,
+            images: currentImages.filter(image => image !== removed),
         });
     };
 
@@ -675,7 +687,7 @@ const AdminPanel: React.FC = () => {
                                     <ArrowUpDown size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
                                 </div>
                                 <button 
-                                    onClick={() => { setEditingProduct({ images: [], variants: [], category: 'suits', active: true, featured: false }); setSelectedFile(null); setIsProductModalOpen(true); }}
+                                    onClick={() => { setEditingProduct({ images: [], variants: [], category: 'suits', active: true, featured: false }); setSelectedFiles([]); setIsProductModalOpen(true); }}
                                     className="bg-lux-black dark:bg-white text-white dark:text-lux-black px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold shadow-lg shadow-lux-black/10 dark:shadow-white/10 hover:translate-y-[-2px] transition-all"
                                 >
                                     <Plus size={18} /> <span className="hidden sm:inline">افزودن</span>
@@ -723,7 +735,8 @@ const AdminPanel: React.FC = () => {
                                                 <td className="px-6 py-4">
                                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button 
-                                                            onClick={() => { setEditingProduct(p); setSelectedFile(null); setIsProductModalOpen(true); }}
+                                                            aria-label={`ویرایش ${p.name}`}
+                                                            onClick={() => { setEditingProduct(p); setSelectedFiles([]); setIsProductModalOpen(true); }}
                                                             className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                                                             title="ویرایش"
                                                         >
@@ -962,7 +975,7 @@ const AdminPanel: React.FC = () => {
                                     </div>
                                 )}
 
-                                {commerceSection === 'payments' && <CommerceList empty={payments.length === 0} emptyText="رکورد پرداختی ثبت نشده است.">{payments.map(payment => <div key={payment.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold dark:text-white">پرداخت سفارش #{toPersianDigits(payment.orderId)}</h3><p className="mt-1 text-sm text-gray-500">{payment.provider || payment.method} · {formatPrice(payment.amount)}</p>{payment.transactionId && <p className="mt-1 text-xs text-gray-400" dir="ltr">{payment.transactionId}</p>}</div><select value={payment.status} onChange={e => void runCommerceAction(`payment-${payment.id}`, () => api.adminUpdatePayment(payment.id, { status: e.target.value as Payment['status'] }), 'وضعیت پرداخت به‌روزرسانی شد')} className="admin-commerce-input max-w-48"><option value="unpaid">پرداخت نشده</option><option value="pending">در انتظار</option><option value="paid">پرداخت شده</option><option value="failed">ناموفق</option><option value="cancelled">لغو شده</option><option value="partially_refunded">بازپرداخت جزئی</option><option value="refunded">بازپرداخت شده</option></select></div>{payment.failureReason && <p className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{payment.failureReason}</p>}</div>)}</CommerceList>}
+                                {commerceSection === 'payments' && <CommerceList empty={payments.length === 0} emptyText="رکورد پرداختی ثبت نشده است.">{payments.map(payment => <div key={payment.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="font-bold dark:text-white">پرداخت سفارش #{toPersianDigits(payment.orderId)}</h3><p className="mt-1 text-sm text-gray-500">{payment.provider || payment.method} · {formatPrice(payment.amount)}</p>{payment.transactionId && <p className="mt-1 text-xs text-gray-400" dir="ltr">{payment.transactionId}</p>}</div><select value={payment.status} onChange={e => void handlePaymentStatus(payment, e.target.value as Payment['status'])} className="admin-commerce-input max-w-48"><option value="unpaid">پرداخت نشده</option><option value="pending">در انتظار</option><option value="paid">پرداخت شده</option><option value="failed">ناموفق</option><option value="cancelled">لغو شده</option><option value="partially_refunded">بازپرداخت جزئی</option><option value="refunded">بازپرداخت شده</option></select></div>{payment.failureReason && <p className="mt-3 rounded-lg bg-rose-50 p-2 text-xs text-rose-700">{payment.failureReason}</p>}</div>)}</CommerceList>}
 
                                 {commerceSection === 'reviews' && <CommerceList empty={reviews.length === 0} emptyText="دیدگاهی برای بررسی وجود ندارد.">{reviews.map(review => <div key={review.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-bold dark:text-white">{review.title || 'دیدگاه محصول'} · {review.userName}</h3><p className="mt-1 text-amber-500">{'★'.repeat(review.rating)}{'☆'.repeat(Math.max(0, 5 - review.rating))}</p></div><span className="rounded-full bg-gray-100 px-2 py-1 text-xs text-gray-600">{review.status === 'approved' ? 'تأییدشده' : review.status === 'rejected' ? 'ردشده' : 'در انتظار'}</span></div><p className="mt-3 text-sm leading-7 text-gray-600 dark:text-gray-300">{review.body}</p><div className="mt-4 flex justify-end gap-2"><button onClick={() => void runCommerceAction(`review-a-${review.id}`, () => api.adminUpdateReview(review.id, { status: 'approved' }), 'دیدگاه تأیید شد')} className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-bold text-white">تأیید</button><button onClick={() => void runCommerceAction(`review-r-${review.id}`, () => api.adminUpdateReview(review.id, { status: 'rejected' }), 'دیدگاه رد شد')} className="rounded-lg bg-amber-500 px-3 py-1.5 text-xs font-bold text-white">رد</button><button onClick={() => window.confirm('دیدگاه حذف شود؟') && void runCommerceAction(`review-d-${review.id}`, () => api.adminDeleteReview(review.id), 'دیدگاه حذف شد')} className="rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600">حذف</button></div></div>)}</CommerceList>}
 
@@ -1207,13 +1220,22 @@ const AdminPanel: React.FC = () => {
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">گالری تصاویر</label>
                                         <div className="bg-gray-50 dark:bg-zinc-800 p-4 rounded-xl border border-gray-200 dark:border-zinc-700 border-dashed border-2">
                                             <div className="flex flex-wrap gap-4 mb-4">
-                                                {(editingProduct.images || []).map((img, idx) => (
+                                                {persistedImages.map((img, idx) => (
                                                     <div key={idx} className="relative w-20 h-20 group">
                                                         <img src={img} alt="" className="w-full h-full object-cover rounded-lg shadow-sm" />
                                                         <button 
+                                                            aria-label={`حذف تصویر ذخیره‌شده ${idx + 1}`}
                                                             onClick={() => handleRemoveImage(idx)}
                                                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100"
                                                         >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {uploadPreviews.map((preview, index) => (
+                                                    <div key={preview} className="relative w-20 h-20 group">
+                                                        <img src={preview} alt={selectedFiles[index]?.name || ''} className="w-full h-full object-cover rounded-lg shadow-sm" />
+                                                        <button type="button" aria-label={`حذف تصویر انتخاب‌شده ${index + 1}`} onClick={() => setSelectedFiles(files => files.filter((_, i) => i !== index))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md">
                                                             <X size={12} />
                                                         </button>
                                                     </div>

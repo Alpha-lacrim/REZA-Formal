@@ -6,22 +6,37 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 1 audit baseline established and published; next planned work is Batch 2 |
+| Program status | Batch 2 confirmed-defect remediation verified; SQL concurrency/deployment gates remain open |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 1 - Forensic audit |
-| Batch status | Complete; required checks rerun and branches published on 2026-09-13 |
-| Batch branch | `codex/batch-01-forensic-audit` |
-| Batch start commit | `94d665881e3e929c41121d057385c28f822002fe` |
-| Integration branch SHA | Published audit merge `fc17a0788aa973f1626c876be29619c76ab3f98b`; the following documentation-only publication record is identified below |
-| Program bootstrap commit | `b638e63813c972fe096a7830131a233a69606416` - `docs(codex): initialize remediation program` |
-| Final batch commit | `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322` - `docs(audit): establish remediation baseline` |
-| Integration merge commit | `fc17a0788aa973f1626c876be29619c76ab3f98b` - `Merge Batch 1 forensic audit`; published to origin after the owner's follow-up request; no `main` merge |
-| Audit IDs handled | 43 recorded, all Open; none remediated. [Canonical register](audit/AUDIT_INDEX.md) |
-| Verification performed | Isolated Django check/drift/50 tests, frontend typecheck/build, Compose config, disposable probes and documentation review; exact results in [testing audit](audit/TESTING_CI_AUDIT.md) |
-| Remaining risks | Eight P1 records, SQL Server/browser/deployment evidence gaps, dependency advisories and unresolved provider/policy/history obligations |
-| Next batch | Batch 2 - Critical correctness; not started in Batch 1 |
+| Current batch | Batch 2 - Critical correctness |
+| Batch status | Confirmed-defect scope complete; local merge follows this verification record |
+| Batch branch | `codex/batch-02-critical-correctness` |
+| Batch start commit | `8d867c2017f627c69d533de5d5dfacd9dd70a4f8` |
+| Final batch / integration merge | Resolve exactly with the fixed-start commands below; no remote push in this batch |
+| Audit IDs handled | BE-001..BE-006, SEC-001, FE-001, FE-002; TEST-001 partially addressed |
+| Verification performed | 81 isolated backend tests, 10 frontend tests, typecheck, build, Django check/drift and Compose config passed |
+| Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
+| Next batch | Batch 3 - Tests and CI; not started |
+
+## Batch 2 - Critical correctness
+
+- Read/revalidated Batch 1 before edits. Fixed the six confirmed P1 defects and the explicitly requested authentication/media paths. BE-006 was covered as part of the cancellation invariant. No P0 finding was established and unverified SQL risks were not presented as reproduced bugs.
+- Finding commits: `3109735` (BE-005/BE-006), `d400b60` (BE-001), `46e62b1` (BE-002), `30a0825` (BE-003/BE-004), `d98b051` (FE-001), `b4bcc1d` (SEC-001/FE-002), `899ce0a` (BE-001 deleted identities), `59db209` (BE-004 historical consistency). Final documentation records follow these commits.
+- New regression tests reproduced each defect before its fix. Checkout remains server-priced, inventory mutations transactional, order snapshots historical and lifecycle guards enforced. The owner selected proportional net item refunds excluding shipping, with reconciled pennies; no external transfer was simulated.
+- No schema migration, production-data mutation, bulk media deletion, broad architecture refactor or state-management framework was introduced. Frontend/backend contracts now require inventory versions and explicit manual-refund fields; native commerce admin screens are inspection-only.
+- Final checks (2026-09-14): all 81 backend tests (7.671s) and 10 frontend tests (7.530s), Django check/drift, typecheck, build and Compose config pass. Build required an approved sandbox-access retry. [Exact evidence](audit/TESTING_CI_AUDIT.md#batch-2-final-checks---2026-09-14).
+- Docker daemon was unavailable. DB-002/TEST-003 remain open, with no SQL Server concurrency or live Nginx verification claimed. Historical financial discrepancies require reconciliation and older media requires backed-up deployment review. Other audit findings retain their later-batch scope.
+- The authorized local merge follows the final documentation commit and passing checks; no remote push or main/dev merge is included. Preserve the batch branch. The final response reports the observed merge; these commands provide durable exact provenance:
+
+```powershell
+git rev-parse codex/batch-02-critical-correctness
+git log --reverse --format='%H %s' 8d867c2017f627c69d533de5d5dfacd9dd70a4f8..codex/batch-02-critical-correctness
+git rev-list --reverse --first-parent --merges 8d867c2017f627c69d533de5d5dfacd9dd70a4f8..codex/remediation-program | Select-Object -First 1
+```
+
+Expected merge subject: `Merge Batch 2 critical correctness remediation`. The final batch tip is the second parent of that merge; its first parent is the recorded start commit.
 
 ## Batch 1 - Forensic audit
 
@@ -110,7 +125,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 
 - [x] Batch 0 — Git/bootstrap
 - [x] Batch 1 — Forensic audit
-- [ ] Batch 2 — Critical correctness
+- [x] Batch 2 — Critical correctness (confirmed defects; SQL/deployment gates remain open)
 - [ ] Batch 3 — Tests and CI
 - [ ] Batch 4 — Backend architecture
 - [ ] Batch 5 — API/auth frontend
@@ -140,7 +155,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 
 ## Current blockers
 
-No Batch 1 completion or publication blocker remains. Production readiness remains unproven; the open audit findings and evidence gates apply before affected workflows can be relied on.
+No confirmed-defect implementation or isolated-check blocker remains for Batch 2. Production readiness remains unproven: DB-002/TEST-003 and live media-serving/legacy reconciliation gates remain open. Docker daemon was unavailable during verification.
 
 ## Owner decisions
 
@@ -152,6 +167,7 @@ See [roadmap owner decisions](ROADMAP.md#owner-decisions-and-evidence-still-need
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | 0 - Git/bootstrap | Complete | `codex/remediation-program` | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` | `b638e63813c972fe096a7830131a233a69606416` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | None | Batch 1 audit complete |
 | 1 - Forensic audit | Complete and published | `codex/batch-01-forensic-audit` | `94d665881e3e929c41121d057385c28f822002fe` | Not applicable | `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322` | `fc17a0788aa973f1626c876be29619c76ab3f98b` | All 43 recorded; none fixed | Batch 2 pending |
+| 2 - Critical correctness | Confirmed defects verified; local merge is final operation | `codex/batch-02-critical-correctness` | `8d867c2017f627c69d533de5d5dfacd9dd70a4f8` | Not applicable | Batch tip via commands above | First merge after fixed start, via commands above | BE-001..BE-006, SEC-001, FE-001/FE-002; TEST-001 partial | Batch 3 pending; DB-002/TEST-003 open |
 
 Record:
 - Batch

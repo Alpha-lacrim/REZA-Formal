@@ -209,6 +209,7 @@ function normalizeProduct(raw: any): Product {
     category: raw?.category ?? '',
     fabric: raw?.fabric || undefined,
     stock: explicitStock ?? (variants ? variants.reduce((sum: number, variant: ProductVariant) => sum + variant.stock, 0) : undefined),
+    inventoryVersion: raw?.inventory_version ?? raw?.inventoryVersion,
     variants,
     rating: raw?.rating === null || raw?.rating === undefined ? undefined : toNumber(raw.rating),
     reviewCount: raw?.reviewCount === undefined && raw?.review_count === undefined
@@ -979,7 +980,9 @@ export const api = {
   async adminGetPayments(params?: Record<string, unknown>): Promise<Page<Payment>> {
     return normalizePage(await request(withQuery('/api/admin/payments/', params)), normalizePayment);
   },
-  async adminUpdatePayment(id: string, changes: Partial<Payment>): Promise<Payment> {
+  async adminUpdatePayment(id: string, changes: Partial<Payment> & {
+    refund_amount?: string; reason?: string; reference?: string; confirmed?: boolean;
+  }): Promise<Payment> {
     return normalizePayment(await request(`/api/admin/payments/${encodeId(id)}/`, { method: 'PUT', ...jsonBody(changes) }));
   },
 

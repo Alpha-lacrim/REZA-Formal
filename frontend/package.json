@@ -7,6 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "typecheck": "tsc --noEmit",
+    "test": "node --import ./tests/register.mjs --test tests/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
@@ -16,9 +17,11 @@
     "react-router-dom": "^7.18.1"
   },
   "devDependencies": {
+    "@testing-library/react": "^16.3.3",
     "@types/node": "^22.14.0",
     "@vitejs/plugin-react": "^5.0.0",
     "autoprefixer": "^10.4.21",
+    "jsdom": "^29.1.1",
     "postcss": "^8.5.10",
     "tailwindcss": "^3.4.17",
     "typescript": "~5.8.2",
