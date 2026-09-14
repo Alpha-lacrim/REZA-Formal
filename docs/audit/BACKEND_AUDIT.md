@@ -54,7 +54,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-002 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; native mutation containment |
+| Batch 2 revalidation/fix | 2026-09-14: actual native POST changed a return directly to refunded and allowed product/payment deletion. Product, variant, order, payment and return native admins/inlines are now inspection-only, including add/change/delete and bulk deletion; staff mutations remain available through service-backed REST/UI. 12 native/model tests pass, covering superusers and delegated model permissions, preserved snapshots and ledger. No historical records were changed or deleted. |
 | Evidence | P09: payment and return forms contain writable status. P10: ProductVariantAdmin.save_model sets variant stock 99 while Product.stock stays 10 and creates zero movements. |
 | File/function references | backend/shop/admin.py:49,61,87,172,287; backend/reza_backend/urls.py:7 |
 | Current behaviour | Variant stock, Payment status/method (including order inline) and ReturnRequest status remain writable through default ModelAdmin saving. No service hooks reconcile them. |
