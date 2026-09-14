@@ -1,6 +1,6 @@
 # Backend audit
 
-See [architecture workflow traces](ARCHITECTURE_AUDIT.md), [database](DATABASE_AUDIT.md), [security](SECURITY_AUDIT.md) and [verification/probes](TESTING_CI_AUDIT.md). This is a documentation-only baseline; no service or application defect was repaired.
+See [architecture workflow traces](ARCHITECTURE_AUDIT.md), [database](DATABASE_AUDIT.md), [security](SECURITY_AUDIT.md) and [verification/probes](TESTING_CI_AUDIT.md). Descriptive observations are the historical Batch 1 baseline; canonical entries include dated Batch 2 fixes and regression results.
 
 ## Verified strengths and boundaries
 

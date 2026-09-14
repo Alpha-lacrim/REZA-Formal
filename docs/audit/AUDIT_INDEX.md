@@ -2,7 +2,7 @@
 
 Source/probe audit: **2026-09-10**; documentation completion review: **2026-09-13**. Application baseline: `94d665881e3e929c41121d057385c28f822002fe` (Batch 0 integration tip), descended from `pre-codex-remediation-2026-09-10` at `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e`. Branch: `codex/batch-01-forensic-audit`; integration target: `codex/remediation-program`.
 
-This batch establishes documentation and evidence only. **No application defect was fixed, no migration changed, no dependency upgraded, and no production database accessed.** Passing baseline checks are not a production-readiness approval.
+Batch 1 established documentation and evidence only. Its original source/probe observations are retained below. **Batch 2 updates (2026-09-14) are recorded in the register and canonical entries:** nine findings addressed, including the six confirmed P1 defects and explicitly requested auth/media work. No production database was accessed and no schema migration was introduced. Passing isolated checks are not a production-readiness approval.
 
 ## Reading order and ownership
 
@@ -30,7 +30,7 @@ File/function line references describe the unchanged application baseline. A fin
 - **P2:** material functional/scalability/tooling issue or scoped design/deployment risk.
 - **P3:** lower-priority maintenance debt with no demonstrated current critical effect.
 
-Severity is remediation priority, **not confidence or a vulnerability scanner's severity**. Confidence is High (direct code/probe evidence for stated behavior) or Medium (credible conditional mechanism requiring target-environment verification). Every record remains Open: confirmed defect/validation defect/compatibility gap, maintenance debt, design/configuration/conditional risk, or coverage/tooling/operational gap as labeled. Architectural size/coupling is not classified as a confirmed application defect.
+Severity is remediation priority, **not confidence or a vulnerability scanner's severity**. Confidence is High (direct code/probe evidence for stated behavior) or Medium (credible conditional mechanism requiring target-environment verification). All records were Open at Batch 1; current status is in the register. Architectural size/coupling is not classified as a confirmed application defect.
 
 **43 findings: P0 0; P1 8; P2 33; P3 2.** P1 entries include DB-002 (unverified SQL concurrency risk) and TEST-003 (coverage gap); do not report all P1 entries as reproduced bugs. No production incident or successful deployed exploit was demonstrated.
 
@@ -96,7 +96,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | PERF-001 | P2 | High | Open - confirmed query growth | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
 | PERF-002 | P2 | High | Open - confirmed scalability gap | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
 | PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
-| TEST-001 | P2 | High | Open - coverage gap | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
+| TEST-001 | P2 | High | Partial - targeted Batch 2 suite; broader coverage open | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
 | TEST-002 | P2 | High | Open - tooling gap | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3 (API typing work in 5) |
 | TEST-003 | P1 | High | Open - coverage gap | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
 | OPS-001 | P2 | High | Open - confirmed CI gap | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
@@ -108,6 +108,8 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | UX-003 | P2 | High | Open - confirmed navigation/metadata gap | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
 
 ## Baseline summary and open evidence
+
+Batch 2 final verification (2026-09-14): 81 backend tests, 10 mounted frontend/API tests, typecheck, production build, Django system/drift checks and Compose validation pass. Nine findings are addressed; 34 remain open or partially addressed. The remaining P1 records are DB-002 and TEST-003, both SQL concurrency/evidence gaps. No SQL Server or live Nginx check ran because the Docker daemon was unavailable. See the dated [testing results](TESTING_CI_AUDIT.md#batch-2-final-checks---2026-09-14); the following paragraph preserves Batch 1's baseline.
 
 Required isolated Django check/drift/50-test suite, frontend typecheck/production build and Compose config pass. The first build was blocked by sandbox filesystem access and passed after approved retry. Compose warned about unreadable global Docker config. npm advisory query completed with six affected package entries; Python advisory scan was unavailable. Exact commands/results and fixture probes are in [testing](TESTING_CI_AUDIT.md).
 

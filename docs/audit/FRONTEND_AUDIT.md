@@ -1,5 +1,7 @@
 # Frontend audit
 
+The descriptive analysis below preserves Batch 1 observations. Dated Batch 2 results in FE-001/FE-002 supersede their original behavior; broader frontend work remains open.
+
 The frontend has React 19, TypeScript 5.8 and Vite 6, with locally compiled Tailwind/PostCSS and lazy route chunks. [Baseline typecheck/build](TESTING_CI_AUDIT.md) pass. Those checks do not exercise effects, concurrent requests, accessibility or wire-data validation.
 
 ## State, loading and API boundaries

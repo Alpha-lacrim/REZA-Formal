@@ -4,6 +4,29 @@ The original baseline commands and probes below ran on September 10, 2026 on Win
 
 ## Exact baseline commands and results
 
+### Batch 2 final checks - 2026-09-14
+
+All commands used the isolated test configuration, not the configured SQL Server. The original Batch 1 evidence below is retained for comparison.
+
+| Working directory | Command | Observed result |
+| --- | --- | --- |
+| backend | `.\.venv\Scripts\python.exe manage.py check --settings=reza_backend.test_settings` | PASS; no issues |
+| backend | `.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings` | PASS; no changes detected |
+| backend | `.\.venv\Scripts\python.exe manage.py test --settings=reza_backend.test_settings` | PASS; 81 tests in 7.671s; expected negative-input warnings; test DB destroyed |
+| frontend | `npm.cmd test` | PASS; 10 tests in 7.530s using the actual mounted React provider/AdminPanel and actual API adapter with fixture transport |
+| frontend | `npm.cmd run typecheck` | PASS |
+| frontend | `npm.cmd run build` | Sandbox failed with esbuild parent-directory access denied; approved outside-sandbox retry PASS, Vite 6.4.3, 1738 modules, 3.24s |
+| root | `docker compose config --quiet` | PASS; two unreadable global Docker-config warnings; interpolated configuration was not printed |
+| root | `docker ps --format '{{.Names}} {{.Image}}'`; `docker image ls --format '{{.Repository}}:{{.Tag}}'` | UNAVAILABLE; Docker daemon pipe missing. No SQL Server concurrency or live Nginx header test claimed |
+
+Added 31 backend tests: `test_order_atomicity.py` (3), `test_inventory_authority.py` (7), `test_native_admin_integrity.py` (3), `test_refund_accounting.py` (10), `test_product_media.py` (8). Existing checkout authority, stock, idempotency, permissions, historical snapshot, cancellation and lifecycle regressions remain green. The existing variant adjustment fixture now supplies the required fresh inventory version; commerce rules were not relaxed to satisfy tests.
+
+Before implementation, targeted tests reproduced committed cancellation/details after failure, stale sold stock restoration, native state/deletion bypasses, gross discounted refunds, status-only refunds, active gallery uploads, orphan files, inline persistence and mounted admin bootstrap loading the public catalog. Review extensions additionally reproduced stale PUT recreating deleted stock and incomplete legacy full-refund history reopening payment state.
+
+`frontend/tests/` adds six session/catalog tests, three mounted media-form tests and one adapter/multipart/CSRF/normalization test. The suite uses Node's built-in test runner and installed TypeScript compiler with test-only React Testing Library/jsdom dependencies. It is now part of the AGENTS baseline; broader CI wiring, linting, other browser journeys and production-engine concurrency remain Batch 3. No real-browser rendering/accessibility, SQL Server, provider, restore or production test is claimed.
+
+### Original Batch 1 baseline
+
 | Working directory | Command | Observed result |
 | --- | --- | --- |
 | backend | `.\.venv\Scripts\python.exe manage.py check --settings=reza_backend.test_settings` | PASS; System check identified no issues (0 silenced) |
@@ -104,7 +127,8 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | TEST-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - coverage gap |
+| Status | Partial - targeted Batch 2 suite; broader coverage open |
+| Batch 2 evidence | Ten mounted React/API regressions and an npm test script now exist and pass. CI integration and other critical journeys remain Batch 3; this does not close the wider coverage gap. |
 | Evidence | Tracked-file and package/CI inspection; FE-001..FE-007 illustrate missing behavioral coverage. |
 | File/function references | frontend/package.json; frontend source tree; .github/workflows/ci.yml:frontend |
 | Current behaviour | Only dev/build/typecheck/preview scripts exist; no tracked frontend tests, test runner or test CI step. |
@@ -149,6 +173,7 @@ The current tracked-tree secret signature scan returned zero matches for private
 | Severity | P1 |
 | Confidence | High |
 | Status | Open - coverage gap |
+| Batch 2 evidence | 81 isolated SQLite tests pass, including deterministic stale-write schedules, rollback and idempotent/refund invariants. Docker daemon was unavailable; no SQL Server transactions or separate-connection concurrency tests ran. This finding and DB-002 remain open. |
 | Evidence | Suite inventory and settings; mssql-django emits lock hints whereas SQLite does not implement equivalent SELECT FOR UPDATE. |
 | File/function references | backend/reza_backend/test_settings.py; backend/shop/test_commerce_models.py:261; .github/workflows/ci.yml |
 | Current behaviour | All automated DB checks use SQLite; no SQL Server CI service or concurrent transaction tests exist. |

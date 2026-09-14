@@ -1,5 +1,7 @@
 # Security audit
 
+Historical analysis below describes Batch 1. SEC-001 includes the dated Batch 2 product-upload fix; other security findings and production media-serving verification remain open.
+
 Audit scope is current tracked application/configuration plus isolated fixtures. No credential values were read from ignored environment files or recorded. No exploit against a deployed system was attempted. A current-tree signature scan for private keys, token formats and credential-bearing URLs produced no matches; that is not proof that all secrets or Git history are clean.
 
 ## Existing controls and trust boundaries

@@ -36,6 +36,7 @@ Run the checks relevant to the files changed. The standard baseline is:
 ```powershell
 # Frontend
 cd frontend
+npm.cmd test
 npm.cmd run typecheck
 npm.cmd run build
 

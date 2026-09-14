@@ -78,6 +78,7 @@ SQL JSONField storage and query/index capabilities must be checked against the d
 | Severity | P1 |
 | Confidence | Medium |
 | Status | Open - unverified concurrency risk |
+| Batch 2 revalidation | Inventory paths still have mixed lock acquisition order. Refund/payment mutations now lock their order before payment/return state, but this does not establish SQL-wide safety. Docker daemon was unavailable (docker_engine pipe missing), so no isolated SQL Server lane or concurrent production-engine test ran. SQLite stale-write/rollback regressions pass; no deadlock/oversell claim is closed. |
 | Evidence | Static order-of-operations trace plus installed mssql-django hint implementation. Reproduction requires barriers and separate SQL Server connections; SQLite P08 only proves a stale-write interleaving. |
 | File/function references | backend/shop/commerce_services.py:134,321,540,622,671,715; backend/shop/views.py:293,933; backend/shop/commerce_views.py:195,277 |
 | Current behaviour | Checkout can lock variant then product or product then default variant; catalog updates write product then lock variants. Fulfillment locks order then payment; payment transition starts at payment. |
