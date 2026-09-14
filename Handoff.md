@@ -4,6 +4,13 @@ Last updated: 2026-09-14
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-09-14 - Complete authorized Batch 2 publication
+
+- Objective and starting state: resume publication after the owner explicitly approved both branches to `https://github.com/Alpha-lacrim/REZA-Formal`; integration was clean at `2550a2f`, with Batch 2 at `36fbd4eb04ba5b9c3e2b522c1d1388f585b2a42c`.
+- The destination-specific authorization resolved the earlier approval block. `git push --atomic --set-upstream origin codex/batch-02-critical-correctness codex/remediation-program` succeeded: GitHub created Batch 2 and advanced integration from `8d867c2` to `2550a2f`. Both upstreams are configured.
+- This handoff-only follow-up records the observed publication and is pushed to integration. Application files are unchanged, so the prior 81 backend tests, 10 frontend tests and baseline checks remain applicable. Whitespace, diff and final remote-tip/worktree checks accompany publication.
+- No deployment or production data change was performed. Existing SQL Server concurrency, deployment verification and historical refund reconciliation work remains open; owner rollout requirements below still apply.
+
 ## 2026-09-14 - Publish Batch 2
 
 - Objective: publish Batch 2 and integration after the owner's explicit push instruction.
