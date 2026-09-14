@@ -4,6 +4,14 @@ Last updated: 2026-09-14
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-09-14 - Publish Batch 2
+
+- Objective: publish Batch 2 and integration after the owner's explicit push instruction.
+- Starting state: clean integration at `8d219f94f9c1e82f2478f7fd6bf106f82ed2d772`; batch branch at `36fbd4eb04ba5b9c3e2b522c1d1388f585b2a42c`. Confirmed merge parents and preserved main/dev. The prior 81 backend tests, 10 frontend tests and baseline results apply to the unchanged application tree.
+- Read-only remote verification succeeded: origin is `https://github.com/Alpha-lacrim/REZA-Formal.git`, remote integration matches the published baseline `8d867c2017f627c69d533de5d5dfacd9dd70a4f8`, and the prior audit branch matches `dbafbf2a68a01ce27d1769fab274cd9e9e8b4322`. The Batch 2 remote branch does not yet exist.
+- Publication blocked: automatic approval review rejected the atomic push before execution. After remote verification, the retry was also rejected because destination ownership was not independently verified and the user had not explicitly named this GitHub destination. No branch was pushed. Explicit authorization naming that repository is required to continue; do not work around the rejection.
+- Reviewed outgoing paths and whitespace; application code is unchanged from the passing checks. This documentation-only record preserves the blocked result. Existing SQL/deployment/legacy-reconciliation gaps remain open; no deployment is included.
+
 ## 2026-09-14 - Batch 2 critical correctness remediation
 
 - Objective: revalidate Batch 1 P0/P1 findings, add regression coverage, implement scoped correctness fixes, and merge only after relevant checks. Explicitly inspect authentication bootstrap and the complete product media path.
