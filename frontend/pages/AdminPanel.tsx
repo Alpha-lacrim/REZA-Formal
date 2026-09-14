@@ -61,8 +61,19 @@ const AdminPanel: React.FC = () => {
     const [viewingOrder, setViewingOrder] = useState<Order | null>(null);
     const [editingProduct, setEditingProduct] = useState<Partial<Product>>({});
     
-    // NEW: We need to store the raw FILE object to send to Django
-    const [selectedFile, setSelectedFile] = useState<File | null>(null);
+    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+    const [uploadPreviews, setUploadPreviews] = useState<string[]>([]);
+    const persistedImages = Array.from(new Set([editingProduct.image, ...(editingProduct.images || [])].filter(Boolean)));
+
+    useEffect(() => {
+        const previews = selectedFiles.map(file => URL.createObjectURL(file));
+        setUploadPreviews(previews);
+        return () => previews.forEach(preview => URL.revokeObjectURL(preview));
+    }, [selectedFiles]);
+
+    useEffect(() => {
+        if (!isProductModalOpen) setSelectedFiles([]);
+    }, [isProductModalOpen]);
     
     const [newImageUrl, setNewImageUrl] = useState('');
     const [deleteConfirmation, setDeleteConfirmation] = useState<{ isOpen: boolean; productId: string | null }>({
@@ -194,20 +205,17 @@ const AdminPanel: React.FC = () => {
             formData.append('variants', JSON.stringify(variants));
         }
 
-        if (editingProduct.images && editingProduct.images.length > 0) {
-            formData.append('images', JSON.stringify(editingProduct.images));
-        }
-
-        if (selectedFile) {
-            formData.append('image', selectedFile); 
-        }
+        formData.append('images', JSON.stringify(selectedFiles.length && editingProduct.image ? persistedImages : editingProduct.images || []));
+        if (selectedFiles.length) formData.append('image', selectedFiles[0]);
+        else if (editingProduct.image === '') formData.append('image', '');
+        selectedFiles.slice(1).forEach(file => formData.append('images[]', file));
 
         try {
             await api.adminSaveProduct(formData);
             await refreshProducts();
             setIsProductModalOpen(false);
             setEditingProduct({});
-            setSelectedFile(null);
+            setSelectedFiles([]);
             setNewImageUrl('');
             showToast('محصول با موفقیت ذخیره شد');
         } catch (e: any) {
@@ -217,23 +225,9 @@ const AdminPanel: React.FC = () => {
     };
 
     const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = e.target.files;
-        if (files && files.length > 0) {
-            const mainFile = files[0];
-            setSelectedFile(mainFile);
-            Array.from(files).forEach((file: File) => {
-                const reader = new FileReader();
-                reader.onloadend = () => {
-                    const result = reader.result as string;
-                    setEditingProduct(prev => ({
-                        ...prev,
-                        images: [...(prev.images || []), result],
-                        image: result 
-                    }));
-                };
-                reader.readAsDataURL(file);
-            });
-        }
+        const files = Array.from(e.target.files || []);
+        setSelectedFiles(previous => [...previous, ...files]);
+        e.target.value = '';
     };
 
     const handleDeleteProduct = (id: string) => {
@@ -391,10 +385,12 @@ const AdminPanel: React.FC = () => {
     };
 
     const handleRemoveImage = (index: number) => {
+        const removed = persistedImages[index];
         const currentImages = editingProduct.images || [];
         setEditingProduct({
             ...editingProduct,
-            images: currentImages.filter((_, i) => i !== index)
+            image: editingProduct.image === removed ? '' : editingProduct.image,
+            images: currentImages.filter(image => image !== removed),
         });
     };
 
@@ -691,7 +687,7 @@ const AdminPanel: React.FC = () => {
                                     <ArrowUpDown size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none" />
                                 </div>
                                 <button 
-                                    onClick={() => { setEditingProduct({ images: [], variants: [], category: 'suits', active: true, featured: false }); setSelectedFile(null); setIsProductModalOpen(true); }}
+                                    onClick={() => { setEditingProduct({ images: [], variants: [], category: 'suits', active: true, featured: false }); setSelectedFiles([]); setIsProductModalOpen(true); }}
                                     className="bg-lux-black dark:bg-white text-white dark:text-lux-black px-5 py-2.5 rounded-xl flex items-center gap-2 text-sm font-bold shadow-lg shadow-lux-black/10 dark:shadow-white/10 hover:translate-y-[-2px] transition-all"
                                 >
                                     <Plus size={18} /> <span className="hidden sm:inline">افزودن</span>
@@ -739,7 +735,8 @@ const AdminPanel: React.FC = () => {
                                                 <td className="px-6 py-4">
                                                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                                         <button 
-                                                            onClick={() => { setEditingProduct(p); setSelectedFile(null); setIsProductModalOpen(true); }}
+                                                            aria-label={`ویرایش ${p.name}`}
+                                                            onClick={() => { setEditingProduct(p); setSelectedFiles([]); setIsProductModalOpen(true); }}
                                                             className="p-2 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/30 rounded-lg transition-colors"
                                                             title="ویرایش"
                                                         >
@@ -1223,13 +1220,22 @@ const AdminPanel: React.FC = () => {
                                         <label className="text-sm font-bold text-gray-700 dark:text-gray-300">گالری تصاویر</label>
                                         <div className="bg-gray-50 dark:bg-zinc-800 p-4 rounded-xl border border-gray-200 dark:border-zinc-700 border-dashed border-2">
                                             <div className="flex flex-wrap gap-4 mb-4">
-                                                {(editingProduct.images || []).map((img, idx) => (
+                                                {persistedImages.map((img, idx) => (
                                                     <div key={idx} className="relative w-20 h-20 group">
                                                         <img src={img} alt="" className="w-full h-full object-cover rounded-lg shadow-sm" />
                                                         <button 
+                                                            aria-label={`حذف تصویر ذخیره‌شده ${idx + 1}`}
                                                             onClick={() => handleRemoveImage(idx)}
                                                             className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-all scale-75 hover:scale-100"
                                                         >
+                                                            <X size={12} />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                                {uploadPreviews.map((preview, index) => (
+                                                    <div key={preview} className="relative w-20 h-20 group">
+                                                        <img src={preview} alt={selectedFiles[index]?.name || ''} className="w-full h-full object-cover rounded-lg shadow-sm" />
+                                                        <button type="button" aria-label={`حذف تصویر انتخاب‌شده ${index + 1}`} onClick={() => setSelectedFiles(files => files.filter((_, i) => i !== index))} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md">
                                                             <X size={12} />
                                                         </button>
                                                     </div>

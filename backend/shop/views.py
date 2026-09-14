@@ -37,7 +37,6 @@ from django.db.models import F
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
 from rest_framework.exceptions import APIException
-import os
 import json
 import logging
 from decimal import Decimal
@@ -136,22 +135,6 @@ def serialize_user(user):
         'last_login': user.last_login,
     }
 
-# Helper for Gallery Images (JSON List) ONLY
-def _save_uploaded_file_get_url(fobj, request=None):
-    ext = os.path.splitext(getattr(fobj, 'name', ''))[1] or ''
-    name = f"uploads/{uuid.uuid4().hex}{ext}"
-    saved_name = default_storage.save(name, ContentFile(fobj.read()))
-    try:
-        urlpath = default_storage.url(saved_name)
-    except Exception:
-        media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        urlpath = media_url.rstrip('/') + '/' + saved_name.lstrip('/')
-    try:
-        if request is not None:
-            return request.build_absolute_uri(urlpath)
-    except Exception:
-        pass
-    return urlpath
 
 
 def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentFile:
@@ -181,90 +164,24 @@ def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentF
         raise ValueError('Invalid image data URL') from exc
 
 def prepare_product_data(request):
-    """
-    Prepares data for the serializer.
-    1. Copies request.data to a mutable dict.
-    2. SKIPS manual processing of 'image' (let Serializer handle it).
-    3. Manually processes 'images' list (gallery) to URLs for JSONField.
-    """
-    # Create mutable copy of request data (but preserve file objects separately)
-    if hasattr(request.data, 'dict'):
-        data = request.data.dict()
-    else:
-        data = request.data.copy()
-
-    for client_name, model_name in (
-        ('active', 'is_active'),
-        ('compareAtPrice', 'compare_at_price'),
-    ):
+    """Normalize multipart values without writing any file before validation."""
+    data = request.data.dict() if hasattr(request.data, 'dict') else request.data.copy()
+    for client_name, model_name in (('active', 'is_active'), ('compareAtPrice', 'compare_at_price')):
         if client_name in data and model_name not in data:
             data[model_name] = data.pop(client_name)
-
-    # If an image file was uploaded, preserve the UploadedFile so the
-    # serializer's ImageField can validate and save it (preferred flow).
-    if request.FILES and 'image' in request.FILES:
-        try:
-            data['image'] = request.FILES.get('image')
-        except Exception:
-            pass
-
-    # NOTE: We do NOT process data['image'] here. 
-    # We let the File object pass through to the serializer's ImageField.
-
-    # Process 'images' (Gallery) - Assume JSONField of strings
     if request.FILES:
-        imgs = []
-        for key in ['images', 'images[]']:
-            if key in request.FILES:
-                for f in request.FILES.getlist(key):
-                    try:
-                        # Save file and get URL string
-                        imgs.append(_save_uploaded_file_get_url(f, request))
-                    except Exception:
-                        continue
-        
-        # Merge with existing gallery images
-        if imgs:
-            try:
-                existing = data.get('images') or []
-                if isinstance(existing, str):
-                    try:
-                        existing = json.loads(existing)
-                    except Exception:
-                        existing = []
-                
-                if not isinstance(existing, list):
-                    existing = []
-                    
-                data['images'] = existing + imgs
-            except Exception:
-                data['images'] = imgs
-            
-        # Fallback: if `image` field was provided as a data-URL (or list with a data-URL),
-        # decode it into a ContentFile so the serializer ImageField can accept it.
-        try:
-            img_field = data.get('image')
-            if isinstance(img_field, list) and len(img_field) > 0:
-                img_field = img_field[0]
-
-            if isinstance(img_field, str) and img_field.startswith('data:image/'):
-                # Decode and wrap as ContentFile with a generated name
-                header, encoded = img_field.split(',', 1)
-                import base64
-                binary = base64.b64decode(encoded)
-                # choose extension
-                if 'image/png' in header:
-                    ext = '.png'
-                elif 'image/jpeg' in header or 'image/jpg' in header:
-                    ext = '.jpg'
-                elif 'image/gif' in header:
-                    ext = '.gif'
-                else:
-                    ext = '.png'
-                filename = f"img_{uuid.uuid4().hex}{ext}"
-                data['image'] = ContentFile(binary, name=filename)
-        except Exception:
-            pass
+        files = [file for key in ('images', 'images[]') for file in request.FILES.getlist(key)]
+        if files:
+            data['gallery_files'] = files
+            # request.data.dict() can return the last file for this key.
+            text_values = [value for value in request.data.getlist('images') if isinstance(value, str)]
+            if text_values:
+                data['images'] = text_values[-1]
+            else:
+                data.pop('images', None)
+        data.pop('images[]', None)
+    if data.get('image') == '':
+        data['image'] = None
     return data
 
 
@@ -297,18 +214,26 @@ class InventoryConflict(APIException):
 
 
 def _save_product(serializer, variants, actor):
-    with transaction.atomic():
-        if serializer.instance is not None:
-            serializer.instance = Product.objects.select_for_update().get(pk=serializer.instance.pk)
-            if 'stock' in serializer.validated_data or variants is not None:
-                expected = serializer.initial_data.get('inventory_version')
-                current = serializer.get_inventory_version(serializer.instance)
-                if not expected or expected != current:
-                    raise InventoryConflict()
-        serializer.save()
-        _sync_product_variants(
-            serializer.instance, variants, actor, update_stock='stock' in serializer.validated_data,
-        )
+    from .product_media import store_product_media
+    saved_names = []
+    try:
+        with transaction.atomic():
+            if serializer.instance is not None:
+                serializer.instance = Product.objects.select_for_update().get(pk=serializer.instance.pk)
+                if 'stock' in serializer.validated_data or variants is not None:
+                    expected = serializer.initial_data.get('inventory_version')
+                    current = serializer.get_inventory_version(serializer.instance)
+                    if not expected or expected != current:
+                        raise InventoryConflict()
+            store_product_media(serializer.validated_data, saved_names)
+            serializer.save()
+            _sync_product_variants(
+                serializer.instance, variants, actor, update_stock='stock' in serializer.validated_data,
+            )
+    except Exception:
+        for name in saved_names:
+            default_storage.delete(name)
+        raise
 
 
 def _sync_product_variants(product, variants, actor, *, update_stock=False):
@@ -622,8 +547,7 @@ def product_detail(request, pk=None):
 
         if serializer.is_valid():
             try:
-                with transaction.atomic():
-                    _save_product(serializer, variants, request.user)
+                _save_product(serializer, variants, request.user)
             except (DjangoValidationError, IntegrityError) as exc:
                 return Response({'variants': [str(exc)]}, status=400)
             response_status = status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK
@@ -889,12 +813,7 @@ def admin_products(request):
         return Response(ProductSerializer(qs, many=True, context={'request': request}).data)
 
     # POST (Create)
-    # Debug: log content type and uploaded files briefly to assist debugging client uploads
-    try:
-        logger.info('admin_products content_type=%s, files=%s', request.META.get('CONTENT_TYPE'), list(request.FILES.keys()))
-    except Exception:
-        pass
-    # 1. Prepare data (this leaves 'image' as a File, but handles 'images' list)
+    # Normalize the request; validation and the transaction own all storage writes.
     data = prepare_product_data(request)
     variants, variant_errors = _extract_variants(data)
     if variant_errors:
@@ -902,12 +821,10 @@ def admin_products(request):
 
     data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
     
-    # 2. Pass 'image' FILE to serializer. ImageField will handle it.
     serializer = ProductSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         try:
-            with transaction.atomic():
-                _save_product(serializer, variants, request.user)
+            _save_product(serializer, variants, request.user)
         except (DjangoValidationError, IntegrityError) as exc:
             return Response({'variants': [str(exc)]}, status=400)
         return Response(
@@ -941,8 +858,7 @@ def admin_product_detail(request, pk=None):
             serializer = ProductSerializer(prod, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
                 try:
-                    with transaction.atomic():
-                        _save_product(serializer, variants, request.user)
+                    _save_product(serializer, variants, request.user)
                 except (DjangoValidationError, IntegrityError) as exc:
                     return Response({'variants': [str(exc)]}, status=400)
                 return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
@@ -959,8 +875,7 @@ def admin_product_detail(request, pk=None):
             serializer = ProductSerializer(data=data, context={'request': request})
             if serializer.is_valid():
                 try:
-                    with transaction.atomic():
-                        _save_product(serializer, variants, request.user)
+                    _save_product(serializer, variants, request.user)
                 except (DjangoValidationError, IntegrityError) as exc:
                     return Response({'variants': [str(exc)]}, status=400)
                 return Response(ProductSerializer(serializer.instance, context={'request': request}).data, status=201)

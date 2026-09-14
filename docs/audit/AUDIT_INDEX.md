@@ -77,7 +77,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | BE-008 | P2 | High | Open - confirmed defect | [Newsletter repeat/reactivation path is rejected by serializer uniqueness](BACKEND_AUDIT.md#be-008) | 4 |
 | BE-009 | P2 | High | Open - confirmed defect | [Customer cancellation capability describes staff transitions](BACKEND_AUDIT.md#be-009) | 5 |
 | FE-001 | P2 | High | Fixed - Batch 2; explicit priority | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 2 |
-| FE-002 | P2 | High | Open - confirmed defect | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 7 (SEC-001 containment in 2) |
+| FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
 | FE-003 | P2 | High | Open - confirmed defect | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
 | FE-004 | P2 | High | Open - confirmed defect | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
 | FE-005 | P2 | High | Open - confirmed defect | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5 (complete staff surfaces in 7) |
@@ -88,7 +88,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | DB-002 | P1 | Medium | Open - unverified concurrency risk | [Lock acquisition order differs between mutation paths](DATABASE_AUDIT.md#db-002) | 2 (SQL verification in 3) |
 | DB-003 | P2 | High | Open - confirmed compatibility gap | [Legacy migration does not establish payment history](DATABASE_AUDIT.md#db-003) | 4 |
 | DB-004 | P3 | High | Open - maintenance debt | [SKU has an explicit index alongside a uniqueness index](DATABASE_AUDIT.md#db-004) | 8 |
-| SEC-001 | P1 | High | Open - confirmed validation defect | [Gallery upload bypasses image validation and persists before validation](SECURITY_AUDIT.md#sec-001) | 2 (complete media pipeline in 7/9) |
+| SEC-001 | P1 | High | Fixed - Batch 2; deployment review open | [Gallery upload bypasses image validation and persists before validation](SECURITY_AUDIT.md#sec-001) | 2 (deployment in 9/10) |
 | SEC-002 | P2 | High | Open - confirmed lifecycle gap | [Logout cannot revoke a copied refresh token](SECURITY_AUDIT.md#sec-002) | 9 (coordinate API work in 5) |
 | SEC-003 | P2 | High | Open - configuration risk | [Throttle identity and cache are weak across proxies/workers](SECURITY_AUDIT.md#sec-003) | 9 |
 | SEC-004 | P2 | Medium | Open - conditional security risk | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |

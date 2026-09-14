@@ -48,7 +48,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 2; explicit user priority |
+| Batch 2 revalidation/fix | 2026-09-14: traced and tested File -> pending browser state -> object-URL preview -> FormData -> validated storage -> API -> subsequent edit. New previews are separate from persisted product fields; all selected files are sent as binary parts, removal drops the associated File, and URLs are revoked on removal/close. Gallery JSON is always a list and explicit clearing works. The backend converts verified legacy inline images to stored files on edit while retaining existing URLs/files. Three mounted AdminPanel tests plus a real API-adapter transport test pass; backend media round-trip and legacy preservation tests also pass. |
 | Evidence | P03 reproduces multipart form behavior: HTTP 201, stored images type=str containing data:image/, same inline content in response. A harmless sentinel proves persistence; primary PNG passes ImageField. |
 | File/function references | frontend/pages/AdminPanel.tsx:160,196,218; frontend/services/api.ts:936; backend/shop/views.py:182; backend/shop/models.py:Product.images |
 | Current behaviour | FileReader Data URLs enter editingProduct.images; save JSON-stringifies them while separately uploading the first raw File. Backend JSONField accepts the string without gallery normalization. |
