@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-09-14 (Batch 2; isolated regression/baseline results in Handoff)
+Last verified: 2026-09-16 (Batch 3; local fast gates and Chrome smoke pass; SQL lane unrun)
 
 ## Purpose and product
 
@@ -78,7 +78,12 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `backend/shop/commerce_services.py` | Quotes, idempotent checkout, locking, inventory, refunds, and lifecycle transitions. |
 | `backend/shop/refunds.py` | Net item allocation, remaining refund bounds, reference replay and recorded financial totals. |
 | `backend/shop/product_media.py` | Shared product image validation, gallery normalization and storage staging. |
-| `frontend/tests/` | Mounted React auth/media and API transport regressions using Node's test runner, React Testing Library and jsdom. |
+| `frontend/tests/` | Retained Node auth/media regressions plus Vitest/RTL/user-event/MSW commerce and HTTP tests. |
+| `docs/TESTING.md` | Fast quality gates, browser smoke and disposable SQL Server lane commands and isolation constraints. |
+| `frontend/e2e/`, `frontend/playwright.config.ts` | Real Django browser smoke journeys using a disposable SQLite server. |
+| `backend/e2e_server.py`, `backend/reza_backend/e2e_settings.py` | Synthetic browser fixtures and marked temporary database/media directory. |
+| `docker-compose.sql-test.yml`, `backend/reza_backend/sql_test_settings.py` | Separate disposable SQL Server topology and fail-closed connection configuration. |
+| `.github/workflows/extended-tests.yml` | Manually dispatched SQL Server and Playwright jobs. |
 | `backend/shop/commerce_views.py` | Customer and staff commerce endpoints. |
 | `backend/shop/commerce_serializers.py` | Commerce validation, client aliases, and immutable response snapshots. |
 | `backend/shop/management/commands/seed_data.py` | Idempotent initial data/bootstrap behavior. |
@@ -123,6 +128,7 @@ docker compose up --build
 # Frontend
 cd frontend
 npm.cmd ci
+npm.cmd run lint
 npm.cmd test
 npm.cmd run typecheck
 npm.cmd run build
@@ -139,6 +145,8 @@ python manage.py runserver
 ```
 
 Use the repository's isolated test settings/command documented in `AGENTS.md` for automated tests so the live SQL Server is never modified by a test run.
+
+Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm.cmd run test:e2e`. Both loopback ports 3100/18080 must be free; `vite.e2e.config.ts` isolates the test proxy from normal development. The runner always creates synthetic data in a temporary SQLite database. SQL commands and test-only names (`REZA_SQL_TEST`, `REZA_SQL_TEST_HOST`, `REZA_SQL_TEST_PASSWORD`, `REZA_E2E_DIRECTORY`, `E2E_PYTHON`, `PLAYWRIGHT_CHANNEL`) are documented in [docs/TESTING.md](docs/TESTING.md); never substitute production data or connection settings. Fast CI covers `codex/**`; expensive lanes are manually dispatched separately.
 
 ## Stable implementation constraints
 

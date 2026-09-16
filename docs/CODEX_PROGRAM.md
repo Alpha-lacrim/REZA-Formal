@@ -6,19 +6,29 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 2 confirmed-defect remediation verified; SQL concurrency/deployment gates remain open |
+| Program status | Batch 3 foundation verified locally; SQL concurrency/deployment gates remain open |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 2 - Critical correctness |
-| Batch status | Confirmed-defect scope complete; local merge follows this verification record |
-| Batch branch | `codex/batch-02-critical-correctness` |
-| Batch start commit | `8d867c2017f627c69d533de5d5dfacd9dd70a4f8` |
+| Current batch | Batch 3 - Testing and CI |
+| Batch status | Fast gates and Chrome smoke pass; local integration merge follows; SQL environment exception documented |
+| Batch branch | `codex/batch-03-testing-ci` |
+| Batch start commit | `7bec4bcf9450c8c252935ae79435bed00af1a881` |
 | Final batch / integration merge | Resolve exactly with the fixed-start commands below; no remote push in this batch |
-| Audit IDs handled | BE-001..BE-006, SEC-001, FE-001, FE-002; TEST-001 partially addressed |
-| Verification performed | 81 isolated backend tests, 10 frontend tests, typecheck, build, Django check/drift and Compose config passed |
+| Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 lane configured but evidence open |
+| Verification performed | Clean npm ci, lint, typecheck, 18 frontend tests, build, three Chrome E2E tests; 93 backend tests with five SQL skips; Django check/drift, both Compose files and workflow YAML validation |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 3 - Tests and CI; not started |
+| Next batch | Batch 4 after Batch 3 acceptance |
+
+## Batch 3 - Testing and CI
+
+- Preserve the Node/RTL auth/admin-media regressions and add Vitest, user-event and MSW for commerce state and HTTP sessions. Add frontend lint without a repository formatting rewrite.
+- Add checkout/permission/malformed-input and isolation regressions, a disposable real-backend Playwright runner, and a separate SQL Server Compose lane with independent-connection transaction tests.
+- Fast workflow covers `codex/**` and PRs; browser/SQL jobs are separately dispatched. No provider is simulated: browser checkout uses COD and asserts unpaid state.
+- Local verification passed on September 16. Browser used installed Chrome 152.0.7977.84 because pinned Chromium's CDN rejected this location. SQL Server was not run because Docker's daemon pipe is missing; this explicitly documented environment lane is excluded from local merge acceptance, not claimed passing. Hosted GitHub runs remain unobserved.
+- Only four small lint-required source cleanups were needed; no runtime dependency upgrades or formatting rewrite. Backend commit: `3a0966b`; final frontend/CI/documentation commits follow and are discoverable from the fixed start commit above.
+- Commands/isolation constraints: [TESTING.md](TESTING.md). Actual results: [testing audit](audit/TESTING_CI_AUDIT.md). No SQL execution or hosted CI success is implied by configured workflows.
+- Resolve final batch and merge provenance with `git rev-parse codex/batch-03-testing-ci` and `git log --merges --oneline codex/remediation-program --grep="batch-03-testing-ci"`. No push or production deployment is part of this batch.
 
 ## Batch 2 - Critical correctness
 

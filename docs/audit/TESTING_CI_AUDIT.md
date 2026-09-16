@@ -4,6 +4,35 @@ The original baseline commands and probes below ran on September 10, 2026 on Win
 
 ## Exact baseline commands and results
 
+### Batch 3 verification - 2026-09-16
+
+Working branch: `codex/batch-03-testing-ci`. Commands and isolation design: [TESTING.md](../TESTING.md). All new fast gates and local browser smoke pass. The SQL lane is the documented environment-specific exception; no SQL transactional-safety claim is made.
+
+| Directory | Command / check | Observed result |
+| --- | --- | --- |
+| backend | `.\.venv\Scripts\python.exe manage.py check --settings=reza_backend.test_settings` | PASS; no issues |
+| backend | `.\.venv\Scripts\python.exe manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings` | PASS; no changes |
+| backend | `.\.venv\Scripts\python.exe manage.py test --settings=reza_backend.test_settings` | PASS September 14: 98 discovered, 93 passed, five SQL-only skips; 6.768s |
+| frontend | `npm.cmd ci --prefer-offline --no-audit --no-fund --fetch-retries=1 --fetch-timeout=60000 --maxsockets=4` | PASS; clean lockfile install, 367 packages, 18s |
+| frontend | `npm.cmd run lint`; `npm.cmd run typecheck` | PASS; ESLint 10 and TypeScript |
+| frontend | `npm.cmd test` | PASS; ten retained Node tests (7.529s) plus eight Vitest tests (4.96s) |
+| frontend | `npm.cmd run build` | PASS after lint cleanups; 1738 modules, 4.29s, outside the esbuild sandbox restriction |
+| frontend | `$env:PLAYWRIGHT_CHANNEL='chrome'; npm.cmd run test:e2e` | PASS; 3 real-backend smoke tests, 19.7s, installed Chrome 152.0.7977.84 with temporary profile |
+| frontend | `npx.cmd playwright install chromium` | UNAVAILABLE locally; CDN returned HTTP 403 location restriction. The supported installed-Chrome channel passed instead; CI-pinned Chromium has not run locally |
+| root | Both Compose topologies `config --quiet` | PASS; global Docker-config read warnings only |
+| backend | `e2e_server.py` with HTTP health/catalog/CSRF-cookie-login probe | PASS; synthetic customer authenticated against temporary SQLite; not a browser run |
+| root | `docker info --format '{{.ServerVersion}}'` | UNAVAILABLE on both dates; daemon pipe absent. No SQL integration pass |
+
+The September 14 dependency install failed with registry resets/timeouts and incomplete cache. September 16 recovered by reusing downloaded cache, reducing parallel downloads and retrying. Lockfile installation is now verified. Build initially failed on sandbox parent-directory access; automatic review rejected the first escalation due to a usage limit. The resumed build was approved and passed. Browser setup fixes were Windows interpreter quoting, dedicated available ports 3100/18080 (Windows rejected 8000), and scoping the desktop login locator to navigation. No application auth/checkout behavior was relaxed to make tests pass.
+
+Added nine backend boundary tests and three lane-isolation guards. Existing 81 regressions retain upload-negative, coupon-limit, inventory/version, refund and lifecycle coverage. Five SQL-only tests cover independent connections, last-unit contention, duplicate idempotency, a held row lock, constraints, rollback/decrement and one-time restock. SQLite skips these explicitly.
+
+Frontend additions use Vitest/RTL/user-event/MSW for cart variants/stock/update/removal, persistence/recovery, cart/wishlist account synchronization and failures, catalog fallback, and real-adapter CSRF/login/logout/refresh. The default command retains mounted AdminPanel edit/media and bootstrap race regressions. Three Playwright tests cover all seven requested smoke flows through real Django, with COD checkout asserted unpaid and no simulated provider success.
+
+Fast CI adds lint/tests and `codex/**` triggers. Browser/SQL jobs are separately dispatched. SQL has a standalone Compose project without application volumes/network, fixed test database, local host/port allowlist and opt-in guard. No production database or hosted CI run was accessed; DB-002/TEST-003 remain open.
+
+Both workflow YAML files parsed successfully and their job/trigger structures were checked. Lint excludes generated output and the retained .mjs harness; existing any/unused-symbol debt remains explicit. Four small lint cleanups use const, remove a redundant initializer, and reuse two array-guard values. Runtime dependency versions, Vite and TypeScript were preserved. No formatting rewrite, schema migration or backend runtime change was introduced.
+
 ### Batch 2 final checks - 2026-09-14
 
 All commands used the isolated test configuration, not the configured SQL Server. The original Batch 1 evidence below is retained for comparison.
@@ -127,11 +156,12 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | TEST-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Partial - targeted Batch 2 suite; broader coverage open |
+| Status | Fixed - Batch 3 initial regression foundation |
+| Batch 3 evidence | 18 frontend tests and three real-backend browser smoke tests pass; lint/tests are in fast CI. Further pagination, identity races and accessibility cases remain in their feature batches. |
 | Batch 2 evidence | Ten mounted React/API regressions and an npm test script now exist and pass. CI integration and other critical journeys remain Batch 3; this does not close the wider coverage gap. |
 | Evidence | Tracked-file and package/CI inspection; FE-001..FE-007 illustrate missing behavioral coverage. |
 | File/function references | frontend/package.json; frontend source tree; .github/workflows/ci.yml:frontend |
-| Current behaviour | Only dev/build/typecheck/preview scripts exist; no tracked frontend tests, test runner or test CI step. |
+| Current behaviour | Combined Node/Vitest suite, lint/typecheck/build gates and a separate real-backend Playwright lane exist; dated results above distinguish local from hosted evidence. |
 | Impact | Effects, API races, account synchronization, upload forms and pagination can regress while typecheck/build remain green. |
 | Reproduction/proof | Tracked-file and package/CI inspection; FE-001..FE-007 illustrate missing behavioral coverage. |
 | Root cause | Verification relies on compilation and historical manual smoke testing. |
@@ -150,10 +180,10 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | TEST-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - tooling gap |
+| Status | Partial - lint gate added; strict typing deferred |
 | Evidence | Scripts/config inspection and 48 lexical any tokens in api.ts. This is a tooling/debt finding, not proof every assertion fails. |
 | File/function references | frontend/package.json; frontend/tsconfig.json; .github/workflows/ci.yml; frontend/services/api.ts |
-| Current behaviour | No lint script/config/job; strict/noImplicitAny/strictNullChecks are not enabled; unchecked request<T> and extensive any hide wire contracts. |
+| Current behaviour | ESLint 10/typescript-eslint gate passes without broad formatting. strict/noImplicitAny/strictNullChecks and unchecked request<T>/any adapter debt remain Batch 5; hooks dependency auditing is not claimed. |
 | Impact | Passing typecheck does not detect missing effect dependencies or invalid response shapes; maintenance errors lack automatic checks. |
 | Reproduction/proof | Scripts/config inspection and 48 lexical any tokens in api.ts. This is a tooling/debt finding, not proof every assertion fails. |
 | Root cause | Generated baseline TS config and no agreed lint/runtime DTO policy. |
@@ -172,11 +202,12 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | TEST-003 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - coverage gap |
+| Status | Open - SQL lane configured; execution pending |
+| Batch 3 evidence | Dedicated SQL settings/Compose/manual CI and five connection/transaction tests exist. Local Docker daemon is unavailable; all five are skipped under SQLite. No SQL pass claimed. |
 | Batch 2 evidence | 81 isolated SQLite tests pass, including deterministic stale-write schedules, rollback and idempotent/refund invariants. Docker daemon was unavailable; no SQL Server transactions or separate-connection concurrency tests ran. This finding and DB-002 remain open. |
 | Evidence | Suite inventory and settings; mssql-django emits lock hints whereas SQLite does not implement equivalent SELECT FOR UPDATE. |
 | File/function references | backend/reza_backend/test_settings.py; backend/shop/test_commerce_models.py:261; .github/workflows/ci.yml |
-| Current behaviour | All automated DB checks use SQLite; no SQL Server CI service or concurrent transaction tests exist. |
+| Current behaviour | Fast DB checks use SQLite. The separate disposable SQL lane is configured, but migrations/constraints/concurrency must still be executed on SQL Server and failures investigated. |
 | Impact | Most consequential stock/coupon/idempotency/refund assumptions lack production-engine evidence despite 50 passing tests. |
 | Reproduction/proof | Suite inventory and settings; mssql-django emits lock hints whereas SQLite does not implement equivalent SELECT FOR UPDATE. |
 | Root cause | Hermetic tests are the only automated database lane; historical manual SQL smoke was sequential. |
@@ -195,10 +226,10 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | OPS-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed CI gap |
+| Status | Fixed - Batch 3 branch filters; hosted run unverified |
 | Evidence | Static workflow branch filter compared with required program branches. |
 | File/function references | .github/workflows/ci.yml:3; docs/CODEX_PROGRAM.md |
-| Current behaviour | Push workflow includes main/dev/feature/**, but neither codex/remediation-program nor batch branches; PR workflow still applies. |
+| Current behaviour | Push workflow includes main/dev/feature/**/codex/** and unrestricted pull requests. Local workflow parsing and commands pass; hosted runs and branch protection need verification after publication. |
 | Impact | Direct integration/batch pushes can bypass automated baseline checks; no actual failed/absent hosted run was queried. |
 | Reproduction/proof | Static workflow branch filter compared with required program branches. |
 | Root cause | CI predates remediation branch naming. |
