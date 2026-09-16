@@ -10,5 +10,5 @@ if not root.name.startswith('reza-e2e-') or not (root / '.disposable').is_file()
 DATABASES = {'default': {'ENGINE': 'django.db.backends.sqlite3', 'NAME': root / 'db.sqlite3'}}
 MEDIA_ROOT = root / 'media'
 ALLOWED_HOSTS = ['127.0.0.1', 'localhost', 'testserver']
-CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:3000', 'http://localhost:3000']
+CSRF_TRUSTED_ORIGINS = ['http://127.0.0.1:3100']
 SECURE_SSL_REDIRECT = False

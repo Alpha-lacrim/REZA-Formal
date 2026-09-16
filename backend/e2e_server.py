@@ -19,7 +19,7 @@ def main():
         product = Product.objects.create(id='e2e-suit', name='E2E Suit', price=100, stock=10, category='suit')
         ProductVariant.objects.create(product=product, sku='E2E-50', size='50', stock=10)
         ShippingMethod.objects.create(code='E2E', name='Test shipping', price=10)
-        call_command('runserver', '127.0.0.1:8000', use_reloader=False)
+        call_command('runserver', '127.0.0.1:18080', use_reloader=False)
 
 
 if __name__ == '__main__':
