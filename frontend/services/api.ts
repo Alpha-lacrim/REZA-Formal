@@ -447,11 +447,12 @@ function normalizeReview(raw: any): ProductReview {
 }
 
 function normalizeReturnRequest(raw: any): ReturnRequest {
+  const itemIds = raw?.itemIds ?? raw?.item_ids;
   return {
     id: String(raw?.id ?? ''),
     orderId: String(raw?.orderId ?? raw?.order_id ?? raw?.order ?? ''),
-    itemIds: Array.isArray(raw?.itemIds ?? raw?.item_ids)
-      ? (raw?.itemIds ?? raw?.item_ids).map((id: unknown) => String(id))
+    itemIds: Array.isArray(itemIds)
+      ? itemIds.map((id: unknown) => String(id))
       : undefined,
     reason: raw?.reason ?? '',
     details: raw?.details || undefined,
@@ -552,10 +553,11 @@ function normalizeCapabilities(raw: any): CommerceCapabilities {
 }
 
 function normalizeAdminCapabilities(raw: any): AdminCapabilities {
+  const paymentProviders = raw?.paymentProviders ?? raw?.payment_providers;
   return {
     ...normalizeCapabilities(raw),
-    paymentProviders: Array.isArray(raw?.paymentProviders ?? raw?.payment_providers)
-      ? (raw?.paymentProviders ?? raw?.payment_providers).map(String)
+    paymentProviders: Array.isArray(paymentProviders)
+      ? paymentProviders.map(String)
       : [],
     canManageUsers: toBoolean(raw?.canManageUsers ?? raw?.can_manage_users),
     canManageInventory: toBoolean(raw?.canManageInventory ?? raw?.can_manage_inventory),
@@ -758,7 +760,7 @@ async function request<T = unknown>(path: string, opts: RequestInit = {}): Promi
 
   const res = await fetchApi(path, { ...opts, headers });
   const text = await res.text();
-  let data: any = null;
+  let data: any;
   try { data = text ? JSON.parse(text) : null; } catch { data = text; }
 
   if (!res.ok) {

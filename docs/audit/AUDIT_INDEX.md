@@ -96,10 +96,10 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | PERF-001 | P2 | High | Open - confirmed query growth | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
 | PERF-002 | P2 | High | Open - confirmed scalability gap | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
 | PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
-| TEST-001 | P2 | High | Partial - targeted Batch 2 suite; broader coverage open | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
-| TEST-002 | P2 | High | Open - tooling gap | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3 (API typing work in 5) |
-| TEST-003 | P1 | High | Open - coverage gap | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
-| OPS-001 | P2 | High | Open - confirmed CI gap | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
+| TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
+| TEST-002 | P2 | High | Partial - lint gate added; strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3 (API typing work in 5) |
+| TEST-003 | P1 | High | Open - SQL lane configured; execution pending | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
+| OPS-001 | P2 | High | Fixed - Batch 3 branch filters; hosted run unverified | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
 | OPS-002 | P2 | High | Open - deployment hardening gap | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |
 | OPS-003 | P2 | High | Open - conditional deployment risk | [TLS forwarding and security header inheritance need an explicit ingress design](TESTING_CI_AUDIT.md#ops-003) | 10 |
 | OPS-004 | P2 | High | Open - operational evidence gap | [Recovery and provider-dependent workflows lack launch evidence](TESTING_CI_AUDIT.md#ops-004) | 10 (provider work requires explicit scoped batch) |
@@ -108,6 +108,8 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | UX-003 | P2 | High | Open - confirmed navigation/metadata gap | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
 
 ## Baseline summary and open evidence
+
+Batch 3 (2026-09-16): clean lockfile install, lint, typecheck, 18 frontend tests, build and three real-backend Chrome smoke tests pass. Backend has 93 passing cases and five explicit SQL-only skips. Both Compose topologies validate. TEST-001 and OPS-001 are addressed at foundation/configuration scope; TEST-002 remains partial. There are now 11 addressed findings and 32 open/partial records. See [dated verification](TESTING_CI_AUDIT.md#batch-3-verification---2026-09-16). SQL Server is unavailable locally, so DB-002/TEST-003 remain open. New tooling does not imply hosted CI success or close remaining TypeScript safety debt.
 
 Batch 2 final verification (2026-09-14): 81 backend tests, 10 mounted frontend/API tests, typecheck, production build, Django system/drift checks and Compose validation pass. Nine findings are addressed; 34 remain open or partially addressed. The remaining P1 records are DB-002 and TEST-003, both SQL concurrency/evidence gaps. No SQL Server or live Nginx check ran because the Docker daemon was unavailable. See the dated [testing results](TESTING_CI_AUDIT.md#batch-2-final-checks---2026-09-14); the following paragraph preserves Batch 1's baseline.
 

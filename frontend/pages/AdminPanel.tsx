@@ -446,7 +446,7 @@ const AdminPanel: React.FC = () => {
     };
 
     // Filter Logic
-    let filteredProducts = products.filter(p => 
+    const filteredProducts = products.filter(p =>
         p.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
         p.category.includes(searchTerm)
     );

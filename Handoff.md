@@ -1,8 +1,25 @@
 # Session Handoff
 
-Last updated: 2026-09-14
+Last updated: 2026-09-16
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-09-16 - Resume Batch 3
+
+- Resumed on `codex/batch-03-testing-ci`, preserving all uncommitted Batch 3 changes. Prior run: 93 backend tests passed, five SQL-only skips, ten retained frontend tests passed; disposable browser backend health/catalog/cookie login and isolation guards passed.
+- Prior blockers: npm registry resets/timeouts and missing cached packages prevented lockfile generation and frontend lint/Vitest/typecheck; Docker daemon absent; build sandbox failure followed by automatic approval usage-limit rejection. No merge or push occurred.
+- Completed dependency/lockfile installation, Vitest/RTL/user-event/MSW cart/wishlist/session tests, ESLint 10, Playwright fixtures, fast CI gates and separate browser/SQL jobs. Runtime dependency versions, Vite and TypeScript are unchanged. Only four lint-required declaration/array-guard cleanups touch application source; no formatting rewrite or schema/runtime backend change.
+- Verification: clean `npm ci` passed (367 packages, 18s), lint/typecheck passed, all 18 frontend tests passed (10 retained Node + 8 Vitest), production build passed (4.29s), all three browser smoke tests passed (19.7s) in installed Chrome 152.0.7977.84 using temporary profiles and a disposable SQLite database. Real COD checkout asserts unpaid state; no provider simulated. Prior 98-case backend run has 93 passes and five deliberate SQL-only skips; Django check/drift pass. Both Compose files validate; both workflow YAML files parse. Exact commands/results are in docs/audit/TESTING_CI_AUDIT.md.
+- Environment corrections: dependency download recovered using cached packages/retries/reduced connections. Chromium CDN returned 403 location restriction; documented `PLAYWRIGHT_CHANNEL=chrome` runs the same smoke suite. Windows rejected port 8000, so E2E uses dedicated loopback ports 3100/18080 with its own Vite config. Fixed Windows interpreter quoting and scoped desktop login locator to navigation. Normal development ports remain unchanged.
+- SQL Server remains unrun because the Docker daemon pipe is missing. Its independent connection/concurrency/migration lane is configured and documented, not claimed passing. DB-002/TEST-003 remain open. Hosted GitHub runs/branch protection, pinned Chromium on CI, further identity/pagination/DTO/accessibility tests and dependency advisories remain follow-up evidence/work.
+- Updated durable commands and all requested audit/roadmap/program/handoff files, plus docs/TESTING.md and AGENTS lint baseline. Backend commit `3a0966b`; frontend/CI/docs commits and local integration merge follow final diff review. No push, deployment, production data/credential/volume access or main/dev change is included.
+- Owner follow-up: run the manual SQL lane on a Docker-capable disposable host; review hosted fast and extended CI after separately authorized publication. Do not treat SQLite or configured workflows as SQL concurrency proof.
+
+## 2026-09-14 - Batch 3 testing and CI foundation
+
+- Objective: establish frontend, backend, browser and isolated SQL Server test lanes, lint and CI without unrelated refactoring.
+- Starting state: clean `codex/remediation-program`; repository root and mandatory guidance verified. Working branch: `codex/batch-03-testing-ci`.
+- Implementation and verification in progress; no production database access is authorized or needed.
 
 ## 2026-09-14 - Complete authorized Batch 2 publication
 
