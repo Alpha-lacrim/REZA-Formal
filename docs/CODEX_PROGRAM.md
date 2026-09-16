@@ -11,10 +11,10 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 3 - Testing and CI |
-| Batch status | Fast gates and Chrome smoke pass; local integration merge follows; SQL environment exception documented |
+| Batch status | Locally merged after passing fast gates and Chrome smoke; SQL environment exception documented |
 | Batch branch | `codex/batch-03-testing-ci` |
 | Batch start commit | `7bec4bcf9450c8c252935ae79435bed00af1a881` |
-| Final batch / integration merge | Resolve exactly with the fixed-start commands below; no remote push in this batch |
+| Final batch / integration merge | `8c6735fb6acde3c79f0a160948d126c8942e5e6e` / `1618a130b5b28ea56d2502e1926b5eb7d2c9f024`; no remote push |
 | Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 lane configured but evidence open |
 | Verification performed | Clean npm ci, lint, typecheck, 18 frontend tests, build, three Chrome E2E tests; 93 backend tests with five SQL skips; Django check/drift, both Compose files and workflow YAML validation |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
@@ -26,7 +26,7 @@ pre-codex-remediation-2026-09-10
 - Add checkout/permission/malformed-input and isolation regressions, a disposable real-backend Playwright runner, and a separate SQL Server Compose lane with independent-connection transaction tests.
 - Fast workflow covers `codex/**` and PRs; browser/SQL jobs are separately dispatched. No provider is simulated: browser checkout uses COD and asserts unpaid state.
 - Local verification passed on September 16. Browser used installed Chrome 152.0.7977.84 because pinned Chromium's CDN rejected this location. SQL Server was not run because Docker's daemon pipe is missing; this explicitly documented environment lane is excluded from local merge acceptance, not claimed passing. Hosted GitHub runs remain unobserved.
-- Only four small lint-required source cleanups were needed; no runtime dependency upgrades or formatting rewrite. Backend commit: `3a0966b`; final frontend/CI/documentation commits follow and are discoverable from the fixed start commit above.
+- Only four small lint-required source cleanups were needed; no runtime dependency upgrades or formatting rewrite. Commits: backend `3a0966b`, frontend `d3d65a4`, CI/docs `8c6735f`. Local merge `1618a13` has parents `7bec4bc` and `8c6735f`; the subsequent integration closeout changes documentation only.
 - Commands/isolation constraints: [TESTING.md](TESTING.md). Actual results: [testing audit](audit/TESTING_CI_AUDIT.md). No SQL execution or hosted CI success is implied by configured workflows.
 - Resolve final batch and merge provenance with `git rev-parse codex/batch-03-testing-ci` and `git log --merges --oneline codex/remediation-program --grep="batch-03-testing-ci"`. No push or production deployment is part of this batch.
 
