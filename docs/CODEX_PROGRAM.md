@@ -11,16 +11,18 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 3 - Testing and CI |
-| Batch status | Initial foundation merged; September 28 SQL follow-up passes and awaits local follow-up merge |
+| Batch status | Initial foundation and passing September 28 SQL follow-up merged locally |
 | Batch branch | `codex/batch-03-testing-ci` |
 | Batch start commit | `7bec4bcf9450c8c252935ae79435bed00af1a881` |
-| Final batch / integration merge | `8c6735fb6acde3c79f0a160948d126c8942e5e6e` / `1618a130b5b28ea56d2502e1926b5eb7d2c9f024`; no remote push |
+| Final batch / integration merge | Initial `8c6735f` / `1618a13`; SQL follow-up `7317cb3` / `dff0d9105db3ead321a619b1286ac0d05f09174e`; no remote push |
 | Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 partial with executed SQL baseline |
 | Verification performed | September 16 frontend/Chrome/CI gates; September 28 SQL 99/99, SQLite 93 passes/six SQL skips, Django check/drift; test DB/container cleanup verified |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
 | Next batch | Batch 4 after Batch 3 acceptance |
 
 ## Batch 3 - Testing and CI
+
+- SQL follow-up commits `7193ead` (checkout replay and regressions) and `7317cb3` (evidence) merged at `dff0d91`, parents `517996d` and `7317cb3`. The following closeout is documentation-only. Batch branch remains `codex/batch-03-testing-ci`.
 
 - September 28 supersedes the initial SQL exception below: native Python/ODBC execution against disposable SQL Server 2022 Developer 16.0.4255.1 passed 99/99 cases. The run reproduced/fixed concurrent same-key replay and corrected an invalid JSON fixture. Six SQL-only cases pass; broader mixed mutation schedules and hosted/full-image CI remain unverified. Temporary database and test container/network were removed. See [SQL results](audit/TESTING_CI_AUDIT.md#sql-server-follow-up---2026-09-28).
 
