@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-09-16 (Batch 3; local fast gates and Chrome smoke pass; SQL lane unrun)
+Last verified: 2026-09-28 (Batch 3; SQL Server baseline 99/99 passes; prior frontend/Chrome gates preserved)
 
 ## Purpose and product
 
@@ -154,6 +154,7 @@ Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm
 - The backend is authoritative for price, total, stock, roles, and order status. Never trust client-submitted totals or privileges.
 - Variant stock is used by checkout; `Product.stock` is its active-variant projection. Default-variant stock can be adjusted explicitly through the product API. Existing stock/variant writes require the latest `inventory_version` (frontend `inventoryVersion`); stale or absent versions return 409. Missing-product updates return 404, and product IDs cannot change. SQL Server concurrency/lock-order evidence remains DB-002/TEST-003.
 - Order creation, cancellation, and admin cancellation must keep stock changes atomic and idempotent.
+- Checkout rechecks the idempotency key after a rolled-back validation or integrity failure: a concurrent winning checkout may have consumed the last stock/coupon before the duplicate request validates. Replay only the same customer's order; cross-customer key reuse returns conflict.
 - User emails are normalized and database-unique. Migration `0005` deliberately stops on blank/duplicate legacy emails and clears unusable secrets created by the retired 2FA delivery flow.
 - Keep cookie flags and allowed origins environment-aware; production cookies must be secure.
 - Cookie auth permits only `SameSite=Lax` or `Strict` and has an explicit CSRF token/header flow. Keep frontend/API same-site; third-party-cookie deployment remains intentionally unsupported.
