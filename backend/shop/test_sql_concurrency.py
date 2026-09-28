@@ -24,12 +24,13 @@ class SqlConcurrencyTests(TransactionTestCase):
                 'shipping_address': 'Synthetic SQL test address', 'payment_method': 'cod',
                 'idempotency_key': key or uuid.uuid4()}
 
-    def race(self, keys):
+    def race(self, keys, buyer_ids=None):
         barrier = threading.Barrier(2)
-        def checkout(key):
+        def checkout(request):
+            key, buyer_id = request
             close_old_connections()
             try:
-                buyer = User.objects.get(pk=self.user.pk)
+                buyer = User.objects.get(pk=buyer_id)
                 barrier.wait(timeout=10)
                 try:
                     order, created = create_checkout_order(buyer, self.payload(key))
@@ -39,7 +40,7 @@ class SqlConcurrencyTests(TransactionTestCase):
             finally:
                 connections.close_all()
         with ThreadPoolExecutor(max_workers=2) as pool:
-            results = list(pool.map(checkout, keys))
+            results = list(pool.map(checkout, zip(keys, buyer_ids or [self.user.pk] * 2)))
         self.variant.refresh_from_db(); self.product.refresh_from_db()
         self.assertEqual((self.variant.stock, self.product.stock), (0, 0))
         self.assertEqual(Order.objects.count(), 1)
@@ -57,6 +58,14 @@ class SqlConcurrencyTests(TransactionTestCase):
         self.assertTrue(all(row[0] == 'ok' for row in results), results)
         self.assertEqual(results[0][1], results[1][1])
         self.assertEqual(sum(row[2] for row in results), 1)
+
+    def test_concurrent_key_reuse_by_another_customer_never_discloses_order(self):
+        other = User.objects.create_user('sql-other', 'sql-other@example.invalid', 'Test-only-493!')
+        key = uuid.uuid4()
+        results = self.race([key, key], [self.user.pk, other.pk])
+        self.assertEqual(sum(row[0] == 'ok' for row in results), 1, results)
+        self.assertEqual([row for row in results if row[0] == 'rejected'],
+                         [('rejected', 'idempotency_key_conflict')])
 
     def test_rollback_and_cancellation_restock(self):
         with patch('shop.commerce_services.Payment.objects.create', side_effect=RuntimeError('rollback probe')):

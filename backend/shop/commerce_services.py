@@ -530,9 +530,14 @@ def create_checkout_order(user, validated_data):
                 user=user,
                 variant_id__in=[line.variant.pk for line in quote['lines']],
             ).delete()
-    except IntegrityError:
+    except (IntegrityError, CommerceError):
+        # A same-key request can wait on inventory while the winning checkout
+        # commits. Recheck after rollback: its stock/coupon validation failure
+        # must replay that order, just like a duplicate-key insert would.
         existing = _order_queryset().filter(idempotency_key=requested_key).first()
-        if existing and existing.user_id == user.id:
+        if existing:
+            if existing.user_id != user.id:
+                raise CommerceError('idempotency_key_conflict', 'This idempotency key is already in use.', 409)
             return existing, False
         raise
 

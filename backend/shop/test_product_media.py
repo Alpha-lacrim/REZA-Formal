@@ -12,6 +12,7 @@ from PIL import Image
 from rest_framework.test import APIClient
 
 from .models import Product, User
+from .product_media import ProductGalleryField
 
 
 def png_bytes(size=(2, 2)):
@@ -88,7 +89,10 @@ class ProductMediaTests(TestCase):
 
     def test_legacy_inline_gallery_is_converted_on_edit_without_losing_image(self):
         inline = 'data:image/png;base64,' + base64.b64encode(png_bytes()).decode()
-        product = Product.objects.create(id='legacy-image', name='Legacy', price='10', images=json.dumps([inline]))
+        # Retain legacy JSON-string representation coverage without inserting a
+        # scalar JSON value rejected by SQL Server's JSONField CHECK constraint.
+        self.assertEqual(ProductGalleryField().to_representation(json.dumps([inline])), [inline])
+        product = Product.objects.create(id='legacy-image', name='Legacy', price='10', images=[inline])
         response = self.client.put(f'/api/admin/products/{product.pk}/', {'images': json.dumps([inline])}, format='multipart')
         self.assertEqual(response.status_code, 200, response.data)
         product.refresh_from_db()
