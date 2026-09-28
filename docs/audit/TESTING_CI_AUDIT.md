@@ -4,6 +4,29 @@ The original baseline commands and probes below ran on September 10, 2026 on Win
 
 ## Exact baseline commands and results
 
+### SQL Server follow-up - 2026-09-28
+
+Docker Desktop was started after the resumed session found its Linux-engine pipe missing. Used only `docker-compose.sql-test.yml`, project `reza-sql-tests`: inspected mounts `[]` and binding `127.0.0.1:11434`. The prior full-image build had been stopped during slow base-image downloads, then an automatic approval usage limit blocked the container start. This run used the documented native Python/ODBC runner against the cached disposable SQL image; no production database, application volume or application container was used for testing.
+
+Environment: SQL Server 2022 Developer Edition 16.0.4255.1; ODBC Driver 18; existing backend virtual environment. Set only test-lane variables `REZA_SQL_TEST=disposable`, `REZA_SQL_TEST_HOST=127.0.0.1`, and a disposable `REZA_SQL_TEST_PASSWORD`.
+
+| Directory | Command / check | Observed result |
+| --- | --- | --- |
+| root | `docker compose -f docker-compose.sql-test.yml up -d --wait sql-test` | PASS; disposable service healthy |
+| backend | `.\.venv\Scripts\python.exe -u manage.py test --noinput --settings=reza_backend.sql_test_settings --verbosity=2` (initial) | FAIL; 98 cases, one invalid media fixture and one same-key concurrency failure; 29.183s |
+| backend | Same command with labels `shop.test_sql_concurrency shop.test_product_media` after fixes | PASS; 14 cases, 5.328s |
+| backend | Full SQL command after fixes | PASS; 99 cases, zero skips, 27.621s; fresh migrations and legacy migration-backfill test passed; database destroyed |
+| backend | `manage.py check --settings=reza_backend.test_settings`; `manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings` using the same Python | PASS; no issues or migration drift |
+| backend | `.\.venv\Scripts\python.exe manage.py test --settings=reza_backend.test_settings` | PASS; 99 discovered, 93 passed, six SQL-only skips; 7.573s |
+| isolated SQL server | Query for `test_reza_ci_disposable` after the run | Zero databases with that name remained |
+| root | `docker compose -f docker-compose.sql-test.yml down`; project-filtered `docker ps -a` | PASS; only test container/network removed; no test containers remained |
+
+The initial root-directory discovery found zero tests and is not counted as verification. Correct discovery and all reported suite results above ran from `backend`.
+
+The concurrency failure reproduced a committed order plus an `insufficient_stock` response from its simultaneous same-key duplicate. After a validation/integrity rollback, checkout now rechecks the key and returns the same customer's committed order; a different customer receives `idempotency_key_conflict`. No stock guard, transaction or assertion was weakened. Added a cross-customer concurrent-key regression. The media fixture now stores a JSON array accepted by SQL Server's JSONField CHECK while retaining direct legacy JSON-string representation coverage and the multipart conversion path.
+
+All six SQL-only tests pass: last-unit contention, same-key replay, cross-customer key conflict, rollback/restock, blocking row lock and database stock constraint. TEST-003 is partially addressed with executed production-engine baseline evidence. DB-002 remains open for mixed mutation lock order and broader coupon/edit/cancel/refund race schedules. No hosted CI or full Linux test-runner image execution is claimed. Frontend files were unchanged; the September 16 frontend/Chrome results remain applicable.
+
 ### Batch 3 verification - 2026-09-16
 
 Working branch: `codex/batch-03-testing-ci`. Commands and isolation design: [TESTING.md](../TESTING.md). All new fast gates and local browser smoke pass. The SQL lane is the documented environment-specific exception; no SQL transactional-safety claim is made.
@@ -202,12 +225,12 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | TEST-003 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Open - SQL lane configured; execution pending |
-| Batch 3 evidence | Dedicated SQL settings/Compose/manual CI and five connection/transaction tests exist. Local Docker daemon is unavailable; all five are skipped under SQLite. No SQL pass claimed. |
+| Status | Partial - SQL baseline passes; broader races remain |
+| Batch 3 evidence | September 28 native runner against disposable SQL Server passed all 99 cases, including six SQL-only tests, after reproducing/fixing duplicate-key replay and correcting an invalid JSON fixture. See dated evidence above; hosted execution and broader schedules remain unverified. |
 | Batch 2 evidence | 81 isolated SQLite tests pass, including deterministic stale-write schedules, rollback and idempotent/refund invariants. Docker daemon was unavailable; no SQL Server transactions or separate-connection concurrency tests ran. This finding and DB-002 remain open. |
 | Evidence | Suite inventory and settings; mssql-django emits lock hints whereas SQLite does not implement equivalent SELECT FOR UPDATE. |
 | File/function references | backend/reza_backend/test_settings.py; backend/shop/test_commerce_models.py:261; .github/workflows/ci.yml |
-| Current behaviour | Fast DB checks use SQLite. The separate disposable SQL lane is configured, but migrations/constraints/concurrency must still be executed on SQL Server and failures investigated. |
+| Current behaviour | Fast DB checks use SQLite. The separate disposable SQL baseline has executed successfully for migrations, constraints, locking, checkout, duplicate idempotency/ownership, rollback, decrement and restock. Broader mutation races remain follow-up. |
 | Impact | Most consequential stock/coupon/idempotency/refund assumptions lack production-engine evidence despite 50 passing tests. |
 | Reproduction/proof | Suite inventory and settings; mssql-django emits lock hints whereas SQLite does not implement equivalent SELECT FOR UPDATE. |
 | Root cause | Hermetic tests are the only automated database lane; historical manual SQL smoke was sequential. |

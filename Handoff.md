@@ -1,8 +1,24 @@
 # Session Handoff
 
-Last updated: 2026-09-16
+Last updated: 2026-09-28
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-09-28 - Resume SQL Server verification
+
+- Resumed on `codex/batch-03-testing-ci` at `517996d`, preserving the prior uncommitted SQL follow-up entry. Previous build was stopped during base-image download; the subsequent isolated-container start was rejected by automatic approval review due to a usage limit. No SQL result was obtained.
+- Initial Docker probe now reports the Docker Desktop Linux engine pipe missing. Checking startup before continuing the same disposable lane; production services/data remain outside scope.
+- Started Docker Desktop and only the `reza-sql-tests` SQL service; verified no mounts and loopback port 11434. Used the native Python/ODBC runner. Initial root-directory discovery found zero tests and was not counted; all real runs used `backend`.
+- Initial SQL run reproduced an invalid JSON-string media fixture and a same-key concurrent checkout returning insufficient_stock. Corrected the fixture while retaining legacy-string representation coverage. Checkout now rechecks the key after validation/integrity rollback, replays the same customer's committed order and rejects foreign key reuse. Added a cross-customer race regression; no transaction/stock guard was relaxed.
+- Verification: targeted SQL 14/14 pass (5.328s); full SQL 99/99 pass with no skips (27.621s), including fresh migrations and legacy backfill. SQL Server 2022 Developer 16.0.4255.1, ODBC Driver 18. SQLite: 93 passes/six SQL skips out of 99 (7.573s); Django check/drift pass. Frontend unchanged; September 16 results remain applicable.
+- Confirmed zero remaining test databases, then removed only the disposable container/network; project-filtered inventory is empty. No production database, application volume, main/dev, remote or deployment was modified.
+- Updated all continuity/audit documents and native SQL commands. TEST-003 is partial with executed baseline evidence; DB-002 mixed mutation locking and wider coupon/edit/cancel/refund schedules remain open. Hosted/full Linux test-image execution is not claimed. Local commit/merge follows final review.
+
+## 2026-09-16 - Execute disposable SQL Server lane
+
+- Owner reported Docker is available. Confirmed Docker 29.1.3 outside the sandbox; the initial sandbox probe was denied access to the daemon.
+- Starting state: clean integration at `517996d`. Fast-forwarded the preserved Batch 3 branch to integration before this follow-up. Only the standalone `reza-sql-tests` project is in scope; no existing test-project containers were found.
+- Attempt stopped during slow image download; native-runner startup then hit an automatic approval usage-limit rejection. No SQL tests ran then. The September 28 entry records successful continuation.
 
 ## 2026-09-16 - Resume Batch 3
 

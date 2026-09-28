@@ -98,7 +98,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
 | TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
 | TEST-002 | P2 | High | Partial - lint gate added; strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3 (API typing work in 5) |
-| TEST-003 | P1 | High | Open - SQL lane configured; execution pending | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
+| TEST-003 | P1 | High | Partial - SQL baseline passes; broader races remain | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
 | OPS-001 | P2 | High | Fixed - Batch 3 branch filters; hosted run unverified | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
 | OPS-002 | P2 | High | Open - deployment hardening gap | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |
 | OPS-003 | P2 | High | Open - conditional deployment risk | [TLS forwarding and security header inheritance need an explicit ingress design](TESTING_CI_AUDIT.md#ops-003) | 10 |
@@ -108,6 +108,8 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | UX-003 | P2 | High | Open - confirmed navigation/metadata gap | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
 
 ## Baseline summary and open evidence
+
+September 28 SQL follow-up: all 99 tests pass on disposable SQL Server 2022 Developer with zero skips. The run exposed and fixed a same-key replay race and corrected a JSON fixture; six SQL-only cases now pass. TEST-003 moves to partial; DB-002 mixed lock-order coverage remains open. The initial Batch 3 environment exception below is superseded by this [executed SQL evidence](TESTING_CI_AUDIT.md#sql-server-follow-up---2026-09-28), not by a hosted CI claim.
 
 Batch 3 (2026-09-16): clean lockfile install, lint, typecheck, 18 frontend tests, build and three real-backend Chrome smoke tests pass. Backend has 93 passing cases and five explicit SQL-only skips. Both Compose topologies validate. TEST-001 and OPS-001 are addressed at foundation/configuration scope; TEST-002 remains partial. There are now 11 addressed findings and 32 open/partial records. See [dated verification](TESTING_CI_AUDIT.md#batch-3-verification---2026-09-16). SQL Server is unavailable locally, so DB-002/TEST-003 remain open. New tooling does not imply hosted CI success or close remaining TypeScript safety debt.
 

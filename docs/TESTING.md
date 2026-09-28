@@ -55,9 +55,24 @@ docker compose -f docker-compose.sql-test.yml down
 
 The test image includes ODBC Driver 18. `sql_test_settings.py` requires `REZA_SQL_TEST=disposable`, allows only `sql-test` or loopback port 11434, and fixes the test database name to `test_reza_ci_disposable`. The normal DB environment variables are not used for its connection. Django creates the test database from migrations and runs the full regression suite, including legacy migration backfill and database constraints.
 
-`test_sql_concurrency.py` adds separate-connection tests for final-unit concurrent checkout, duplicate idempotency, a held row lock blocking another writer, database stock constraints, mid-checkout rollback, decrement and one-time cancellation restock. Thread/barrier/future waits are bounded; SQL deadlocks/errors fail the lane, not silently retried into a pass. A database-level failure requires investigation before claiming DB-002 resolved. Further coupon/edit/refund race matrices remain follow-up coverage.
+`test_sql_concurrency.py` adds six separate-connection tests for final-unit concurrent checkout, duplicate idempotency, cross-customer key reuse, a held row lock blocking another writer, database stock constraints, mid-checkout rollback, decrement and one-time cancellation restock. Thread/barrier/future waits are bounded; SQL deadlocks/errors fail the lane, not silently retried into a pass. A database-level failure requires investigation before claiming DB-002 resolved. Further coupon/edit/refund race matrices remain follow-up coverage.
 
 To run directly against this same disposable container with ODBC installed, set `REZA_SQL_TEST=disposable`, `REZA_SQL_TEST_HOST=127.0.0.1`, and the same test password, then run `python manage.py test --noinput --settings=reza_backend.sql_test_settings` from backend. The lane never uses `--keepdb`.
+
+The native path avoids rebuilding the Python image when Python requirements and ODBC Driver 18 are already installed:
+
+```powershell
+# From the repository root, with REZA_SQL_TEST_PASSWORD set as above:
+docker compose -f docker-compose.sql-test.yml up -d --wait sql-test
+$env:REZA_SQL_TEST = 'disposable'
+$env:REZA_SQL_TEST_HOST = '127.0.0.1'
+cd backend
+.\.venv\Scripts\python.exe manage.py test --noinput --settings=reza_backend.sql_test_settings --verbosity=2
+cd ..
+docker compose -f docker-compose.sql-test.yml down
+```
+
+Run discovery from `backend`, not the repository root. On September 28 this native runner passed all 99 tests on SQL Server 2022 Developer 16.0.4255.1; the test database was destroyed and the disposable container/network removed. This establishes the covered scenarios, not every lock-order/coupon/refund race or hosted container-job execution.
 
 ## CI behavior
 

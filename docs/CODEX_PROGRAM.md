@@ -6,21 +6,23 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 3 foundation verified locally; SQL concurrency/deployment gates remain open |
+| Program status | Batch 3 foundation and SQL baseline verified locally; broader concurrency/deployment gates remain open |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 3 - Testing and CI |
-| Batch status | Locally merged after passing fast gates and Chrome smoke; SQL environment exception documented |
+| Batch status | Initial foundation merged; September 28 SQL follow-up passes and awaits local follow-up merge |
 | Batch branch | `codex/batch-03-testing-ci` |
 | Batch start commit | `7bec4bcf9450c8c252935ae79435bed00af1a881` |
 | Final batch / integration merge | `8c6735fb6acde3c79f0a160948d126c8942e5e6e` / `1618a130b5b28ea56d2502e1926b5eb7d2c9f024`; no remote push |
-| Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 lane configured but evidence open |
-| Verification performed | Clean npm ci, lint, typecheck, 18 frontend tests, build, three Chrome E2E tests; 93 backend tests with five SQL skips; Django check/drift, both Compose files and workflow YAML validation |
+| Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 partial with executed SQL baseline |
+| Verification performed | September 16 frontend/Chrome/CI gates; September 28 SQL 99/99, SQLite 93 passes/six SQL skips, Django check/drift; test DB/container cleanup verified |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
 | Next batch | Batch 4 after Batch 3 acceptance |
 
 ## Batch 3 - Testing and CI
+
+- September 28 supersedes the initial SQL exception below: native Python/ODBC execution against disposable SQL Server 2022 Developer 16.0.4255.1 passed 99/99 cases. The run reproduced/fixed concurrent same-key replay and corrected an invalid JSON fixture. Six SQL-only cases pass; broader mixed mutation schedules and hosted/full-image CI remain unverified. Temporary database and test container/network were removed. See [SQL results](audit/TESTING_CI_AUDIT.md#sql-server-follow-up---2026-09-28).
 
 - Preserve the Node/RTL auth/admin-media regressions and add Vitest, user-event and MSW for commerce state and HTTP sessions. Add frontend lint without a repository formatting rewrite.
 - Add checkout/permission/malformed-input and isolation regressions, a disposable real-backend Playwright runner, and a separate SQL Server Compose lane with independent-connection transaction tests.
