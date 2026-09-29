@@ -2,6 +2,8 @@ from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes, parser_classes, throttle_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
+from collections.abc import Mapping
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from .models import (
@@ -156,6 +158,8 @@ def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentF
 
 def prepare_product_data(request):
     """Normalize multipart values without writing any file before validation."""
+    if not isinstance(request.data, Mapping):
+        raise ValidationError({'non_field_errors': ['Expected an object.']})
     data = request.data.dict() if hasattr(request.data, 'dict') else request.data.copy()
     for client_name, model_name in (('active', 'is_active'), ('compareAtPrice', 'compare_at_price')):
         if client_name in data and model_name not in data:

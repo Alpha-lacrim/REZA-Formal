@@ -1,4 +1,5 @@
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
@@ -499,8 +500,8 @@ def admin_shipping_methods(request):
         return denied
     if request.method == 'GET':
         return page_response(request, ShippingMethod.objects.order_by('sort_order', 'name'), ShippingMethodSerializer)
-    payload = request.data.copy()
-    if not payload.get('code'):
+    payload = request.data.copy() if isinstance(request.data, Mapping) else request.data
+    if isinstance(payload, Mapping) and not payload.get('code'):
         generated = slugify(str(payload.get('name') or ''), allow_unicode=True).upper()
         payload['code'] = (generated or f'SHIP-{uuid.uuid4().hex[:12]}')[:64]
     serializer = ShippingMethodSerializer(data=payload)

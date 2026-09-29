@@ -134,4 +134,3 @@ def _sync_product_variants(product, variants, actor, *, update_stock=False):
     if product.stock != active_stock:
         product.stock = active_stock
         product.save(update_fields=['stock', 'updated_at'])
-

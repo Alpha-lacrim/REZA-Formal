@@ -22,6 +22,13 @@ class WriteContractTests(TestCase):
         self.staff.refresh_from_db()
         self.assertEqual((self.staff.first_name, self.staff.role), ('Updated', 'user'))
 
+    def test_non_object_product_and_promotion_payloads_are_validation_errors(self):
+        for path in ('/api/admin/products/', '/api/products/new/', '/api/admin/coupons/',
+                     '/api/admin/shipping-methods/'):
+            for payload in ([], 12, 'invalid'):
+                with self.subTest(path=path, payload=payload):
+                    self.assertEqual(self.client.post(path, payload, format='json').status_code, 400)
+
     def test_coupon_range_dates_and_merged_update(self):
         url = '/api/admin/coupons/'
         for data in [
