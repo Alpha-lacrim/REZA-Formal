@@ -6,7 +6,6 @@ from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from .models import (
     ContactMessage,
-    InventoryMovement,
     Order,
     Product,
     ProductVariant,
@@ -14,7 +13,9 @@ from .models import (
 )
 from .serializers import (
     ContactMessageSerializer,
-    ProductSerializer,
+    PublicProductReadSerializer,
+    AdminProductReadSerializer,
+    AdminProductWriteSerializer,
     ProductVariantInputSerializer,
     RegisterSerializer,
     SiteSettingsSerializer,
@@ -32,7 +33,9 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
-from rest_framework.exceptions import APIException
+from .commerce_services import CommerceError
+from .product_services import save_product
+from .selectors import product_reads, order_reads
 import json
 import logging
 from decimal import Decimal
@@ -203,122 +206,6 @@ def _extract_variants(data):
         return None, None
     return serializer.validated_data, None
 
-
-class InventoryConflict(APIException):
-    status_code = 409
-    default_detail = {'code': 'inventory_conflict', 'detail': 'Inventory changed. Reload the product before saving.'}
-
-
-def _save_product(serializer, variants, actor):
-    from .product_media import store_product_media
-    saved_names = []
-    try:
-        with transaction.atomic():
-            if serializer.instance is not None:
-                serializer.instance = get_object_or_404(Product.objects.select_for_update(), pk=serializer.instance.pk)
-                if 'stock' in serializer.validated_data or variants is not None:
-                    expected = serializer.initial_data.get('inventory_version')
-                    current = serializer.get_inventory_version(serializer.instance)
-                    if not expected or expected != current:
-                        raise InventoryConflict()
-            store_product_media(serializer.validated_data, saved_names)
-            serializer.save()
-            _sync_product_variants(
-                serializer.instance, variants, actor, update_stock='stock' in serializer.validated_data,
-            )
-    except Exception:
-        for name in saved_names:
-            default_storage.delete(name)
-        raise
-
-
-def _sync_product_variants(product, variants, actor, *, update_stock=False):
-    """Keep SKU inventory auditable and maintain legacy Product.stock as a projection."""
-    if variants is None:
-        current = list(product.variants.select_for_update())
-        if len(current) > 1 or (current and (current[0].size or current[0].color)):
-            projected_stock = sum(item.stock for item in current if item.is_active)
-            if product.stock != projected_stock:
-                product.stock = projected_stock
-                product.save(update_fields=['stock', 'updated_at'])
-            return
-        if current:
-            variant = current[0]
-            created = False
-        else:
-            variant = ProductVariant.objects.create(
-                product=product,
-                size='',
-                color='',
-                sku=f'DEFAULT-{product.pk}'.upper(),
-                stock=product.stock,
-                is_active=product.is_active,
-            )
-            created = True
-        old_stock = variant.stock
-        if not created and ((update_stock and variant.stock != product.stock) or variant.is_active != product.is_active):
-            if update_stock:
-                variant.stock = product.stock
-            variant.is_active = product.is_active
-            variant.save(update_fields=['stock', 'is_active', 'updated_at'])
-        delta = variant.stock if created else variant.stock - old_stock
-        if delta:
-            InventoryMovement.objects.create(
-                variant=variant,
-                actor=actor,
-                sku=variant.sku,
-                delta=delta,
-                resulting_stock=variant.stock,
-                reason='initial' if created else 'adjustment',
-                reference=f'PRODUCT-{product.pk}',
-            )
-        projected_stock = variant.stock if variant.is_active else 0
-        if product.stock != projected_stock:
-            product.stock = projected_stock
-            product.save(update_fields=['stock', 'updated_at'])
-        return
-
-    existing = {str(item.id): item for item in product.variants.select_for_update()}
-    retained = set()
-    active_stock = 0
-    for values in variants:
-        values = dict(values)
-        variant_id = str(values.pop('id', ''))
-        variant = existing.get(variant_id) if variant_id else None
-        if variant_id and (variant is None or variant_id in retained):
-            raise DjangoValidationError('Variant IDs must be distinct and belong to this product.')
-        if variant is None:
-            variant = ProductVariant(product=product)
-            old_stock = 0
-            reason = 'initial'
-        else:
-            old_stock = variant.stock
-            retained.add(str(variant.id))
-            reason = 'adjustment'
-        for field in ('sku', 'size', 'color', 'price', 'stock', 'is_active'):
-            if field in values:
-                setattr(variant, field, values[field])
-        variant.full_clean()
-        variant.save()
-        retained.add(str(variant.id))
-        if variant.is_active:
-            active_stock += variant.stock
-        delta = variant.stock - old_stock
-        if delta:
-            InventoryMovement.objects.create(
-                variant=variant,
-                actor=actor,
-                sku=variant.sku,
-                delta=delta,
-                resulting_stock=variant.stock,
-                reason=reason,
-                reference=f'PRODUCT-{product.pk}',
-            )
-
-    product.variants.exclude(id__in=retained).update(is_active=False)
-    if product.stock != active_stock:
-        product.stock = active_stock
-        product.save(update_fields=['stock', 'updated_at'])
 
 # ==============================================================================
 # VIEWS
@@ -509,8 +396,8 @@ def send_otp(request):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def products_list(request):
-    qs = Product.objects.filter(is_active=True).prefetch_related('variants', 'reviews')
-    serializer = ProductSerializer(qs, many=True, context={'request': request})
+    qs = product_reads().filter(is_active=True)
+    serializer = PublicProductReadSerializer(qs, many=True, context={'request': request})
     return Response(serializer.data)
 
 @api_view(['GET','POST','PUT','DELETE'])
@@ -519,11 +406,11 @@ def products_list(request):
 def product_detail(request, pk=None):
     if request.method == 'GET':
         prod = get_object_or_404(
-            Product.objects.prefetch_related('variants', 'reviews'),
+            product_reads(),
             pk=pk,
             is_active=True,
         )
-        return Response(ProductSerializer(prod, context={'request': request}).data)
+        return Response(PublicProductReadSerializer(prod, context={'request': request}).data)
     
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
@@ -536,19 +423,26 @@ def product_detail(request, pk=None):
 
         if request.method == 'POST':
              data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
-             serializer = ProductSerializer(data=data)
+             serializer = AdminProductWriteSerializer(data=data)
         else: # PUT
              prod = get_object_or_404(Product, pk=pk)
-             serializer = ProductSerializer(prod, data=data, partial=True)
+             serializer = AdminProductWriteSerializer(prod, data=data, partial=True)
 
         if serializer.is_valid():
             try:
-                _save_product(serializer, variants, request.user)
-            except (DjangoValidationError, IntegrityError) as exc:
-                return Response({'variants': [str(exc)]}, status=400)
+                serializer.instance = save_product(
+                    serializer.instance, serializer.validated_data, variants, request.user,
+                    expected_version=serializer.initial_data.get('inventory_version'),
+                )
+            except CommerceError as exc:
+                return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+            except DjangoValidationError as exc:
+                return Response({'variants': exc.messages}, status=400)
+            except IntegrityError:
+                return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
             response_status = status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK
             return Response(
-                ProductSerializer(serializer.instance, context={'request': request}).data,
+                AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data,
                 status=response_status,
             )
         
@@ -664,9 +558,7 @@ def admin_orders(request):
         return Response({'detail':'admin required'}, status=403)
     from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
 
-    qs = Order.objects.select_related(
-        'user', 'address', 'shipping_method', 'coupon', 'payment',
-    ).prefetch_related('items__variant', 'events__actor').order_by('-created_at')
+    qs = order_reads().order_by('-created_at')
     return Response(CommerceOrderSerializer(qs, many=True, context={'request': request}).data)
 
 @api_view(['PUT'])
@@ -743,8 +635,8 @@ def admin_products(request):
         return Response({'detail':'admin required'}, status=403)
     
     if request.method == 'GET':
-        qs = Product.objects.all().prefetch_related('variants', 'reviews')
-        return Response(ProductSerializer(qs, many=True, context={'request': request}).data)
+        qs = product_reads()
+        return Response(AdminProductReadSerializer(qs, many=True, context={'request': request}).data)
 
     # POST (Create)
     # Normalize the request; validation and the transaction own all storage writes.
@@ -755,14 +647,21 @@ def admin_products(request):
 
     data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
     
-    serializer = ProductSerializer(data=data, context={'request': request})
+    serializer = AdminProductWriteSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         try:
-            _save_product(serializer, variants, request.user)
-        except (DjangoValidationError, IntegrityError) as exc:
-            return Response({'variants': [str(exc)]}, status=400)
+            serializer.instance = save_product(
+                serializer.instance, serializer.validated_data, variants, request.user,
+                expected_version=serializer.initial_data.get('inventory_version'),
+            )
+        except CommerceError as exc:
+            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+        except DjangoValidationError as exc:
+            return Response({'variants': exc.messages}, status=400)
+        except IntegrityError:
+            return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
         return Response(
-            ProductSerializer(serializer.instance, context={'request': request}).data,
+            AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
     
@@ -777,8 +676,8 @@ def admin_product_detail(request, pk=None):
         return Response({'detail':'admin required'}, status=403)
 
     if request.method == 'GET':
-        prod = get_object_or_404(Product.objects.prefetch_related('variants', 'reviews'), pk=pk)
-        return Response(ProductSerializer(prod, context={'request': request}).data)
+        prod = get_object_or_404(product_reads(), pk=pk)
+        return Response(AdminProductReadSerializer(prod, context={'request': request}).data)
 
     if request.method == 'PUT':
         try:
@@ -789,13 +688,20 @@ def admin_product_detail(request, pk=None):
             if variant_errors:
                 return Response(variant_errors, status=400)
             
-            serializer = ProductSerializer(prod, data=data, partial=True, context={'request': request})
+            serializer = AdminProductWriteSerializer(prod, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
                 try:
-                    _save_product(serializer, variants, request.user)
-                except (DjangoValidationError, IntegrityError) as exc:
-                    return Response({'variants': [str(exc)]}, status=400)
-                return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
+                    serializer.instance = save_product(
+                        serializer.instance, serializer.validated_data, variants, request.user,
+                        expected_version=serializer.initial_data.get('inventory_version'),
+                    )
+                except CommerceError as exc:
+                    return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+                except DjangoValidationError as exc:
+                    return Response({'variants': exc.messages}, status=400)
+                except IntegrityError:
+                    return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
+                return Response(AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data)
             
             logger.warning('Product admin update error: %s', serializer.errors)
             return Response(serializer.errors, status=400)
