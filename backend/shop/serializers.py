@@ -8,20 +8,11 @@ from django.db.models import Avg
 from django.db import transaction
 from rest_framework import serializers
 
-from .models import ContactMessage, Order, OrderItem, Product, ProductVariant, SiteSettings
+from .models import ContactMessage, Product, ProductVariant, SiteSettings
 from .product_media import MAX_GALLERY_IMAGES, ProductGalleryField, ProductImageField
 
 
 User = get_user_model()
-
-class UserSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = User
-        fields = [
-            'id', 'username', 'email', 'first_name', 'last_name', 'role',
-            'phone', 'address', 'date_joined', 'last_login',
-        ]
-
 
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
@@ -131,32 +122,6 @@ class ProductSerializer(serializers.ModelSerializer):
 
     def get_review_count(self, obj):
         return obj.reviews.filter(status='approved').count()
-
-
-class OrderItemSerializer(serializers.ModelSerializer):
-    product = ProductSerializer(read_only=True)
-    class Meta:
-        model = OrderItem
-        fields = ['product','qty','price']
-
-
-class OrderSerializer(serializers.ModelSerializer):
-    items = OrderItemSerializer(many=True, read_only=True)
-    class Meta:
-        model = Order
-        fields = '__all__'
-
-
-class CreateOrderItemSerializer(serializers.Serializer):
-    id = serializers.CharField()
-    variant_id = serializers.UUIDField(required=False)
-    qty = serializers.IntegerField(min_value=1)
-
-
-class CreateOrderSerializer(serializers.Serializer):
-    items = CreateOrderItemSerializer(many=True, allow_empty=False)
-    total = serializers.DecimalField(max_digits=12, decimal_places=2, required=False)
-    shipping_address = serializers.CharField(trim_whitespace=True, required=False)
 
 
 class ContactMessageSerializer(serializers.ModelSerializer):

@@ -8,15 +8,12 @@ from .models import (
     ContactMessage,
     InventoryMovement,
     Order,
-    OrderItem,
     Product,
     ProductVariant,
     SiteSettings,
 )
 from .serializers import (
     ContactMessageSerializer,
-    CreateOrderSerializer,
-    OrderSerializer,
     ProductSerializer,
     ProductVariantInputSerializer,
     RegisterSerializer,
@@ -33,7 +30,6 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
 from rest_framework.exceptions import APIException
@@ -563,68 +559,6 @@ def product_detail(request, pk=None):
         prod = get_object_or_404(Product, pk=pk)
         prod.delete()
         return Response(status=204)
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def create_order(request):
-    serializer = CreateOrderSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
-    items = serializer.validated_data['items']
-    shipping_address = serializer.validated_data['shipping_address']
-    quantities = {}
-    for item in items:
-        quantities[item['id']] = quantities.get(item['id'], 0) + item['qty']
-
-    with transaction.atomic():
-        products = Product.objects.select_for_update().filter(pk__in=quantities.keys())
-        products_by_id = {product.id: product for product in products}
-        missing_ids = [product_id for product_id in quantities if product_id not in products_by_id]
-        if missing_ids:
-            return Response({'detail': f'Product not found: {missing_ids[0]}'}, status=404)
-
-        for product_id, qty in quantities.items():
-            product = products_by_id[product_id]
-            if product.stock < qty:
-                return Response({'detail': f'Insufficient stock for {product.name}'}, status=400)
-
-        total = sum(products_by_id[product_id].price * qty for product_id, qty in quantities.items())
-        order_id = f'ORD-{uuid.uuid4().hex[:28]}'
-        order = Order.objects.create(id=order_id, user=request.user, total=total, shipping_address=shipping_address)
-
-        for product_id, qty in quantities.items():
-            product = products_by_id[product_id]
-            product.stock -= qty
-            product.save(update_fields=['stock'])
-            OrderItem.objects.create(order=order, product=product, qty=qty, price=product.price)
-
-    return Response(OrderSerializer(order, context={'request': request}).data, status=201)
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def my_orders(request):
-    qs = Order.objects.filter(user=request.user)
-    return Response(OrderSerializer(qs, many=True, context={'request': request}).data)
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def cancel_order(request, pk):
-    with transaction.atomic():
-        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
-        if order.user_id != request.user.id and not request.user.is_admin():
-            return Response({'detail': 'Not allowed'}, status=403)
-        if order.status != 'pending':
-            return Response({'detail': 'Only pending orders can be cancelled'}, status=400)
-
-        for item in order.items.select_related('product').all():
-            if item.product_id:
-                Product.objects.filter(pk=item.product_id).update(stock=F('stock') + item.qty)
-
-        order.status = 'cancelled'
-        order.save(update_fields=['status'])
-
-    return Response(OrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET','PUT'])
 @permission_classes([permissions.AllowAny])
