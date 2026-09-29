@@ -11,16 +11,18 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 3 - Testing and CI |
-| Batch status | Initial foundation and passing September 28 SQL follow-up merged locally |
+| Batch status | Initial foundation and passing September 28 SQL follow-up merged; both branches published September 30 |
 | Batch branch | `codex/batch-03-testing-ci` |
 | Batch start commit | `7bec4bcf9450c8c252935ae79435bed00af1a881` |
-| Final batch / integration merge | Initial `8c6735f` / `1618a13`; SQL follow-up `7317cb3` / `dff0d9105db3ead321a619b1286ac0d05f09174e`; no remote push |
+| Final batch / integration merge | Initial `8c6735f` / `1618a13`; SQL follow-up `7317cb3` / `dff0d9105db3ead321a619b1286ac0d05f09174e`; published to origin September 30 |
 | Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 partial with executed SQL baseline |
 | Verification performed | September 16 frontend/Chrome/CI gates; September 28 SQL 99/99, SQLite 93 passes/six SQL skips, Django check/drift; test DB/container cleanup verified |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
 | Next batch | Batch 4 after Batch 3 acceptance |
 
 ## Batch 3 - Testing and CI
+
+- September 30: owner authorized publication. Atomic push successfully created `origin/codex/batch-03-testing-ci` at `7317cb3` and advanced integration through publication record `5d48220`; this completion record follows on integration. Hosted CI results remain unobserved; main/dev and deployment are unchanged.
 
 - SQL follow-up commits `7193ead` (checkout replay and regressions) and `7317cb3` (evidence) merged at `dff0d91`, parents `517996d` and `7317cb3`. The following closeout is documentation-only. Batch branch remains `codex/batch-03-testing-ci`.
 
@@ -32,7 +34,7 @@ pre-codex-remediation-2026-09-10
 - Local verification passed on September 16. Browser used installed Chrome 152.0.7977.84 because pinned Chromium's CDN rejected this location. SQL Server was not run because Docker's daemon pipe is missing; this explicitly documented environment lane is excluded from local merge acceptance, not claimed passing. Hosted GitHub runs remain unobserved.
 - Only four small lint-required source cleanups were needed; no runtime dependency upgrades or formatting rewrite. Commits: backend `3a0966b`, frontend `d3d65a4`, CI/docs `8c6735f`. Local merge `1618a13` has parents `7bec4bc` and `8c6735f`; the subsequent integration closeout changes documentation only.
 - Commands/isolation constraints: [TESTING.md](TESTING.md). Actual results: [testing audit](audit/TESTING_CI_AUDIT.md). No SQL execution or hosted CI success is implied by configured workflows.
-- Resolve final batch and merge provenance with `git rev-parse codex/batch-03-testing-ci` and `git log --merges --oneline codex/remediation-program --grep="batch-03-testing-ci"`. No push or production deployment is part of this batch.
+- Resolve final batch and merge provenance with `git rev-parse codex/batch-03-testing-ci` and `git log --merges --oneline codex/remediation-program --grep="batch-03-testing-ci"`. Publication was separately authorized September 30; no production deployment is included.
 
 ## Batch 2 - Critical correctness
 

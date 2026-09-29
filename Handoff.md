@@ -8,7 +8,8 @@ This is the chronological continuity log for the repository. Keep the newest ses
 
 - Owner explicitly requested a Git commit and push. Started with a clean integration worktree at `94ac9bd`; Batch 3 is already committed at `7317cb3`. Verified origin is `https://github.com/Alpha-lacrim/REZA-Formal.git`, remote integration remains `7bec4bc`, and the remote Batch 3 branch does not yet exist.
 - Reviewed the outgoing file summary and whitespace check. Existing September 16 frontend/browser and September 28 backend/SQL evidence remains applicable: this session changes publication documentation only. No application changes or test reruns are needed.
-- Publishing the preserved Batch 3 and integration branches together with a non-forced atomic push. Remote verification and completion record follow the push; no main/dev change or deployment is requested.
+- Committed the publication entry as `5d48220`, then successfully pushed both branches atomically without force: Batch 3 at `7317cb3`, integration at `5d48220`. Both now track their origin branches. This documentation-only completion record follows on integration; exact current remote tips can be checked with `git ls-remote --heads origin codex/batch-03-testing-ci codex/remediation-program`.
+- Hosted CI results have not been observed. No main/dev branch or deployment was changed.
 
 ## 2026-09-28 - Resume SQL Server verification
 
