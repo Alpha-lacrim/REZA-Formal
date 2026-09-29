@@ -1,8 +1,14 @@
 # Session Handoff
 
-Last updated: 2026-09-28
+Last updated: 2026-09-30
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
+
+## 2026-09-30 - Publish Batch 3
+
+- Owner explicitly requested a Git commit and push. Started with a clean integration worktree at `94ac9bd`; Batch 3 is already committed at `7317cb3`. Verified origin is `https://github.com/Alpha-lacrim/REZA-Formal.git`, remote integration remains `7bec4bc`, and the remote Batch 3 branch does not yet exist.
+- Reviewed the outgoing file summary and whitespace check. Existing September 16 frontend/browser and September 28 backend/SQL evidence remains applicable: this session changes publication documentation only. No application changes or test reruns are needed.
+- Publishing the preserved Batch 3 and integration branches together with a non-forced atomic push. Remote verification and completion record follow the push; no main/dev change or deployment is requested.
 
 ## 2026-09-28 - Resume SQL Server verification
 
