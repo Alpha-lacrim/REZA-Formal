@@ -1,4 +1,3 @@
-import math
 import uuid
 from decimal import Decimal
 
@@ -65,6 +64,7 @@ from .models import (
 )
 from .throttles import CheckoutQuoteRateThrottle, CheckoutRateThrottle, NewsletterRateThrottle
 from .subscription_services import subscribe
+from .pagination import page_response
 from .selectors import order_reads
 
 
@@ -80,27 +80,6 @@ def _admin_error(request):
     if not request.user.is_admin():
         return Response({'detail': 'Administrator access is required.', 'code': 'admin_required'}, status=403)
     return None
-
-
-def _page(request, queryset, serializer_class):
-    try:
-        page = max(int(request.query_params.get('page', 1)), 1)
-        page_size = min(max(int(request.query_params.get('page_size', 25)), 1), 100)
-    except (TypeError, ValueError):
-        page, page_size = 1, 25
-    count = queryset.count()
-    total_pages = max(math.ceil(count / page_size), 1)
-    start = (page - 1) * page_size
-    results = serializer_class(queryset[start:start + page_size], many=True, context={'request': request}).data
-    return Response({
-        'results': results,
-        'count': count,
-        'next': None,
-        'previous': None,
-        'page': page,
-        'page_size': page_size,
-        'total_pages': total_pages,
-    })
 
 
 @api_view(['GET'])
@@ -168,7 +147,7 @@ def order_detail(request, pk):
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
     queryset = order_reads().filter(user=request.user).order_by('-created_at')
-    return _page(request, queryset, OrderSerializer)
+    return page_response(request, queryset, OrderSerializer)
 
 
 @api_view(['POST'])
@@ -313,7 +292,7 @@ def product_reviews(request, product_id):
     product = get_object_or_404(Product, pk=product_id, is_active=True)
     if request.method == 'GET':
         queryset = ProductReview.objects.filter(product=product, status='approved').select_related('user')
-        return _page(request, queryset, ProductReviewSerializer)
+        return page_response(request, queryset, ProductReviewSerializer)
     if not request.user.is_authenticated:
         return Response({'detail': 'Authentication is required.', 'code': 'authentication_required'}, status=401)
 
@@ -349,7 +328,7 @@ def product_reviews(request, product_id):
 def returns(request):
     if request.method == 'GET':
         queryset = ReturnRequest.objects.filter(user=request.user).select_related('order', 'order_item')
-        return _page(request, queryset, ReturnRequestSerializer)
+        return page_response(request, queryset, ReturnRequestSerializer)
 
     serializer = ReturnCreateSerializer(data=request.data)
     if not serializer.is_valid():
@@ -470,7 +449,7 @@ def admin_coupons(request):
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(code__icontains=search)
-        return _page(request, queryset, CouponSerializer)
+        return page_response(request, queryset, CouponSerializer)
     serializer = CouponSerializer(data=request.data)
     if not serializer.is_valid():
         return _validation_error(serializer)
@@ -519,7 +498,7 @@ def admin_shipping_methods(request):
     if denied:
         return denied
     if request.method == 'GET':
-        return _page(request, ShippingMethod.objects.order_by('sort_order', 'name'), ShippingMethodSerializer)
+        return page_response(request, ShippingMethod.objects.order_by('sort_order', 'name'), ShippingMethodSerializer)
     payload = request.data.copy()
     if not payload.get('code'):
         generated = slugify(str(payload.get('name') or ''), allow_unicode=True).upper()
@@ -575,7 +554,7 @@ def admin_payments(request):
     search = request.query_params.get('search')
     if search:
         queryset = queryset.filter(Q(order__id__icontains=search) | Q(reference__icontains=search))
-    return _page(request, queryset, PaymentSerializer)
+    return page_response(request, queryset, PaymentSerializer)
 
 
 @api_view(['GET', 'PUT'])
@@ -608,7 +587,7 @@ def admin_reviews(request):
     review_status = request.query_params.get('status')
     if review_status:
         queryset = queryset.filter(status=review_status)
-    return _page(request, queryset, ProductReviewSerializer)
+    return page_response(request, queryset, ProductReviewSerializer)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -641,7 +620,7 @@ def admin_returns(request):
     return_status = request.query_params.get('status')
     if return_status:
         queryset = queryset.filter(status=return_status)
-    return _page(request, queryset, ReturnRequestSerializer)
+    return page_response(request, queryset, ReturnRequestSerializer)
 
 
 @api_view(['GET', 'PUT'])
@@ -686,7 +665,7 @@ def admin_bespoke_requests(request):
     bespoke_status = request.query_params.get('status')
     if bespoke_status:
         queryset = queryset.filter(status=bespoke_status)
-    return _page(request, queryset, BespokeRequestSerializer)
+    return page_response(request, queryset, BespokeRequestSerializer)
 
 
 @api_view(['GET', 'PUT'])

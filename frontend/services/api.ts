@@ -137,6 +137,24 @@ function normalizePage<T>(raw: any, normalize: (item: any) => T): Page<T> {
   };
 }
 
+// Preserve complete collections for existing staff screens during the pagination rollout.
+// Follow our numeric page contract, never an arbitrary server-provided URL.
+async function readAdminCollection<T>(path: string, normalize: (item: any) => T): Promise<T[]> {
+  const items: T[] = [];
+  for (let pageNumber = 1; ; pageNumber++) {
+    const raw = await request(withQuery(path, { page: pageNumber, page_size: 100 }));
+    const page = normalizePage(raw, normalize);
+    // Compatibility with an older backend during a coordinated deployment.
+    if (Array.isArray(raw)) return page.results;
+    if (page.page !== pageNumber || !Number.isInteger(page.totalPages) || page.totalPages! < 1
+        || (pageNumber < page.totalPages! && page.results.length === 0)) {
+      throw new Error('Invalid administrative pagination response');
+    }
+    items.push(...page.results);
+    if (pageNumber >= page.totalPages!) return items;
+  }
+}
+
 function withQuery(path: string, params?: Record<string, unknown>): string {
   if (!params) return path;
   const search = new URLSearchParams();
@@ -908,7 +926,7 @@ export const api = {
     return normalizeAdminCapabilities(await request('/api/admin/capabilities/'));
   },
   async adminGetOrders(): Promise<Order[]> {
-    return normalizePage(await request('/api/admin/orders/'), normalizeOrder).results;
+    return readAdminCollection('/api/admin/orders/', normalizeOrder);
   },
   async adminUpdateOrderStatus(id: string, status: string): Promise<Order> {
     return normalizeOrder(await request(`/api/admin/orders/${encodeId(id)}/status/`, { method: 'PUT', ...jsonBody({ status }) }));
@@ -924,16 +942,16 @@ export const api = {
     }));
   },
   async adminGetUsers(): Promise<User[]> {
-    return normalizePage(await request('/api/admin/users/'), normalizeUser).results;
+    return readAdminCollection('/api/admin/users/', normalizeUser);
   },
   async adminGetMessages(): Promise<ContactMessage[]> {
-    return normalizePage(await request('/api/admin/messages/'), normalizeContactMessage).results;
+    return readAdminCollection('/api/admin/messages/', normalizeContactMessage);
   },
   async adminMarkMessageRead(id: string) {
     return request(`/api/admin/messages/${encodeId(id)}/mark-read/`, { method: 'POST' });
   },
   async adminGetProducts(): Promise<Product[]> {
-    return normalizePage(await request('/api/admin/products/'), normalizeProduct).results;
+    return readAdminCollection('/api/admin/products/', normalizeProduct);
   },
 
   async adminSaveProduct(product: any): Promise<Product> {

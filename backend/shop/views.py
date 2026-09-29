@@ -38,6 +38,7 @@ from .auth import enforce_csrf
 from .commerce_services import CommerceError
 from .product_services import save_product
 from .selectors import product_reads, order_reads
+from .pagination import page_response
 import json
 import logging
 from decimal import Decimal
@@ -540,7 +541,7 @@ def admin_orders(request):
     from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
 
     qs = order_reads().order_by('-created_at')
-    return Response(CommerceOrderSerializer(qs, many=True, context={'request': request}).data)
+    return page_response(request, qs, CommerceOrderSerializer)
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
@@ -585,7 +586,7 @@ def admin_update_order_status(request, pk):
 def admin_users(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
-    return Response(AccountReadSerializer(User.objects.all(), many=True).data)
+    return page_response(request, User.objects.order_by('id'), AccountReadSerializer)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -593,7 +594,7 @@ def admin_messages(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     msgs = ContactMessage.objects.all().order_by('-created_at')
-    return Response(ContactMessageSerializer(msgs, many=True).data)
+    return page_response(request, msgs, ContactMessageSerializer)
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -614,7 +615,7 @@ def admin_products(request):
     
     if request.method == 'GET':
         qs = product_reads()
-        return Response(AdminProductReadSerializer(qs, many=True, context={'request': request}).data)
+        return page_response(request, qs.order_by('id'), AdminProductReadSerializer)
 
     # POST (Create)
     # Normalize the request; validation and the transaction own all storage writes.

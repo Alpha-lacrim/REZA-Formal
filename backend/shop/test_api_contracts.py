@@ -5,7 +5,7 @@ from django.urls import resolve
 from rest_framework.test import APIClient
 
 from . import commerce_views
-from .models import Product, ProductReview, User
+from .models import ContactMessage, Order, OrderItem, Payment, Product, ProductReview, ReturnRequest, User
 from .selectors import product_reads
 from .serializers import AdminProductReadSerializer, PublicProductReadSerializer
 
@@ -80,3 +80,67 @@ class ProductContractTests(TestCase):
         self.assertEqual(len(many), 100)
         empty = next(item for item in many if item['id'] == 'bulk-0')
         self.assertEqual((empty['rating'], empty['review_count']), (None, 0))
+
+
+class AdminPaginationTests(TestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user('pager-staff', 'pager@example.invalid', is_staff=True)
+        self.buyer = User.objects.create_user('pager-buyer', 'pager-buyer@example.invalid')
+        self.client = APIClient()
+        for index in range(103):
+            Product.objects.create(id=f'page-{index:03}', name='Suit', price=10)
+            Order.objects.create(id=f'ORD-PAGE-{index:03}', user=self.buyer, total=10)
+            ContactMessage.objects.create(name='Buyer', email='buyer@example.invalid', message='Hello')
+            User.objects.create_user(f'page-{index:03}', f'page-{index:03}@example.invalid')
+
+    def test_admin_collections_are_bounded_complete_and_permission_checked(self):
+        for collection in ('products', 'orders', 'users', 'messages'):
+            path = f'/api/admin/{collection}/'
+            for actor in (None, self.buyer):
+                self.client.force_authenticate(actor)
+                self.assertIn(self.client.get(path).status_code, (401, 403))
+            self.client.force_authenticate(self.staff)
+            first = self.client.get(path)
+            self.assertEqual(first.status_code, 200)
+            self.assertEqual(len(first.data['results']), 25)
+            self.assertIsNone(first.data['previous'])
+            seen = [row['id'] for row in first.data['results']]
+            current = first
+            while current.data['next']:
+                current = self.client.get(current.data['next'])
+                seen.extend(row['id'] for row in current.data['results'])
+            self.assertEqual(len(seen), first.data['count'])
+            self.assertEqual(len(set(seen)), len(seen))
+            limited = self.client.get(path, {'page_size': 999})
+            self.assertEqual(len(limited.data['results']), 100)
+            self.assertEqual(self.client.get(path, {'page': 999}).data['results'], [])
+            malformed = self.client.get(path, {'page': 'bad', 'page_size': 'bad'})
+            self.assertEqual((malformed.data['page'], malformed.data['page_size']), (1, 25))
+
+
+class LegacyOrderContractTests(TestCase):
+    def test_missing_payment_history_is_readable_but_cannot_be_refunded(self):
+        from .commerce_services import CommerceError, transition_return
+        buyer = User.objects.create_user('legacy-buyer', 'legacy@example.invalid')
+        client = APIClient()
+        client.force_authenticate(buyer)
+        for status in ('pending', 'delivered', 'cancelled'):
+            order = Order.objects.create(id=f'LEGACY-{status}', user=buyer, total=10, status=status)
+            response = client.get(f'/api/orders/{order.pk}/')
+            self.assertEqual(response.status_code, 200)
+            self.assertIsNone(response.data['payment'])
+            self.assertEqual(response.data['status'], status)
+            other = APIClient()
+            other.force_authenticate(User.objects.create_user(f'other-{status}', f'{status}@example.invalid'))
+            self.assertEqual(other.get(f'/api/orders/{order.pk}/').status_code, 404)
+        delivered = Order.objects.get(pk='LEGACY-delivered')
+        line = OrderItem.objects.create(order=delivered, qty=1, price=10, product_name='Historical suit')
+        returned = ReturnRequest.objects.create(
+            user=buyer, order=delivered, order_item=line, quantity=1, reason='Size', status='received',
+        )
+        with self.assertRaises(CommerceError) as error:
+            transition_return(returned.pk, 'refunded', buyer)
+        self.assertEqual(error.exception.code, 'payment_not_found')
+        returned.refresh_from_db()
+        self.assertEqual(returned.status, 'received')
+        self.assertFalse(Payment.objects.exists())
