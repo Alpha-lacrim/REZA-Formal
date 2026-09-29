@@ -458,7 +458,9 @@ def admin_coupons(request):
         with transaction.atomic():
             coupon = serializer.save()
     except IntegrityError:
-        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
             return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
         return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(CouponSerializer(coupon).data, status=201)
@@ -486,7 +488,9 @@ def admin_coupon_detail(request, pk):
         with transaction.atomic():
             coupon = serializer.save()
     except IntegrityError:
-        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
             return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
         return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(CouponSerializer(coupon).data)
@@ -511,7 +515,9 @@ def admin_shipping_methods(request):
         with transaction.atomic():
             method = serializer.save()
     except IntegrityError:
-        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
             return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
         return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(ShippingMethodSerializer(method).data, status=201)
@@ -536,7 +542,9 @@ def admin_shipping_method_detail(request, pk):
         with transaction.atomic():
             method = serializer.save()
     except IntegrityError:
-        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
             return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
         return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(ShippingMethodSerializer(method).data)

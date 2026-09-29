@@ -1,3 +1,6 @@
+from unittest.mock import patch
+
+from django.db import IntegrityError
 from django.test import TestCase
 from django.utils import timezone
 from rest_framework.test import APIClient
@@ -56,6 +59,26 @@ class WriteContractTests(TestCase):
             self.assertEqual(response.status_code, 400, response.data)
         method.refresh_from_db()
         self.assertEqual((method.estimated_days_min, method.estimated_days_max), (2, 4))
+
+    def test_promotion_multipart_fields_survive_code_normalization(self):
+        coupon = self.client.post('/api/admin/coupons/', {
+            'code': ' form-coupon ', 'type': 'fixed', 'value': '10',
+        }, format='multipart')
+        shipping = self.client.post('/api/admin/shipping-methods/', {
+            'code': ' form-shipping ', 'name': 'Shipping', 'price': '10',
+        }, format='multipart')
+        self.assertEqual(coupon.status_code, 201, coupon.data)
+        self.assertEqual(shipping.status_code, 201, shipping.data)
+        self.assertEqual(coupon.data['code'], 'FORM-COUPON')
+        self.assertEqual(shipping.data['code'], 'FORM-SHIPPING')
+
+    def test_unidentified_write_conflict_is_not_mislabeled_as_own_duplicate(self):
+        coupon = Coupon.objects.create(code='OWN', discount_type='fixed', value=10)
+        with patch('shop.commerce_views.CouponSerializer.save', side_effect=IntegrityError('private diagnostic')):
+            response = self.client.put(f'/api/admin/coupons/{coupon.pk}/', {'code': 'OWN'}, format='json')
+        self.assertEqual(response.status_code, 409)
+        self.assertEqual(response.data['code'], 'write_conflict')
+        self.assertNotIn('private', str(response.data))
 
     def test_checkout_bounds_address_lines_and_total_before_writes(self):
         product = Product.objects.create(id='huge', name='Suit', price='9999999999.99', stock=2)

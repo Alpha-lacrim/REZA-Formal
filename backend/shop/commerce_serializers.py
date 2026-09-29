@@ -116,7 +116,8 @@ class ShippingMethodSerializer(AliasedModelSerializer):
 
     def to_internal_value(self, data):
         if isinstance(data, dict) and isinstance(data.get('code'), str):
-            data = {**data, 'code': data['code'].strip().upper()}
+            data = data.copy()
+            data['code'] = data['code'].strip().upper()
         return super().to_internal_value(data)
 
     def validate(self, attrs):
@@ -175,7 +176,8 @@ class CouponSerializer(AliasedModelSerializer):
 
     def to_internal_value(self, data):
         if isinstance(data, dict) and isinstance(data.get('code'), str):
-            data = {**data, 'code': data['code'].strip().upper()}
+            data = data.copy()
+            data['code'] = data['code'].strip().upper()
         return super().to_internal_value(data)
 
     def validate(self, attrs):
