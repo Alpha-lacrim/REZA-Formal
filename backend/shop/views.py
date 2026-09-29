@@ -18,6 +18,8 @@ from .serializers import (
     AdminProductWriteSerializer,
     ProductVariantInputSerializer,
     RegisterSerializer,
+    ProfileWriteSerializer,
+    AccountReadSerializer,
     SiteSettingsSerializer,
 )
 from django.contrib.auth import get_user_model
@@ -122,18 +124,7 @@ def _new_username(email):
 
 
 def serialize_user(user):
-    return {
-        'id': user.id,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'role': getattr(user, 'role', 'user'),
-        'phone': getattr(user, 'phone', ''),
-        'address': getattr(user, 'address', ''),
-        'date_joined': user.date_joined,
-        'last_login': user.last_login,
-    }
-
+    return AccountReadSerializer(user).data
 
 
 def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentFile:
@@ -321,20 +312,10 @@ def refresh_auth(request):
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def update_profile(request):
-    user = request.user
-    data = request.data
-    if 'first_name' in data:
-        user.first_name = data.get('first_name')
-    if 'last_name' in data:
-        user.last_name = data.get('last_name')
-    if 'name' in data and 'first_name' not in data:
-        user.first_name = data.get('name')
-    if 'address' in data:
-        user.address = data.get('address') or ''
-    if 'phone' in data:
-        user.phone = str(data.get('phone') or '').strip()
-    user.save()
-    return Response(serialize_user(user))
+    serializer = ProfileWriteSerializer(request.user, data=request.data, partial=True)
+    if not serializer.is_valid():
+        return Response({'detail': 'Validation failed.', 'code': 'validation_error', 'errors': serializer.errors}, status=400)
+    return Response(serialize_user(serializer.save()))
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
@@ -604,9 +585,7 @@ def admin_update_order_status(request, pk):
 def admin_users(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
-    users = User.objects.all()
-    data = [serialize_user(u) for u in users]
-    return Response(data)
+    return Response(AccountReadSerializer(User.objects.all(), many=True).data)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -614,8 +593,7 @@ def admin_messages(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     msgs = ContactMessage.objects.all().order_by('-created_at')
-    serializer = ContactMessageSerializer(msgs, many=True)
-    return Response(serializer.data)
+    return Response(ContactMessageSerializer(msgs, many=True).data)
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])

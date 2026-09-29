@@ -6,7 +6,6 @@ from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -17,6 +16,7 @@ from .commerce_serializers import (
     BespokeAdminUpdateSerializer,
     BespokeRequestSerializer,
     CheckoutRequestSerializer,
+    QuoteRequestSerializer,
     CouponSerializer,
     NewsletterSerializer,
     OrderSerializer,
@@ -51,7 +51,6 @@ from .models import (
     Address,
     BespokeRequest,
     Coupon,
-    NewsletterSubscription,
     NotificationOutbox,
     Order,
     OrderEvent,
@@ -65,6 +64,8 @@ from .models import (
     WishlistItem,
 )
 from .throttles import CheckoutQuoteRateThrottle, CheckoutRateThrottle, NewsletterRateThrottle
+from .subscription_services import subscribe
+from .selectors import order_reads
 
 
 def _commerce_error(exc):
@@ -120,7 +121,7 @@ def checkout_options(request):
 @permission_classes([permissions.IsAuthenticated])
 @throttle_classes([CheckoutQuoteRateThrottle])
 def checkout_quote(request):
-    serializer = CheckoutRequestSerializer(data=request.data)
+    serializer = QuoteRequestSerializer(data=request.data)
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
@@ -166,9 +167,7 @@ def order_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
-    queryset = Order.objects.filter(user=request.user).select_related(
-        'user', 'shipping_method', 'coupon', 'payment',
-    ).prefetch_related('items__variant', 'events__actor').order_by('-created_at')
+    queryset = order_reads().filter(user=request.user).order_by('-created_at')
     return _page(request, queryset, OrderSerializer)
 
 
@@ -441,16 +440,7 @@ def newsletter_subscribe(request):
     serializer = NewsletterSerializer(data=request.data)
     if not serializer.is_valid():
         return _validation_error(serializer)
-    email = serializer.validated_data['email'].strip().lower()
-    subscription, created = NewsletterSubscription.objects.get_or_create(
-        email=email,
-        defaults={'is_active': True, 'source': 'website'},
-    )
-    if not created and not subscription.is_active:
-        subscription.is_active = True
-        subscription.unsubscribed_at = None
-        subscription.subscribed_at = timezone.now()
-        subscription.save(update_fields=['is_active', 'unsubscribed_at', 'subscribed_at'])
+    subscription, created = subscribe(serializer.validated_data['email'])
     return Response(NewsletterSerializer(subscription).data, status=201 if created else 200)
 
 
@@ -485,9 +475,12 @@ def admin_coupons(request):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        coupon = serializer.save()
+        with transaction.atomic():
+            coupon = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+            return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(CouponSerializer(coupon).data, status=201)
 
 
@@ -510,9 +503,12 @@ def admin_coupon_detail(request, pk):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        coupon = serializer.save()
+        with transaction.atomic():
+            coupon = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+            return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(CouponSerializer(coupon).data)
 
 
@@ -532,9 +528,12 @@ def admin_shipping_methods(request):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        method = serializer.save()
+        with transaction.atomic():
+            method = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+            return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(ShippingMethodSerializer(method).data, status=201)
 
 
@@ -554,9 +553,12 @@ def admin_shipping_method_detail(request, pk):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        method = serializer.save()
+        with transaction.atomic():
+            method = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exists():
+            return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(ShippingMethodSerializer(method).data)
 
 

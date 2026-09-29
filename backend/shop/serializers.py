@@ -12,6 +12,42 @@ from .product_media import MAX_GALLERY_IMAGES, ProductGalleryField, ProductImage
 
 User = get_user_model()
 
+
+class AccountReadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'id', 'email', 'first_name', 'last_name', 'role', 'phone', 'address',
+            'date_joined', 'last_login',
+        ]
+        read_only_fields = fields
+
+
+class StrictCharField(serializers.CharField):
+    def to_internal_value(self, data):
+        if not isinstance(data, str):
+            self.fail('invalid')
+        return super().to_internal_value(data)
+
+
+class ProfileWriteSerializer(serializers.ModelSerializer):
+    first_name = StrictCharField(max_length=150, required=False, allow_blank=True)
+    last_name = StrictCharField(max_length=150, required=False, allow_blank=True)
+    phone = StrictCharField(max_length=32, required=False, allow_blank=True)
+    address = StrictCharField(max_length=2000, required=False, allow_blank=True)
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'phone', 'address']
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            if 'name' in data and 'first_name' not in data:
+                data['first_name'] = data['name']
+        return super().to_internal_value(data)
+
+
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
     password = serializers.CharField(write_only=True, trim_whitespace=False)
@@ -132,7 +168,7 @@ class AdminProductWriteSerializer(serializers.ModelSerializer):
 class ContactMessageSerializer(serializers.ModelSerializer):
     class Meta:
         model = ContactMessage
-        fields = ['id', 'name', 'email', 'subject', 'message', 'read', 'created_at']
+        fields = ['id', 'name', 'email', 'message', 'read', 'created_at']
         read_only_fields = ['id', 'read', 'created_at']
 
 
