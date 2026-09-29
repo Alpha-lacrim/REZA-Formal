@@ -41,6 +41,11 @@ The backend runner creates a marked temporary directory, migrates SQLite and see
 
 Three tests cover seven requested flows: storefront; customer authentication; product/cart; COD checkout; history; staff authentication; product edit. The customer and staff cases run sequentially against the disposable seed. Traces/reports are ignored and contain only synthetic data. A process killed forcibly may leave its temporary directory for the OS to clean; it contains no live data.
 
+If Windows reserves frontend port 3100, set `$env:REZA_E2E_FRONTEND_PORT='18180'`
+(or another free loopback port) before running the browser suite. Playwright, Vite and
+the disposable backend's CSRF trusted origin use the same value. The backend remains
+on 18080, existing servers are never reused, and production CSRF settings are unchanged.
+
 ## SQL Server integration lane
 
 Requires Docker with enough resources for SQL Server 2022 Developer. This is a standalone Compose project, not an override of the application stack. It has no application volumes or network and stores database state only in its disposable container. Never attach production volumes, import production backups, change the allowlisted host, or combine it with `docker-compose.yml`.
