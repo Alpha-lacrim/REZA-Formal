@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-09-28 (Batch 3; SQL Server baseline 99/99 passes; prior frontend/Chrome gates preserved)
+Last verified: 2026-09-30 (Batch 4; backend/API contracts, SQL Server and frontend/Chrome gates)
 
 ## Purpose and product
 
@@ -39,7 +39,7 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - API routes: `backend/shop/urls.py`.
 - Models: `backend/shop/models.py` contains users/products/variants, addresses, shipping/coupons, orders/items/payments/events, inventory movements, saved carts/wishlists, reviews, returns, bespoke/newsletter records, notification outbox, messages, and site settings.
 - Request logic: auth/catalog/content surfaces remain in `backend/shop/views.py`; commerce views, serializers, and transactional rules live in `commerce_views.py`, `commerce_serializers.py`, and `commerce_services.py`.
-- Active order URLs resolve to `commerce_views.py`; similarly named legacy order handlers in `views.py` remain importable but are not routed. Native Django `/admin/` is a separate model-editing surface from REST `/api/admin/`; inspect `shop/admin.py` when changing write invariants.
+- Active order URLs resolve to `commerce_views.py`; the unrouted legacy handlers and serializers have been removed. Native Django `/admin/` is a separate model-editing surface from REST `/api/admin/`; inspect `shop/admin.py` when changing write invariants.
 - Authentication: HttpOnly access/refresh JWT cookies through `backend/shop/auth.py`; the frontend bootstraps `/api/auth/csrf/` and sends `X-CSRFToken` for every unsafe browser request. Header JWT clients remain usable without cookie CSRF.
 - Persistence: Microsoft SQL Server through `mssql-django` and `pyodbc` for normal runs. Any SQLite test settings are test-only and must not be confused with production configuration.
 - Seed command: `python manage.py seed_data`; it bootstraps catalog records only when the catalog is empty and shipping only when none exists, and never publishes or logs a fixed administrator password.
@@ -48,6 +48,10 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Product uploads use `shop/product_media.py`: decoded/re-encoded still images, bounded files/dimensions/gallery count, URL validation and cleanup of newly staged files on failed product writes. Safe inline legacy galleries convert to files on edit; existing files are retained for historical references.
 - Native Django product/variant/order/payment/return screens are inspection-only. Their write operations use the existing service-backed REST/staff UI, including stock ledger and lifecycle guards.
 - Refund allocations/entries use existing Payment metadata plus OrderEvent records through `shop/refunds.py`; no new schema. Net item allocations derive from immutable purchase amounts, exclude shipping/tax, and reconcile rounding. Manual refunds require amount, currency, reason, per-payment reference and explicit offline-transfer confirmation. Inconsistent legacy refund history requires reconciliation.
+
+- Product mutations use `product_services.py` for atomic product/variant/ledger/media writes. Public detail mutations remain a tested staff-only compatibility route. Product read/write contracts are separate and explicit; only staff product reads expose the inventory version.
+- `selectors.py` owns reusable product aggregates/variants and order read graphs. `pagination.py` shares stable ordering, size limits and links across commerce and older staff collections. Four legacy staff adapters load every numeric page; server-driven screen pagination remains follow-up.
+- `subscription_services.py` owns normalized idempotent newsletter subscription/reactivation. Quote input permits incomplete address forms; checkout validates delivery-address types/limits. See [API contracts and OpenAPI decision](docs/API_CONTRACTS.md); no schema dependency/endpoint is installed.
 
 ### Docker request flow
 
@@ -73,7 +77,7 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `frontend/types.ts` | Canonical UI data shapes. |
 | `backend/reza_backend/settings.py` | Django, SQL Server, CORS, JWT, static, and media configuration. |
 | `backend/shop/urls.py` | Public API surface. |
-| `backend/shop/views.py` | Authentication, products, settings, contact and older staff endpoints; retains unrouted legacy order handlers. |
+| `backend/shop/views.py` | Authentication, products, settings, contact and older staff HTTP endpoints. |
 | `backend/shop/models.py` | Persistent data model and order relationships. |
 | `backend/shop/commerce_services.py` | Quotes, idempotent checkout, locking, inventory, refunds, and lifecycle transitions. |
 | `backend/shop/refunds.py` | Net item allocation, remaining refund bounds, reference replay and recorded financial totals. |
@@ -146,7 +150,7 @@ python manage.py runserver
 
 Use the repository's isolated test settings/command documented in `AGENTS.md` for automated tests so the live SQL Server is never modified by a test run.
 
-Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm.cmd run test:e2e`. Both loopback ports 3100/18080 must be free; `vite.e2e.config.ts` isolates the test proxy from normal development. The runner always creates synthetic data in a temporary SQLite database. SQL commands and test-only names (`REZA_SQL_TEST`, `REZA_SQL_TEST_HOST`, `REZA_SQL_TEST_PASSWORD`, `REZA_E2E_DIRECTORY`, `E2E_PYTHON`, `PLAYWRIGHT_CHANNEL`) are documented in [docs/TESTING.md](docs/TESTING.md); never substitute production data or connection settings. Fast CI covers `codex/**`; expensive lanes are manually dispatched separately.
+Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm.cmd run test:e2e`. Both loopback ports 3100/18080 must be free (override the frontend port with `REZA_E2E_FRONTEND_PORT` if Windows reserves 3100); `vite.e2e.config.ts` isolates the test proxy from normal development. The runner always creates synthetic data in a temporary SQLite database. SQL commands and test-only names (`REZA_SQL_TEST`, `REZA_SQL_TEST_HOST`, `REZA_SQL_TEST_PASSWORD`, `REZA_E2E_DIRECTORY`, `E2E_PYTHON`, `PLAYWRIGHT_CHANNEL`) are documented in [docs/TESTING.md](docs/TESTING.md); never substitute production data or connection settings. Fast CI covers `codex/**`; expensive lanes are manually dispatched separately.
 
 ## Stable implementation constraints
 

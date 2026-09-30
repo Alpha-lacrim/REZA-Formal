@@ -119,7 +119,8 @@ Order item, address, coupon and shipping snapshots preserve most history after c
 | ID | ARCH-003 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - maintenance debt |
+| Status | Partial - Batch 4 explicit backend contracts; frontend DTO debt remains |
+| Batch 4 evidence | Explicit public/admin product read and admin product write serializers, explicit account/contact/settings fields, separate quote/checkout validation, product/subscription service boundaries and shared read graphs replace the scoped broad contracts. Stable response keys, permission checks and error masking have regressions. OpenAPI evaluated in docs/API_CONTRACTS.md; drf-spectacular is the preferred candidate but adoption awaits complete annotation/verification. Frontend any/duplicate normalization and broader DTO work remain Batch 5. |
 | Evidence | Inspected Meta.fields and read_only_fields: contact protects read/created_at; active commerce OrderSerializer uses an explicit field list. |
 | File/function references | backend/shop/serializers.py:31,82,111,128,135; backend/shop/commerce_serializers.py:53,73,219; frontend/services/api.ts:123,154; frontend/types.ts |
 | Current behaviour | Product, legacy Order, ContactMessage and SiteSettings serializers use fields='__all__'. Variant serializers expose different active/attributes shapes; user normalization also exists in context. |

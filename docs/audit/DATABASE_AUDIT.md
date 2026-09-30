@@ -99,6 +99,7 @@ SQL JSONField storage and query/index capabilities must be checked against the d
 | Attribute | Audit record |
 | --- | --- |
 | ID | DB-003 |
+| Batch 4 characterization | New API tests cover pending/delivered/cancelled orders with missing payments, null payment reads, ownership denial and refund rejection without invented financial history. Existing fulfillment compatibility is retained. DB-003 remains open for verified financial records/import and an owner-approved capability policy; no applied migration or historical data was changed. |
 | Severity | P2 |
 | Confidence | High |
 | Status | Open - confirmed compatibility gap |

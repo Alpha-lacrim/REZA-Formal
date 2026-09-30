@@ -29,7 +29,8 @@ Historical June analysis and SQL migration/setup documents are evidence of earli
 | ID | ARCH-004 |
 | Severity | P3 |
 | Confidence | High |
-| Status | Open - maintenance debt |
+| Status | Fixed - Batch 4; routed commerce contracts retained |
+| Batch 4 evidence | Removed views.create_order/my_orders/cancel_order and their four legacy serializers plus unused UserSerializer/imports. Before deletion: shop/urls.py and project urls route customer orders only to commerce_views; repository-wide symbol/import searches found legacy serializers referenced only by the dead views and no frontend/test/direct consumers. Existing tests call commerce_views or live URLs. New RouteContractTests resolve create/list/detail/cancel; existing snapshot, lifecycle, permission and inventory tests remain passing. Public product mutation compatibility is explicitly retained because test_inventory_authority and test_product_media exercise it. |
 | Evidence | P01 resolves create/cancel to shop.commerce_views; URL/import/call-site search distinguishes definitions from live routes. |
 | File/function references | backend/shop/views.py:617,653,660; backend/shop/serializers.py:111,118; backend/shop/urls.py:67; frontend/services/api.ts:810 |
 | Current behaviour | Legacy handlers write Product.stock directly and serialize live products. Current order URLs call commerce handlers instead. |

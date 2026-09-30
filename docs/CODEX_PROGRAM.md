@@ -6,19 +6,28 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 3 foundation and SQL baseline verified locally; broader concurrency/deployment gates remain open |
+| Program status | Batch 4 backend/API cleanup verified; later-batch and deployment gates remain open |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 3 - Testing and CI |
-| Batch status | Initial foundation and passing September 28 SQL follow-up merged; both branches published September 30 |
-| Batch branch | `codex/batch-03-testing-ci` |
-| Batch start commit | `7bec4bcf9450c8c252935ae79435bed00af1a881` |
-| Final batch / integration merge | Initial `8c6735f` / `1618a13`; SQL follow-up `7317cb3` / `dff0d9105db3ead321a619b1286ac0d05f09174e`; published to origin September 30 |
-| Audit IDs handled | TEST-001 and OPS-001 foundation/configuration addressed; TEST-002 partial; TEST-003 partial with executed SQL baseline |
-| Verification performed | September 16 frontend/Chrome/CI gates; September 28 SQL 99/99, SQLite 93 passes/six SQL skips, Django check/drift; test DB/container cleanup verified |
+| Current batch | Batch 4 - Backend/API cleanup |
+| Batch status | Implementation verified; documentation and authorized integration merge closeout |
+| Batch branch | `codex/batch-04-backend-api` |
+| Batch start commit | `820d5ebb69dde31ddd28a729f7d8c00e4eabe6f2` |
+| Final batch / integration merge | Recorded below after the verified no-ff merge; application tip `20001d4` |
+| Audit IDs handled | ARCH-004, BE-007, BE-008, PERF-001 addressed; ARCH-003/PERF-002 partial; DB-003 characterized |
+| Verification performed | SQLite 109 passes/seven SQL skips; SQL Server 116/116 (28.683s); 24 frontend tests, lint/typecheck/build, three Chrome journeys, Django check/drift, Compose validation |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 4 after Batch 3 acceptance |
+| Next batch | Batch 5 - API/auth/frontend; no further batch started |
+
+## Batch 4 - Backend/API cleanup
+
+- Started from clean/fetched integration `820d5ebb69dde31ddd28a729f7d8c00e4eabe6f2`; required branch `codex/batch-04-backend-api`. No main/dev/stash or unrelated changes.
+- Commits: `92ddae4` dead legacy order handlers/serializers, `a406f8c` product contracts/services/aggregates, `eb2fd9b` write validation/newsletter, `5de6836` pagination/adapters/legacy tests, `e7ca669` browser port override, `194b8cc` malformed bodies, `20001d4` multipart/conflict compatibility.
+- Preserved routed order behavior, stock/refund transactions, public product mutation compatibility and historical financial truth. New services/read helpers stay inside the existing Django app. No database migration, dependency update, provider, production write or framework rewrite.
+- Closed ARCH-004, BE-007, BE-008 and PERF-001; kept ARCH-003/PERF-002 partial and DB-003 open with characterization. OpenAPI evaluated and deferred pending accurate annotations/auth/error/media coverage. See [API contracts](API_CONTRACTS.md), [verification](audit/TESTING_CI_AUDIT.md#batch-4-verification---2026-09-30).
+- Integration merge and publication follow the documentation commit after full diff, whitespace, status/link and credential-signature review. The final batch tip is the second parent of the named no-ff merge; observed hashes will be recorded in the integration closeout.
+- Remaining: actual server-driven staff screen pagination, strict frontend DTOs, broader SQL mutation schedules, verified legacy financial reconciliation, schema implementation and hosted CI/deployment evidence. Deploy the frontend adapter with/before the paginated backend; no migration is required.
 
 ## Batch 3 - Testing and CI
 
@@ -142,8 +151,8 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 0 — Git/bootstrap
 - [x] Batch 1 — Forensic audit
 - [x] Batch 2 — Critical correctness (confirmed defects; SQL/deployment gates remain open)
-- [ ] Batch 3 — Tests and CI
-- [ ] Batch 4 — Backend architecture
+- [x] Batch 3 - Tests and CI foundation (broader concurrency/hosted gates remain open)
+- [x] Batch 4 - Backend/API cleanup (scoped completion; follow-ups documented)
 - [ ] Batch 5 — API/auth frontend
 - [ ] Batch 6 — Frontend state
 - [ ] Batch 7 — Admin/media

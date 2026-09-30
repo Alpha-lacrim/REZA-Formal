@@ -65,16 +65,16 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | --- | --- | --- | --- | --- | --- |
 | ARCH-001 | P2 | High | Open - maintenance debt | [GlobalContext couples unrelated state domains](ARCHITECTURE_AUDIT.md#arch-001) | 6 |
 | ARCH-002 | P2 | High | Open - maintenance debt | [AdminPanel combines unrelated administration features](ARCHITECTURE_AUDIT.md#arch-002) | 7 |
-| ARCH-003 | P2 | High | Open - maintenance debt | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4 |
-| ARCH-004 | P3 | High | Open - maintenance debt | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
+| ARCH-003 | P2 | High | Partial - Batch 4 explicit backend contracts; frontend DTO debt remains | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4 |
+| ARCH-004 | P3 | High | Fixed - Batch 4; routed commerce contracts retained | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
 | BE-001 | P1 | High | Fixed - Batch 2; SQL evidence open | [Stale product saves can overwrite sold stock](BACKEND_AUDIT.md#be-001) | 2 |
 | BE-002 | P1 | High | Fixed - Batch 2 | [Native Django admin bypasses inventory and lifecycle services](BACKEND_AUDIT.md#be-002) | 2 |
 | BE-003 | P1 | High | Fixed - Batch 2 | [Return refunds ignore discounts and overstate item entitlement](BACKEND_AUDIT.md#be-003) | 2 |
 | BE-004 | P1 | High | Fixed - Batch 2 | [Manual partial refunds change status without recording money](BACKEND_AUDIT.md#be-004) | 2 |
 | BE-005 | P1 | High | Fixed - Batch 2 | [Staff order update commits before validating the full request](BACKEND_AUDIT.md#be-005) | 2 |
 | BE-006 | P2 | High | Fixed - Batch 2 | [Cancellation leaves the order payment projection stale](BACKEND_AUDIT.md#be-006) | 2 |
-| BE-007 | P2 | High | Open - confirmed defect | [Input validation falls through to database errors](BACKEND_AUDIT.md#be-007) | 4 (prioritize unsafe write cases in 2) |
-| BE-008 | P2 | High | Open - confirmed defect | [Newsletter repeat/reactivation path is rejected by serializer uniqueness](BACKEND_AUDIT.md#be-008) | 4 |
+| BE-007 | P2 | High | Fixed - Batch 4; bounded request contracts | [Input validation falls through to database errors](BACKEND_AUDIT.md#be-007) | 4 (prioritize unsafe write cases in 2) |
+| BE-008 | P2 | High | Fixed - Batch 4; idempotent subscription verified | [Newsletter repeat/reactivation path is rejected by serializer uniqueness](BACKEND_AUDIT.md#be-008) | 4 |
 | BE-009 | P2 | High | Open - confirmed defect | [Customer cancellation capability describes staff transitions](BACKEND_AUDIT.md#be-009) | 5 |
 | FE-001 | P2 | High | Fixed - Batch 2; explicit priority | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 2 |
 | FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
@@ -93,8 +93,8 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | SEC-003 | P2 | High | Open - configuration risk | [Throttle identity and cache are weak across proxies/workers](SECURITY_AUDIT.md#sec-003) | 9 |
 | SEC-004 | P2 | Medium | Open - conditional security risk | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |
 | SEC-005 | P2 | High | Open - dependency assurance gap | [Known dependency advisories and incomplete repeatable scanning](SECURITY_AUDIT.md#sec-005) | 9 (scanning foundation in 3) |
-| PERF-001 | P2 | High | Open - confirmed query growth | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
-| PERF-002 | P2 | High | Open - confirmed scalability gap | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
+| PERF-001 | P2 | High | Fixed - Batch 4; constant product read query budget | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
+| PERF-002 | P2 | High | Partial - Batch 4 bounded admin APIs; screen/stats work remains | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
 | PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
 | TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
 | TEST-002 | P2 | High | Partial - lint gate added; strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3 (API typing work in 5) |
@@ -106,6 +106,10 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | UX-001 | P2 | High | Open - accessibility gap | [Dialogs and controls lack consistent keyboard and naming semantics](UX_A11Y_SEO_AUDIT.md#ux-001) | 11 |
 | UX-002 | P2 | High | Open - SEO limitation | [Hash routes and client-only metadata limit storefront discoverability](UX_A11Y_SEO_AUDIT.md#ux-002) | 11 |
 | UX-003 | P2 | High | Open - confirmed navigation/metadata gap | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
+
+## Batch 4 update - 2026-09-30
+
+Dead order handlers removed after reachability checks; explicit product/account/content contracts, product/subscription services, bounded admin APIs with complete-page consumers, request validation and review aggregates verified. See [API contract/schema decision](../API_CONTRACTS.md). ARCH-004, BE-007, BE-008 and PERF-001 are addressed; ARCH-003 and PERF-002 remain partial. DB-003 legacy missing-payment reads/refund denial are characterized, with financial reconciliation still open. Later-batch UI pagination, DTO typing and broader concurrency are not closed by this cleanup.
 
 ## Baseline summary and open evidence
 

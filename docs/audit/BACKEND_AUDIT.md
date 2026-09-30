@@ -171,7 +171,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-007 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 4; bounded request contracts |
+| Batch 4 evidence | Profile typed lengths, inline-address validation, checkout line/monetary limits, normalized coupon/shipping codes, nonnegative values and merged partial-update date/day/percent validation now reject invalid requests before writes. Quote requests deliberately do not require a completed address. Database conflict responses are sanitized; test_write_contracts covers rollback/no-write and alias behavior. SQL Server suite exercises the same validation paths; broader mutation races remain DB-002. |
 | Evidence | P14: 101-percent coupon reports coupon_exists; min-days 5/max-days 1 shipping reports shipping_code_exists. Static profile None assignment and unbounded address strings bypass model full_clean. |
 | File/function references | backend/shop/commerce_serializers.py:87,113,313; backend/shop/commerce_views.py:487,534; backend/shop/views.py:486; backend/shop/commerce_services.py:317 |
 | Current behaviour | Cross-field coupon/shipping checks are largely deferred to database constraints; IntegrityError is labeled as duplicate code. Profile and inline-address writes bypass bounded typed serializers. |
@@ -193,7 +194,8 @@ The native admin permits deletion of some financial parents and direct lifecycle
 | ID | BE-008 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 4; idempotent subscription verified |
+| Batch 4 evidence | Newsletter email input no longer runs create-only uniqueness validation. subscription_services.subscribe normalizes, gets/creates and locks before reactivation, preserving source and renewing inactive consent only on an explicit request. API tests cover new/repeat/mixed-case/reactivation; an independent-connection SQL test covers concurrent creation/reactivation without duplicates. No delivery or unsolicited subscription is introduced. |
 | Evidence | P13: first email POST returns 201; identical second POST returns 400. Serializer validation precedes intended idempotent lookup. |
 | File/function references | backend/shop/commerce_serializers.py:418; backend/shop/commerce_views.py:439 |
 | Current behaviour | ModelSerializer validates unique email before get_or_create can return or reactivate an existing subscription. |
