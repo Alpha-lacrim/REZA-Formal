@@ -73,7 +73,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-003 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Addressed - Batch 5 |
+| Batch 5 evidence | Shared in-flight refresh and refresh/session versions coalesce concurrent and delayed 401s, bound retries and expire local auth once. Auth mutations wait for refresh cookies. Deterministic tests cover failed/network refresh, second 401, auth exclusions, CSRF/multipart renewal, cancellation and logout during refresh. Mounted context tests guard expiry and late bootstrap/account responses. See docs/FRONTEND_API_AUTH.md. |
 | Evidence | P17 loads the actual transpiled API adapter with mocked fetch: two simultaneous protected 401s cause two refresh calls. |
 | File/function references | frontend/services/api.ts:674,704,715 |
 | Current behaviour | Each failing protected request independently POSTs refresh and retries once. Only CSRF acquisition is deduplicated. |

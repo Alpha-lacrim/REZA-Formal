@@ -23,7 +23,7 @@ If several agents work in parallel, the primary agent owns `Codex.md`, `AGENTS.m
 - The active application consists of `frontend/` and `backend/`; repository-level deployment and setup files live beside them.
 - Treat `frontend/services/api.ts` and the Django routes in `backend/shop/urls.py` as the live client/server contract. `frontend/services/db.ts` is a browser-local fallback, not the authoritative production backend.
 - Keep Persian text as UTF-8 and preserve the RTL user experience.
-- Keep API response normalization in `frontend/services/api.ts`; the Django API uses snake_case while the UI models use camelCase in several places.
+- Keep response normalization inside the API boundary (`frontend/services/api.ts` and its domain modules such as `auth.ts` and `catalog.ts`), never in UI/context code. The Django API uses snake_case while UI models use camelCase. All domains share `services/http/client.ts` for cookies, CSRF, refresh and normalized errors.
 - Prices and stock must remain server-authoritative. Order writes and stock restoration must be transactional.
 - Do not expose development credentials in UI or documentation. Production secrets belong only in ignored environment files or the deployment platform's secret store.
 - Do not rewrite Git history, delete persistent data, remove volumes, or rotate external credentials without explicit owner approval. Redact a tracked secret from the current tree and report the required rotation/history cleanup instead.
