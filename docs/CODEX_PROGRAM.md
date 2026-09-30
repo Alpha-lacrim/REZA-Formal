@@ -11,10 +11,10 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 4 - Backend/API cleanup |
-| Batch status | Implementation verified; documentation and authorized integration merge closeout |
+| Batch status | Complete for Batch 4 scope; verified no-ff merge and both branches published |
 | Batch branch | `codex/batch-04-backend-api` |
 | Batch start commit | `820d5ebb69dde31ddd28a729f7d8c00e4eabe6f2` |
-| Final batch / integration merge | Recorded below after the verified no-ff merge; application tip `20001d4` |
+| Final batch / integration merge | `732ee09267dfdfb00695241f6d515f303b1adefa` / `9f5a203029b5770dc5d7277e0beabfed391a05fc` |
 | Audit IDs handled | ARCH-004, BE-007, BE-008, PERF-001 addressed; ARCH-003/PERF-002 partial; DB-003 characterized |
 | Verification performed | SQLite 109 passes/seven SQL skips; SQL Server 116/116 (28.683s); 24 frontend tests, lint/typecheck/build, three Chrome journeys, Django check/drift, Compose validation |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
@@ -26,7 +26,8 @@ pre-codex-remediation-2026-09-10
 - Commits: `92ddae4` dead legacy order handlers/serializers, `a406f8c` product contracts/services/aggregates, `eb2fd9b` write validation/newsletter, `5de6836` pagination/adapters/legacy tests, `e7ca669` browser port override, `194b8cc` malformed bodies, `20001d4` multipart/conflict compatibility.
 - Preserved routed order behavior, stock/refund transactions, public product mutation compatibility and historical financial truth. New services/read helpers stay inside the existing Django app. No database migration, dependency update, provider, production write or framework rewrite.
 - Closed ARCH-004, BE-007, BE-008 and PERF-001; kept ARCH-003/PERF-002 partial and DB-003 open with characterization. OpenAPI evaluated and deferred pending accurate annotations/auth/error/media coverage. See [API contracts](API_CONTRACTS.md), [verification](audit/TESTING_CI_AUDIT.md#batch-4-verification---2026-09-30).
-- Integration merge and publication follow the documentation commit after full diff, whitespace, status/link and credential-signature review. The final batch tip is the second parent of the named no-ff merge; observed hashes will be recorded in the integration closeout.
+- Final batch documentation commit `732ee09267dfdfb00695241f6d515f303b1adefa` merged with `--no-ff` at `9f5a203029b5770dc5d7277e0beabfed391a05fc`; first parent is start `820d5ebb69dde31ddd28a729f7d8c00e4eabe6f2`. Merge tree equals the verified batch tree. Full diff/whitespace, all 43 audit status categories, six exact changed statuses, changed-document links and added credential signatures pass. Main/dev/stash are unchanged.
+- Normal atomic push successfully created origin Batch 4 at `732ee09` and advanced origin integration to `9f5a203`. This documentation-only closeout follows on integration and is published normally; hosted CI results are not claimed.
 - Remaining: actual server-driven staff screen pagination, strict frontend DTOs, broader SQL mutation schedules, verified legacy financial reconciliation, schema implementation and hosted CI/deployment evidence. Deploy the frontend adapter with/before the paginated backend; no migration is required.
 
 ## Batch 3 - Testing and CI
