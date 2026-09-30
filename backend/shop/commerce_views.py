@@ -1,12 +1,11 @@
-import math
 import uuid
+from collections.abc import Mapping
 from decimal import Decimal
 
 from django.db import IntegrityError, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.deletion import ProtectedError
 from django.shortcuts import get_object_or_404
-from django.utils import timezone
 from django.utils.text import slugify
 from rest_framework import permissions, status
 from rest_framework.decorators import api_view, permission_classes, throttle_classes
@@ -17,6 +16,7 @@ from .commerce_serializers import (
     BespokeAdminUpdateSerializer,
     BespokeRequestSerializer,
     CheckoutRequestSerializer,
+    QuoteRequestSerializer,
     CouponSerializer,
     NewsletterSerializer,
     OrderSerializer,
@@ -51,7 +51,6 @@ from .models import (
     Address,
     BespokeRequest,
     Coupon,
-    NewsletterSubscription,
     NotificationOutbox,
     Order,
     OrderEvent,
@@ -65,6 +64,9 @@ from .models import (
     WishlistItem,
 )
 from .throttles import CheckoutQuoteRateThrottle, CheckoutRateThrottle, NewsletterRateThrottle
+from .subscription_services import subscribe
+from .pagination import page_response
+from .selectors import order_reads
 
 
 def _commerce_error(exc):
@@ -79,27 +81,6 @@ def _admin_error(request):
     if not request.user.is_admin():
         return Response({'detail': 'Administrator access is required.', 'code': 'admin_required'}, status=403)
     return None
-
-
-def _page(request, queryset, serializer_class):
-    try:
-        page = max(int(request.query_params.get('page', 1)), 1)
-        page_size = min(max(int(request.query_params.get('page_size', 25)), 1), 100)
-    except (TypeError, ValueError):
-        page, page_size = 1, 25
-    count = queryset.count()
-    total_pages = max(math.ceil(count / page_size), 1)
-    start = (page - 1) * page_size
-    results = serializer_class(queryset[start:start + page_size], many=True, context={'request': request}).data
-    return Response({
-        'results': results,
-        'count': count,
-        'next': None,
-        'previous': None,
-        'page': page,
-        'page_size': page_size,
-        'total_pages': total_pages,
-    })
 
 
 @api_view(['GET'])
@@ -120,7 +101,7 @@ def checkout_options(request):
 @permission_classes([permissions.IsAuthenticated])
 @throttle_classes([CheckoutQuoteRateThrottle])
 def checkout_quote(request):
-    serializer = CheckoutRequestSerializer(data=request.data)
+    serializer = QuoteRequestSerializer(data=request.data)
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
@@ -166,10 +147,8 @@ def order_detail(request, pk):
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
 def my_orders(request):
-    queryset = Order.objects.filter(user=request.user).select_related(
-        'user', 'shipping_method', 'coupon', 'payment',
-    ).prefetch_related('items__variant', 'events__actor').order_by('-created_at')
-    return _page(request, queryset, OrderSerializer)
+    queryset = order_reads().filter(user=request.user).order_by('-created_at')
+    return page_response(request, queryset, OrderSerializer)
 
 
 @api_view(['POST'])
@@ -314,7 +293,7 @@ def product_reviews(request, product_id):
     product = get_object_or_404(Product, pk=product_id, is_active=True)
     if request.method == 'GET':
         queryset = ProductReview.objects.filter(product=product, status='approved').select_related('user')
-        return _page(request, queryset, ProductReviewSerializer)
+        return page_response(request, queryset, ProductReviewSerializer)
     if not request.user.is_authenticated:
         return Response({'detail': 'Authentication is required.', 'code': 'authentication_required'}, status=401)
 
@@ -350,7 +329,7 @@ def product_reviews(request, product_id):
 def returns(request):
     if request.method == 'GET':
         queryset = ReturnRequest.objects.filter(user=request.user).select_related('order', 'order_item')
-        return _page(request, queryset, ReturnRequestSerializer)
+        return page_response(request, queryset, ReturnRequestSerializer)
 
     serializer = ReturnCreateSerializer(data=request.data)
     if not serializer.is_valid():
@@ -441,16 +420,7 @@ def newsletter_subscribe(request):
     serializer = NewsletterSerializer(data=request.data)
     if not serializer.is_valid():
         return _validation_error(serializer)
-    email = serializer.validated_data['email'].strip().lower()
-    subscription, created = NewsletterSubscription.objects.get_or_create(
-        email=email,
-        defaults={'is_active': True, 'source': 'website'},
-    )
-    if not created and not subscription.is_active:
-        subscription.is_active = True
-        subscription.unsubscribed_at = None
-        subscription.subscribed_at = timezone.now()
-        subscription.save(update_fields=['is_active', 'unsubscribed_at', 'subscribed_at'])
+    subscription, created = subscribe(serializer.validated_data['email'])
     return Response(NewsletterSerializer(subscription).data, status=201 if created else 200)
 
 
@@ -480,14 +450,19 @@ def admin_coupons(request):
         search = request.query_params.get('search')
         if search:
             queryset = queryset.filter(code__icontains=search)
-        return _page(request, queryset, CouponSerializer)
+        return page_response(request, queryset, CouponSerializer)
     serializer = CouponSerializer(data=request.data)
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        coupon = serializer.save()
+        with transaction.atomic():
+            coupon = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
+            return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(CouponSerializer(coupon).data, status=201)
 
 
@@ -510,9 +485,14 @@ def admin_coupon_detail(request, pk):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        coupon = serializer.save()
+        with transaction.atomic():
+            coupon = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        if Coupon.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
+            return Response({'detail': 'Coupon code already exists.', 'code': 'coupon_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(CouponSerializer(coupon).data)
 
 
@@ -523,18 +503,23 @@ def admin_shipping_methods(request):
     if denied:
         return denied
     if request.method == 'GET':
-        return _page(request, ShippingMethod.objects.order_by('sort_order', 'name'), ShippingMethodSerializer)
-    payload = request.data.copy()
-    if not payload.get('code'):
+        return page_response(request, ShippingMethod.objects.order_by('sort_order', 'name'), ShippingMethodSerializer)
+    payload = request.data.copy() if isinstance(request.data, Mapping) else request.data
+    if isinstance(payload, Mapping) and not payload.get('code'):
         generated = slugify(str(payload.get('name') or ''), allow_unicode=True).upper()
         payload['code'] = (generated or f'SHIP-{uuid.uuid4().hex[:12]}')[:64]
     serializer = ShippingMethodSerializer(data=payload)
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        method = serializer.save()
+        with transaction.atomic():
+            method = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
+            return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(ShippingMethodSerializer(method).data, status=201)
 
 
@@ -554,9 +539,14 @@ def admin_shipping_method_detail(request, pk):
     if not serializer.is_valid():
         return _validation_error(serializer)
     try:
-        method = serializer.save()
+        with transaction.atomic():
+            method = serializer.save()
     except IntegrityError:
-        return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        if ShippingMethod.objects.filter(code=serializer.validated_data.get('code', '')).exclude(
+            pk=serializer.instance.pk if serializer.instance else None,
+        ).exists():
+            return Response({'detail': 'Shipping method code already exists.', 'code': 'shipping_code_exists'}, status=409)
+        return Response({'detail': 'The update conflicts with stored data.', 'code': 'write_conflict'}, status=409)
     return Response(ShippingMethodSerializer(method).data)
 
 
@@ -573,7 +563,7 @@ def admin_payments(request):
     search = request.query_params.get('search')
     if search:
         queryset = queryset.filter(Q(order__id__icontains=search) | Q(reference__icontains=search))
-    return _page(request, queryset, PaymentSerializer)
+    return page_response(request, queryset, PaymentSerializer)
 
 
 @api_view(['GET', 'PUT'])
@@ -606,7 +596,7 @@ def admin_reviews(request):
     review_status = request.query_params.get('status')
     if review_status:
         queryset = queryset.filter(status=review_status)
-    return _page(request, queryset, ProductReviewSerializer)
+    return page_response(request, queryset, ProductReviewSerializer)
 
 
 @api_view(['GET', 'PUT', 'DELETE'])
@@ -639,7 +629,7 @@ def admin_returns(request):
     return_status = request.query_params.get('status')
     if return_status:
         queryset = queryset.filter(status=return_status)
-    return _page(request, queryset, ReturnRequestSerializer)
+    return page_response(request, queryset, ReturnRequestSerializer)
 
 
 @api_view(['GET', 'PUT'])
@@ -684,7 +674,7 @@ def admin_bespoke_requests(request):
     bespoke_status = request.query_params.get('status')
     if bespoke_status:
         queryset = queryset.filter(status=bespoke_status)
-    return _page(request, queryset, BespokeRequestSerializer)
+    return page_response(request, queryset, BespokeRequestSerializer)
 
 
 @api_view(['GET', 'PUT'])

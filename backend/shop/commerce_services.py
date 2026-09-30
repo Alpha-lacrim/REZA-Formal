@@ -6,6 +6,8 @@ from django.db import IntegrityError, transaction
 from django.db.models import Sum
 from django.utils import timezone
 
+from .selectors import order_reads
+
 from .models import (
     Address,
     Coupon,
@@ -264,6 +266,8 @@ def calculate_quote(user, validated_data, *, lock=False):
     )
     tax_total = Decimal('0.00')
     total = money(max(subtotal - discount_total + shipping_total + tax_total, Decimal('0.00')))
+    if max(subtotal, total) > Decimal('9999999999.99'):
+        raise CommerceError('order_total_exceeded', 'The order exceeds the supported amount.')
     return {
         'lines': lines,
         'currency': lines[0].product.currency,
@@ -376,14 +380,8 @@ def _sync_product_stock(product):
     product.save(update_fields=['stock', 'updated_at'])
 
 
-def _order_queryset():
-    return Order.objects.select_related(
-        'user', 'address', 'shipping_method', 'coupon', 'payment',
-    ).prefetch_related('items__variant', 'events__actor')
-
-
 def get_order_for_user(order_id, user, *, include_admin=False):
-    queryset = _order_queryset()
+    queryset = order_reads()
     if not include_admin or not user.is_admin():
         queryset = queryset.filter(user=user)
     try:
@@ -404,7 +402,7 @@ def create_checkout_order(user, validated_data):
         raise CommerceError('payment_method_invalid', 'The selected payment method is unavailable.')
 
     requested_key = validated_data.get('idempotency_key') or uuid.uuid4()
-    existing = _order_queryset().filter(idempotency_key=requested_key).first()
+    existing = order_reads().filter(idempotency_key=requested_key).first()
     if existing:
         if existing.user_id != user.id:
             raise CommerceError('idempotency_key_conflict', 'This idempotency key is already in use.', 409)
@@ -534,7 +532,7 @@ def create_checkout_order(user, validated_data):
         # A same-key request can wait on inventory while the winning checkout
         # commits. Recheck after rollback: its stock/coupon validation failure
         # must replay that order, just like a duplicate-key insert would.
-        existing = _order_queryset().filter(idempotency_key=requested_key).first()
+        existing = order_reads().filter(idempotency_key=requested_key).first()
         if existing:
             if existing.user_id != user.id:
                 raise CommerceError('idempotency_key_conflict', 'This idempotency key is already in use.', 409)
@@ -674,7 +672,7 @@ def transition_order_status(order_id, new_status, actor):
                 actor=actor,
                 data={'message': f'Order status changed to {new_status}'},
             )
-    return _order_queryset().get(pk=order_id)
+    return order_reads().get(pk=order_id)
 
 
 def update_staff_order(order_id, new_status, actor, details):
@@ -698,7 +696,7 @@ def update_staff_order(order_id, new_status, actor, details):
                     'message': 'Order fulfillment details updated',
                 },
             )
-    return _order_queryset().get(pk=order_id)
+    return order_reads().get(pk=order_id)
 
 
 def transition_payment(payment_id, new_status, actor, **refund_data):

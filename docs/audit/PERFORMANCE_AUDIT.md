@@ -27,7 +27,8 @@ Existing DB indexes cover many commerce status/user/date paths. No generic claim
 | ID | PERF-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed query growth |
+| Status | Fixed - Batch 4; constant product read query budget |
+| Batch 4 evidence | product_reads annotates approved rating/count and prefetches variants without loading all reviews. Public/staff read serializers consume that graph. Tests assert two queries for 1 and 100 products, pending-review exclusion, no-review null/count behavior and explicit response fields on SQLite and SQL Server. No index migration or production timing claim. |
 | Evidence | P02 CaptureQueriesContext: one product=5 queries/2 review aggregates; two=7 queries/4 aggregates using actual serializer/prefetch. |
 | File/function references | backend/shop/serializers.py:94,98; backend/shop/views.py:562,876 |
 | Current behaviour | Prefetching reviews does not satisfy later filtered aggregate/count calls; each serialized product performs two extra review queries and loads the prefetched reviews as well. |
@@ -49,7 +50,8 @@ Existing DB indexes cover many commerce status/user/date paths. No generic claim
 | ID | PERF-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed scalability gap |
+| Status | Partial - Batch 4 bounded admin APIs; screen/stats work remains |
+| Batch 4 evidence | Orders/users/messages/products now use the shared 25-default/100-max page envelope with deterministic PK tie breakers and relative navigation links. Four staff adapters traverse numeric pages and reject incomplete loads; 103-record and permission/API tests plus MSW pagination tests pass. Browser collections still load all pages, public catalog/account collections and revenue aggregation remain unbounded; server-driven screen pagination is deferred. |
 | Evidence | Static queryset/serializer trace has no slice/paginator on these routes; contrast _page default25/max100 used for coupons/shipping/payments/reviews/returns/bespoke. |
 | File/function references | backend/shop/views.py:561,746,774,842,851,871; backend/shop/commerce_views.py:187,238,287 |
 | Current behaviour | Products, old staff orders/users/messages/products, addresses/cart/wishlist return all records. Admin revenue loops all qualifying payments. New commerce staff lists already use bounded _page. |

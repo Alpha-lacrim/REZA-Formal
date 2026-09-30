@@ -1,5 +1,7 @@
 import { defineConfig, devices } from '@playwright/test';
 
+const frontendPort = Number(process.env.REZA_E2E_FRONTEND_PORT || 3100);
+
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: false,
@@ -7,7 +9,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list'], ['html', { open: 'never' }]],
   use: {
-    baseURL: 'http://127.0.0.1:3100', trace: 'retain-on-failure',
+    baseURL: `http://127.0.0.1:${frontendPort}`, trace: 'retain-on-failure',
     // Optional local installed browser; CI uses Playwright's pinned Chromium.
     channel: process.env.PLAYWRIGHT_CHANNEL || undefined,
   },
@@ -18,6 +20,6 @@ export default defineConfig({
       cwd: '../backend', url: 'http://127.0.0.1:18080/api/health/live/',
       reuseExistingServer: false, timeout: 120_000,
     },
-    { command: 'npm run dev -- --config vite.e2e.config.ts', url: 'http://127.0.0.1:3100', reuseExistingServer: false, env: { VITE_API_BASE: '' } },
+    { command: 'npm run dev -- --config vite.e2e.config.ts', url: `http://127.0.0.1:${frontendPort}`, reuseExistingServer: false, env: { VITE_API_BASE: '' } },
   ],
 });

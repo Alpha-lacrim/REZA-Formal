@@ -1,5 +1,15 @@
 # Testing, CI and operations audit
 
+## Batch 4 verification - 2026-09-30
+
+- SQL Server: full suite **116/116 passes, zero skips**, 28.683s, using the existing isolated `reza-sql-tests` topology and native ODBC runner. This includes the constant product query budget, large staff pages, legacy missing-payment characterization, quote/address regression and seven SQL-only cases (new concurrent newsletter creation/reactivation). Final SQL coverage also includes malformed body, multipart normalization and conflict-classification regressions.
+- Final SQLite: **116 cases, 109 passes/seven deliberate SQL-only skips**, 6.528s. Django `check` and `makemigrations --check --dry-run` with `reza_backend.test_settings` pass; no migrations.
+- Frontend: `npm.cmd run lint`, `npm.cmd run typecheck`, ten retained Node tests, fourteen Vitest tests (six new admin-page cases), and production build pass. Build 4.67s, main bundle 345.04 kB / 102.16 kB gzip. Sandbox esbuild parent-directory reads failed; the same unit/build gates passed outside the sandbox.
+- Browser: three real-backend Chrome smoke tests pass in 11.0s. Windows reserved 3100; used `PLAYWRIGHT_CHANNEL=chrome` and `REZA_E2E_FRONTEND_PORT=18180`, coordinated with disposable backend CSRF. An intermediate run exposed quote validation wrongly requiring a completed address; a separate quote serializer and regression fixed it, then all journeys passed. Synthetic COD checkout remains unpaid; staff product edit persists.
+- Both Compose configurations validate (sandbox warns about unreadable global Docker config). An initial SQL compose command from frontend used the wrong relative file path; the root-directory rerun passes. Django test runner reports database destruction; disposable test container/network removal and empty project-filtered container inventory are confirmed. A supplementary database-count SQL command had quoting syntax failure, so no separate post-test database inventory claim is made.
+- Review: batch-to-base full source/test/contract diff, UTF-8 text, explicit field declarations, permissions, page completeness, secret-signature/path checks and `git diff --check`. No production data, deployment, main branch or applied migrations changed. Wider DB-002/TEST-003 schedules, hosted CI, frontend strict DTOs and actual server-driven staff screen pagination remain open.
+
+
 The original baseline commands and probes below ran on September 10, 2026 on Windows/PowerShell in the nested repository. Documentation was reviewed on September 13 against unchanged application files. After the initial completion handoff, the owner requested a fresh completion check before publication; those six repeated checks are recorded separately below. Isolated Django settings use in-memory SQLite and were asserted again in the original probes. No test used the configured SQL Server or live commerce data. Build output is ignored and not committed.
 
 ## Exact baseline commands and results

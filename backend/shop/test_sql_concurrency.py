@@ -9,7 +9,8 @@ from django.db import IntegrityError, close_old_connections, connection, connect
 from django.test import TransactionTestCase
 
 from .commerce_services import CommerceError, create_checkout_order, transition_order_status
-from .models import InventoryMovement, Order, Payment, Product, ProductVariant, User
+from .models import InventoryMovement, NewsletterSubscription, Order, Payment, Product, ProductVariant, User
+from .subscription_services import subscribe
 
 
 @skipUnless(connection.vendor == 'microsoft', 'Dedicated SQL Server lane only')
@@ -51,6 +52,27 @@ class SqlConcurrencyTests(TransactionTestCase):
         results = self.race([uuid.uuid4(), uuid.uuid4()])
         self.assertEqual(sum(row[0] == 'ok' for row in results), 1, results)
         self.assertEqual(sum(row[0] == 'rejected' for row in results), 1, results)
+
+    def test_concurrent_subscription_converges_and_reactivates_once(self):
+        for existing in (False, True):
+            if existing:
+                NewsletterSubscription.objects.update(is_active=False)
+            barrier = threading.Barrier(2)
+            def subscribe_on_connection(email):
+                close_old_connections()
+                try:
+                    barrier.wait(timeout=10)
+                    subscription, created = subscribe(email)
+                    return subscription.pk, created
+                finally:
+                    connections.close_all()
+            with ThreadPoolExecutor(max_workers=2) as pool:
+                futures = [pool.submit(subscribe_on_connection, email) for email in
+                           ('SQL-Reader@example.invalid', 'sql-reader@example.invalid')]
+                results = [future.result(timeout=20) for future in futures]
+            self.assertEqual(results[0][0], results[1][0])
+            self.assertEqual(sum(row[1] for row in results), 0 if existing else 1)
+            self.assertTrue(NewsletterSubscription.objects.get().is_active)
 
     def test_duplicate_idempotency_converges_to_one_order(self):
         key = uuid.uuid4()

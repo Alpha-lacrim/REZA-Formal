@@ -1,13 +1,12 @@
 from unittest.mock import patch
 
-from django.db import transaction
 from django.test import TestCase
 from rest_framework.test import APIClient
 
 from .commerce_services import create_checkout_order
 from .models import InventoryMovement, Product, ProductVariant, User
-from .serializers import ProductSerializer
-from .views import _sync_product_variants
+from .serializers import AdminProductWriteSerializer
+from .product_services import save_product
 
 
 class InventoryAuthorityTests(TestCase):
@@ -25,12 +24,10 @@ class InventoryAuthorityTests(TestCase):
         })[0]
 
     def test_stale_serializer_description_cannot_restore_sold_stock(self):
-        serializer = ProductSerializer(self.product, data={'name': 'Edited'}, partial=True)
+        serializer = AdminProductWriteSerializer(self.product, data={'name': 'Edited'}, partial=True)
         self.assertTrue(serializer.is_valid())
         self.sell()
-        with transaction.atomic():
-            serializer.save()
-            _sync_product_variants(serializer.instance, None, self.staff)
+        save_product(serializer.instance, serializer.validated_data, None, self.staff)
         self.product.refresh_from_db()
         self.variant.refresh_from_db()
         self.assertEqual((self.product.name, self.product.stock, self.variant.stock), ('Edited', 8, 8))
@@ -78,7 +75,7 @@ class InventoryAuthorityTests(TestCase):
 
     def test_failed_adjustment_rolls_back_product_variant_and_ledger(self):
         snapshot = self.client.get(self.url).data
-        with patch('shop.views.InventoryMovement.objects.create', side_effect=RuntimeError('Ledger failed')):
+        with patch('shop.product_services.InventoryMovement.objects.create', side_effect=RuntimeError('Ledger failed')):
             with self.assertRaisesMessage(RuntimeError, 'Ledger failed'):
                 self.client.put(self.url, {
                     'stock': 12, 'name': 'Must roll back',
