@@ -10,11 +10,15 @@ export default tseslint.config(
     files: ['**/*.{ts,tsx,js}'],
     languageOptions: { globals: { window: 'readonly', document: 'readonly', localStorage: 'readonly', console: 'readonly', setTimeout: 'readonly', clearTimeout: 'readonly', URL: 'readonly', process: 'readonly', __dirname: 'readonly' } },
     rules: {
-      // Existing adapter typing and unused imports are later-batch debt.
+      // Remaining legacy commerce adapter typing and unused imports migrate incrementally.
       '@typescript-eslint/no-explicit-any': 'off',
       '@typescript-eslint/no-unused-vars': 'off',
       'no-unused-vars': 'off',
       'no-undef': 'off', // TypeScript checks names in TS/TSX.
     },
+  },
+  {
+    files: ['services/auth.ts', 'services/catalog.ts', 'services/normalization.ts', 'services/http/*.ts'],
+    rules: { '@typescript-eslint/no-explicit-any': 'error' },
   },
 );

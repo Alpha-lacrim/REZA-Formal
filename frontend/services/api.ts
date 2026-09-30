@@ -1,3 +1,9 @@
+import { authApi, normalizeUser } from './auth';
+import { catalogApi, normalizeProduct, normalizeVariant } from './catalog';
+import { request, jsonBody } from './http/client';
+import { ApiError, invalidResponse, isRecord } from './http/errors';
+import { toNumber, toBoolean, toTimestamp, optionalTimestamp, parseStringRecord } from './normalization';
+export { ApiError, errorMessage } from './http/errors';
 import {
   Address,
   AdminCapabilities,
@@ -29,99 +35,17 @@ import {
   User,
 } from '../types';
 
-const API_BASE = (import.meta.env.VITE_API_BASE || '').trim().replace(/\/+$/, '');
-const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS', 'TRACE']);
-const CSRF_PATH = '/api/auth/csrf/';
-const CSRF_ROTATING_PATHS = new Set([
-  '/api/auth/login/',
-  '/api/auth/register/',
-  '/api/auth/refresh/',
-  '/api/auth/logout/',
-]);
-
-let csrfTokenRequest: Promise<string | undefined> | null = null;
-
-function apiUrl(path: string): string {
-  const normalizedPath = path.startsWith('/') ? path : `/${path}`;
-
-  if (!API_BASE) return normalizedPath;
-
-  if (API_BASE.endsWith('/api') && (normalizedPath === '/api' || normalizedPath.startsWith('/api/'))) {
-    return `${API_BASE}${normalizedPath.slice(4)}`;
-  }
-
-  return `${API_BASE}${normalizedPath}`;
-}
-
-function toNumber(value: unknown, fallback = 0): number {
-  const n = Number(value);
-  return Number.isFinite(n) ? n : fallback;
-}
-
-function toBoolean(value: unknown, fallback = false): boolean {
-  if (typeof value === 'boolean') return value;
-  if (typeof value === 'string') {
-    if (value.toLowerCase() === 'true') return true;
-    if (value.toLowerCase() === 'false') return false;
-  }
-  if (typeof value === 'number') return value !== 0;
-  return fallback;
-}
-
-function toTimestamp(value: unknown, fallback = Date.now()): number {
-  if (typeof value === 'number' && Number.isFinite(value)) return value;
-  if (typeof value === 'string' && value) {
-    const parsed = Date.parse(value);
-    if (Number.isFinite(parsed)) return parsed;
-  }
-  return fallback;
-}
-
-function optionalTimestamp(value: unknown): number | undefined {
-  if (value === null || value === undefined || value === '') return undefined;
-  const parsed = toTimestamp(value, Number.NaN);
-  return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-function parseJsonList(value: unknown): string[] {
-  if (Array.isArray(value)) {
-    return value.filter((item): item is string => typeof item === 'string' && item.length > 0);
-  }
-  if (typeof value === 'string' && value.trim()) {
-    try {
-      const parsed = JSON.parse(value);
-      return Array.isArray(parsed)
-        ? parsed.filter((item): item is string => typeof item === 'string' && item.length > 0)
-        : [value];
-    } catch {
-      return [value];
-    }
-  }
-  return [];
-}
-
-function parseStringRecord(value: unknown): Record<string, string> {
-  let candidate = value;
-  if (typeof candidate === 'string' && candidate.trim()) {
-    try { candidate = JSON.parse(candidate); } catch { return {}; }
-  }
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) return {};
-  return Object.fromEntries(
-    Object.entries(candidate as Record<string, unknown>)
-      .filter(([, item]) => item !== null && item !== undefined)
-      .map(([key, item]) => [key, String(item)]),
-  );
-}
-
-function valuesFrom<T>(raw: any): T[] {
+function valuesFrom(raw: unknown): unknown[] {
   if (Array.isArray(raw)) return raw;
-  if (Array.isArray(raw?.results)) return raw.results;
-  if (Array.isArray(raw?.items)) return raw.items;
+  if (isRecord(raw) && Array.isArray(raw.results)) return raw.results;
+  if (isRecord(raw) && Array.isArray(raw.items)) return raw.items;
   return [];
 }
 
-function normalizePage<T>(raw: any, normalize: (item: any) => T): Page<T> {
-  const results = valuesFrom<any>(raw).map(normalize);
+function normalizePage<T>(value: unknown, normalize: (item: unknown) => T): Page<T> {
+  if (!Array.isArray(value) && !(isRecord(value) && (Array.isArray(value.results) || Array.isArray(value.items)))) return invalidResponse();
+  const results = valuesFrom(value).map(normalize);
+  const raw = isRecord(value) ? value : {};
   return {
     results,
     count: toNumber(raw?.count, results.length),
@@ -139,16 +63,16 @@ function normalizePage<T>(raw: any, normalize: (item: any) => T): Page<T> {
 
 // Preserve complete collections for existing staff screens during the pagination rollout.
 // Follow our numeric page contract, never an arbitrary server-provided URL.
-async function readAdminCollection<T>(path: string, normalize: (item: any) => T): Promise<T[]> {
+async function readAdminCollection<T>(path: string, normalize: (item: unknown) => T, signal?: AbortSignal): Promise<T[]> {
   const items: T[] = [];
   for (let pageNumber = 1; ; pageNumber++) {
-    const raw = await request(withQuery(path, { page: pageNumber, page_size: 100 }));
+    const raw = await request(withQuery(path, { page: pageNumber, page_size: 100 }), { signal });
     const page = normalizePage(raw, normalize);
     // Compatibility with an older backend during a coordinated deployment.
     if (Array.isArray(raw)) return page.results;
     if (page.page !== pageNumber || !Number.isInteger(page.totalPages) || page.totalPages! < 1
         || (pageNumber < page.totalPages! && page.results.length === 0)) {
-      throw new Error('Invalid administrative pagination response');
+      throw new ApiError(502, 'Invalid administrative pagination response', {}, 'invalid_response');
     }
     items.push(...page.results);
     if (pageNumber >= page.totalPages!) return items;
@@ -167,98 +91,6 @@ function withQuery(path: string, params?: Record<string, unknown>): string {
 
 function encodeId(id: string): string {
   return encodeURIComponent(id);
-}
-
-function normalizeVariant(raw: any, fallbackCurrency = 'Toman'): ProductVariant {
-  return {
-    id: String(raw?.id ?? ''),
-    productId: raw?.productId === undefined && raw?.product_id === undefined && raw?.product === undefined
-      ? undefined
-      : String(raw?.productId ?? raw?.product_id ?? raw?.product),
-    sku: raw?.sku ?? '',
-    name: raw?.name || undefined,
-    size: raw?.size || undefined,
-    color: raw?.color || undefined,
-    attributes: parseStringRecord(raw?.attributes),
-    price: toNumber(raw?.price),
-    priceOverride: raw?.priceOverride === undefined && raw?.price_override === undefined
-      ? undefined
-      : (raw?.priceOverride ?? raw?.price_override) === null
-        ? null
-        : toNumber(raw?.priceOverride ?? raw?.price_override),
-    compareAtPrice: (raw?.compareAtPrice ?? raw?.compare_at_price) === null
-      || (raw?.compareAtPrice === undefined && raw?.compare_at_price === undefined)
-      ? undefined
-      : toNumber(raw?.compareAtPrice ?? raw?.compare_at_price),
-    currency: raw?.currency || fallbackCurrency,
-    stock: toNumber(raw?.stock),
-    active: toBoolean(raw?.active ?? raw?.is_active, true),
-    image: raw?.image || undefined,
-    createdAt: optionalTimestamp(raw?.createdAt ?? raw?.created_at),
-    updatedAt: optionalTimestamp(raw?.updatedAt ?? raw?.updated_at),
-  };
-}
-
-function normalizeProduct(raw: any): Product {
-  const images = parseJsonList(raw?.images);
-  const image = raw?.image || images[0] || '';
-  const currency = raw?.currency || 'Toman';
-  const variants = Array.isArray(raw?.variants)
-    ? raw.variants.map((variant: any) => normalizeVariant(variant, currency))
-    : undefined;
-  const explicitStock = raw?.stock === null || raw?.stock === undefined ? undefined : toNumber(raw.stock);
-
-  return {
-    id: String(raw?.id ?? ''),
-    name: raw?.name ?? '',
-    name_fa: raw?.name_fa,
-    price: toNumber(raw?.price),
-    compareAtPrice: (raw?.compareAtPrice ?? raw?.compare_at_price) === null
-      || (raw?.compareAtPrice === undefined && raw?.compare_at_price === undefined)
-      ? undefined
-      : toNumber(raw?.compareAtPrice ?? raw?.compare_at_price),
-    currency,
-    image,
-    images: images.length > 0 ? images : (image ? [image] : []),
-    short: raw?.short ?? '',
-    short_fa: raw?.short_fa,
-    description: raw?.description ?? '',
-    description_fa: raw?.description_fa,
-    category: raw?.category ?? '',
-    fabric: raw?.fabric || undefined,
-    stock: explicitStock ?? (variants ? variants.reduce((sum: number, variant: ProductVariant) => sum + variant.stock, 0) : undefined),
-    inventoryVersion: raw?.inventory_version ?? raw?.inventoryVersion,
-    variants,
-    rating: raw?.rating === null || raw?.rating === undefined ? undefined : toNumber(raw.rating),
-    reviewCount: raw?.reviewCount === undefined && raw?.review_count === undefined
-      ? undefined
-      : toNumber(raw?.reviewCount ?? raw?.review_count),
-    active: raw?.active === undefined && raw?.is_active === undefined
-      ? undefined
-      : toBoolean(raw?.active ?? raw?.is_active),
-    featured: raw?.featured === undefined && raw?.is_featured === undefined
-      ? undefined
-      : toBoolean(raw?.featured ?? raw?.is_featured),
-  };
-}
-
-function normalizeUser(raw: any): User {
-  const firstName = raw?.first_name ?? '';
-  const lastName = raw?.last_name ?? '';
-  const fullName = raw?.name || [firstName, lastName].filter(Boolean).join(' ') || raw?.email || '';
-
-  return {
-    id: String(raw?.id ?? ''),
-    name: fullName,
-    email: raw?.email ?? '',
-    role: raw?.role || 'user',
-    phone: raw?.phone || undefined,
-    address: raw?.address || '',
-    createdAt: toTimestamp(raw?.createdAt ?? raw?.created_at ?? raw?.date_joined),
-    lastLogin: optionalTimestamp(raw?.lastLogin ?? raw?.last_login),
-    avatar: raw?.avatar || undefined,
-    provider: raw?.provider,
-  };
 }
 
 function normalizeAddress(raw: any): Address {
@@ -439,7 +271,7 @@ function normalizeOrder(raw: any): Order {
     coupon: raw?.coupon ? normalizeCoupon(raw.coupon) : undefined,
     trackingCode: raw?.trackingCode ?? raw?.tracking_code ?? undefined,
     trackingUrl: raw?.trackingUrl ?? raw?.tracking_url ?? undefined,
-    allowedTransitions: valuesFrom<string>(raw?.allowedTransitions ?? raw?.allowed_transitions) as OrderStatus[],
+    allowedTransitions: valuesFrom(raw?.allowedTransitions ?? raw?.allowed_transitions) as OrderStatus[],
     events: Array.isArray(raw?.events) ? raw.events.map(normalizeOrderEvent) : undefined,
   };
 }
@@ -541,7 +373,7 @@ function normalizeCartLine(raw: any) {
 }
 
 function normalizeCart(raw: any): CartState {
-  let lines = valuesFrom<any>(raw?.lines ? { results: raw.lines } : raw).map(normalizeCartLine);
+  let lines = valuesFrom(raw?.lines ? { results: raw.lines } : raw).map(normalizeCartLine);
   if (lines.length === 0 && raw && typeof raw === 'object' && !Array.isArray(raw) && !raw.lines && !raw.items) {
     lines = Object.entries(raw)
       .filter(([, quantity]) => Number.isFinite(Number(quantity)) && Number(quantity) > 0)
@@ -585,8 +417,8 @@ function normalizeAdminCapabilities(raw: any): AdminCapabilities {
 
 function normalizeCheckoutOptions(raw: any): CheckoutOptions {
   return {
-    shippingMethods: valuesFrom<any>(raw?.shippingMethods ?? raw?.shipping_methods).map(normalizeShippingMethod),
-    paymentMethods: valuesFrom<any>(raw?.paymentMethods ?? raw?.payment_methods).map(String) as PaymentMethod[],
+    shippingMethods: valuesFrom(raw?.shippingMethods ?? raw?.shipping_methods).map(normalizeShippingMethod),
+    paymentMethods: valuesFrom(raw?.paymentMethods ?? raw?.payment_methods).map(String) as PaymentMethod[],
     defaultShippingMethodId: raw?.defaultShippingMethodId ?? raw?.default_shipping_method_id ?? undefined,
     defaultPaymentMethod: raw?.defaultPaymentMethod ?? raw?.default_payment_method ?? undefined,
     capabilities: normalizeCapabilities(raw?.capabilities ?? raw),
@@ -596,7 +428,7 @@ function normalizeCheckoutOptions(raw: any): CheckoutOptions {
 function normalizeCheckoutQuote(raw: any): CheckoutQuote {
   return {
     id: raw?.id === null || raw?.id === undefined ? undefined : String(raw.id),
-    lines: valuesFrom<any>(raw?.lines ? { results: raw.lines } : raw?.items ? { results: raw.items } : []).map(normalizeOrderLine),
+    lines: valuesFrom(raw?.lines ? { results: raw.lines } : raw?.items ? { results: raw.items } : []).map(normalizeOrderLine),
     currency: raw?.currency || 'Toman',
     subtotal: toNumber(raw?.subtotal),
     discountTotal: toNumber(raw?.discountTotal ?? raw?.discount_total),
@@ -608,10 +440,10 @@ function normalizeCheckoutQuote(raw: any): CheckoutQuote {
       ? normalizeShippingMethod(raw?.shippingMethod ?? raw?.shipping_method)
       : undefined,
     availableShippingMethods: raw?.availableShippingMethods || raw?.available_shipping_methods
-      ? valuesFrom<any>(raw?.availableShippingMethods ?? raw?.available_shipping_methods).map(normalizeShippingMethod)
+      ? valuesFrom(raw?.availableShippingMethods ?? raw?.available_shipping_methods).map(normalizeShippingMethod)
       : undefined,
     availablePaymentMethods: raw?.availablePaymentMethods || raw?.available_payment_methods
-      ? valuesFrom<any>(raw?.availablePaymentMethods ?? raw?.available_payment_methods).map(String) as PaymentMethod[]
+      ? valuesFrom(raw?.availablePaymentMethods ?? raw?.available_payment_methods).map(String) as PaymentMethod[]
       : undefined,
     expiresAt: optionalTimestamp(raw?.expiresAt ?? raw?.expires_at),
   };
@@ -685,139 +517,13 @@ function normalizeAdminStats(raw: any): AdminStats {
   };
 }
 
-function readCookie(name: string): string | undefined {
-  if (typeof document === 'undefined') return undefined;
-  const prefix = `${encodeURIComponent(name)}=`;
-  const match = document.cookie.split(';').map(part => part.trim()).find(part => part.startsWith(prefix));
-  return match ? decodeURIComponent(match.slice(prefix.length)) : undefined;
-}
-
-async function ensureCsrfToken(): Promise<string | undefined> {
-  const cookieToken = readCookie('csrftoken');
-  if (cookieToken) return cookieToken;
-  if (csrfTokenRequest) return csrfTokenRequest;
-
-  csrfTokenRequest = (async () => {
-    try {
-      const response = await fetch(apiUrl(CSRF_PATH), { method: 'GET', credentials: 'include' });
-      if (!response.ok) return readCookie('csrftoken');
-      const data = await response.json().catch(() => null);
-      return data?.csrfToken ?? data?.csrf_token ?? data?.token ?? readCookie('csrftoken');
-    } catch {
-      // Older backends may not expose the bootstrap endpoint yet. Existing
-      // SameSite behavior remains usable while the additive contract rolls out.
-      return readCookie('csrftoken');
-    }
-  })();
-
-  return csrfTokenRequest;
-}
-
-const NO_AUTO_REFRESH_PATHS = new Set([
-  '/api/auth/login/',
-  '/api/auth/register/',
-  '/api/auth/refresh/',
-  '/api/auth/logout/',
-  '/api/auth/google/',
-  CSRF_PATH,
-]);
-
-async function fetchApi(path: string, opts: RequestInit = {}): Promise<Response> {
-  const method = (opts.method || 'GET').toUpperCase();
-  const headers = new Headers(opts.headers);
-  if (!SAFE_METHODS.has(method) && path !== CSRF_PATH && !headers.has('X-CSRFToken')) {
-    const token = await ensureCsrfToken();
-    if (token) headers.set('X-CSRFToken', token);
-  }
-
-  const requestOptions = { ...opts, method, headers, credentials: 'include' as RequestCredentials };
-  let response = await fetch(apiUrl(path), requestOptions);
-
-  if (response.status === 401 && !NO_AUTO_REFRESH_PATHS.has(path)) {
-    const refreshHeaders = new Headers();
-    const csrfToken = await ensureCsrfToken();
-    if (csrfToken) refreshHeaders.set('X-CSRFToken', csrfToken);
-    const refreshResponse = await fetch(apiUrl('/api/auth/refresh/'), {
-      method: 'POST',
-      headers: refreshHeaders,
-      credentials: 'include',
-    });
-    if (refreshResponse.ok) {
-      csrfTokenRequest = null;
-      if (!SAFE_METHODS.has(method)) {
-        headers.delete('X-CSRFToken');
-        const renewedCsrfToken = await ensureCsrfToken();
-        if (renewedCsrfToken) headers.set('X-CSRFToken', renewedCsrfToken);
-      }
-      response = await fetch(apiUrl(path), requestOptions);
-    }
-  }
-
-  if (response.ok && CSRF_ROTATING_PATHS.has(path)) csrfTokenRequest = null;
-  return response;
-}
-
-function errorMessage(data: any): string {
-  if (typeof data === 'string' && data.trim()) return data;
-  if (typeof data?.detail === 'string') return data.detail;
-  if (typeof data?.message === 'string') return data.message;
-  if (data && typeof data === 'object') {
-    for (const [field, value] of Object.entries(data)) {
-      if (Array.isArray(value) && value.length > 0) return `${field}: ${String(value[0])}`;
-      if (typeof value === 'string') return `${field}: ${value}`;
-    }
-  }
-  return 'Request failed';
-}
-
-async function request<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
-  const headers = new Headers(opts.headers);
-  if (opts.body && !(opts.body instanceof FormData) && !headers.has('Content-Type')) {
-    headers.set('Content-Type', 'application/json');
-  }
-
-  const res = await fetchApi(path, { ...opts, headers });
-  const text = await res.text();
-  let data: any;
-  try { data = text ? JSON.parse(text) : null; } catch { data = text; }
-
-  if (!res.ok) {
-    const error = new Error(errorMessage(data)) as Error & { status?: number; data?: unknown };
-    error.status = res.status;
-    error.data = data;
-    throw error;
-  }
-  return data as T;
-}
-
-function jsonBody(payload: unknown): Pick<RequestInit, 'body' | 'headers'> {
-  return { body: JSON.stringify(payload), headers: { 'Content-Type': 'application/json' } };
-}
-
-function isFile(value: any): boolean {
+function isFile(value: unknown): value is Blob {
   return Boolean(value) && (value instanceof File || value instanceof Blob);
 }
 
 export const api = {
-  async getProducts(): Promise<Product[]> {
-    return normalizePage(await request('/api/products/'), normalizeProduct).results;
-  },
-  async getProduct(id: string): Promise<Product> {
-    return normalizeProduct(await request(`/api/products/${encodeId(id)}/`));
-  },
-  async register(name: string, email: string, pass: string) {
-    const data: any = await request('/api/auth/register/', { method: 'POST', ...jsonBody({ first_name: name, email, password: pass }) });
-    return data?.user ? { ...data, user: normalizeUser(data.user) } : normalizeUser(data);
-  },
-  async login(email: string, pass: string, otp?: string) {
-    const data: any = await request('/api/auth/login/', { method: 'POST', ...jsonBody({ email, password: pass, otp }) });
-    return data?.user ? { ...data, user: normalizeUser(data.user) } : normalizeUser(data);
-  },
-  async logout() { return request('/api/auth/logout/', { method: 'POST' }); },
-  async me(): Promise<User> { return normalizeUser(await request('/api/auth/me/')); },
-  async updateProfile(payload: any): Promise<User> {
-    return normalizeUser(await request('/api/auth/me/update/', { method: 'PUT', ...jsonBody(payload) }));
-  },
+  ...authApi,
+  ...catalogApi,
 
   async getCheckoutOptions(): Promise<CheckoutOptions> {
     return normalizeCheckoutOptions(await request('/api/checkout/options/'));
@@ -856,8 +562,8 @@ export const api = {
     return request(`/api/addresses/${encodeId(id)}/`, { method: 'DELETE' });
   },
 
-  async getSavedCart(): Promise<CartState> {
-    return normalizeCart(await request('/api/cart/'));
+  async getSavedCart(signal?: AbortSignal): Promise<CartState> {
+    return normalizeCart(await request('/api/cart/', { signal }));
   },
   async syncSavedCart(cart: CartState): Promise<CartState> {
     const payload = {
@@ -867,21 +573,21 @@ export const api = {
   },
   async clearSavedCart() { return request('/api/cart/', { method: 'DELETE' }); },
 
-  async getWishlist(): Promise<Product[]> {
-    const raw: any = await request('/api/wishlist/');
-    return normalizePage(raw?.products ?? raw, item => normalizeProduct(item?.product ?? item)).results;
+  async getWishlist(signal?: AbortSignal): Promise<Product[]> {
+    const raw: any = await request('/api/wishlist/', { signal });
+    return normalizePage(raw?.products ?? raw, item => normalizeProduct(isRecord(item) ? item.product ?? item : item)).results;
   },
   async addToWishlist(productId: string): Promise<Product[]> {
     const raw: any = await request(`/api/wishlist/${encodeId(productId)}/`, { method: 'POST' });
-    return normalizePage(raw?.products ?? raw, item => normalizeProduct(item?.product ?? item)).results;
+    return normalizePage(raw?.products ?? raw, item => normalizeProduct(isRecord(item) ? item.product ?? item : item)).results;
   },
   async removeFromWishlist(productId: string): Promise<Product[]> {
     const raw: any = await request(`/api/wishlist/${encodeId(productId)}/`, { method: 'DELETE' });
-    return normalizePage(raw?.products ?? raw, item => normalizeProduct(item?.product ?? item)).results;
+    return normalizePage(raw?.products ?? raw, item => normalizeProduct(isRecord(item) ? item.product ?? item : item)).results;
   },
 
-  async getProductReviews(productId: string, params?: Record<string, unknown>): Promise<Page<ProductReview>> {
-    return normalizePage(await request(withQuery(`/api/products/${encodeId(productId)}/reviews/`, params)), normalizeReview);
+  async getProductReviews(productId: string, params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<ProductReview>> {
+    return normalizePage(await request(withQuery(`/api/products/${encodeId(productId)}/reviews/`, params), { signal }), normalizeReview);
   },
   async createProductReview(productId: string, review: Pick<ProductReview, 'rating' | 'title' | 'body'>): Promise<ProductReview> {
     return normalizeReview(await request(`/api/products/${encodeId(productId)}/reviews/`, { method: 'POST', ...jsonBody(review) }));
@@ -910,7 +616,9 @@ export const api = {
     return normalizeNewsletter(await request('/api/newsletter/subscribe/', { method: 'POST', ...jsonBody({ email }) }));
   },
 
-  async getSettings(): Promise<SiteSettings> { return normalizeSettings(await request('/api/settings/')); },
+  async getSettings(): Promise<SiteSettings> {
+    return normalizeSettings(await request('/api/settings/', {}, { sessionBound: false }));
+  },
   async saveSettings(data: any): Promise<SiteSettings> {
     return normalizeSettings(await request('/api/settings/', {
       method: 'PUT',
@@ -950,8 +658,8 @@ export const api = {
   async adminMarkMessageRead(id: string) {
     return request(`/api/admin/messages/${encodeId(id)}/mark-read/`, { method: 'POST' });
   },
-  async adminGetProducts(): Promise<Product[]> {
-    return readAdminCollection('/api/admin/products/', normalizeProduct);
+  async adminGetProducts(signal?: AbortSignal): Promise<Product[]> {
+    return readAdminCollection('/api/admin/products/', normalizeProduct, signal);
   },
 
   async adminSaveProduct(product: any): Promise<Product> {

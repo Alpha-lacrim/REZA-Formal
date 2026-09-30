@@ -17,7 +17,7 @@ test.each([
     requests.push(page);
     const start = (page - 1) * 100;
     return HttpResponse.json({
-      results: Array.from({ length: page === 1 ? 100 : 3 }, (_, i) => ({ id: String(start + i) })),
+      results: Array.from({ length: page === 1 ? 100 : 3 }, (_, i) => ({ id: String(start + i), email: `user${i}@example.invalid`, role: 'user' })),
       count: 103, page, page_size: 100, total_pages: 2,
     });
   }));
