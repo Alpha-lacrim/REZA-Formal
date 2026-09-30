@@ -1,3 +1,4 @@
+import { errorMessage } from '../services/api';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
@@ -49,8 +50,8 @@ const BespokePage: React.FC = () => {
             setRequestId(result.id || '');
             setStep(3);
             showToast('درخواست شما با موفقیت ثبت شد');
-        } catch (submissionError: any) {
-            const message = submissionError?.message || 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید';
+        } catch (submissionError: unknown) {
+            const message = errorMessage(submissionError, 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید');
             setError(message);
             showToast(message);
         } finally {

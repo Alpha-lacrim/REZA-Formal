@@ -5,6 +5,7 @@ import React from 'react';
 import { act, cleanup, render, waitFor } from '@testing-library/react';
 import { GlobalProvider, useGlobal } from '../contexts/GlobalContext.tsx';
 import api from '../services/api.ts';
+import { invalidateSession } from '../services/http/client.ts';
 
 const customer = { id: 'customer', role: 'user', email: 'customer@example.invalid' };
 const admin = { id: 'admin', role: 'admin', email: 'admin@example.invalid' };
@@ -41,6 +42,7 @@ for (const [label, user] of [['anonymous', null], ['customer', customer], ['admi
     mock.method(api, 'me', () => session.promise);
     mount();
     assert.equal(context.isAuthLoading, true);
+    assert.equal(context.authState.status, 'loading');
     assert.equal(api.getProducts.mock.callCount(), 0);
     assert.equal(api.adminGetProducts.mock.callCount(), 0);
     await act(async () => user ? session.resolve(user) : session.reject(new Error('Unauthenticated')));
@@ -49,6 +51,7 @@ for (const [label, user] of [['anonymous', null], ['customer', customer], ['admi
     assert.equal(api.adminGetProducts.mock.callCount(), user?.role === 'admin' ? 1 : 0);
     assert.equal(api.getProducts.mock.callCount(), user?.role === 'admin' ? 0 : 1);
     assert.equal(context.user?.id ?? null, user?.id ?? null);
+    assert.equal(context.authState.status, user ? user.role === 'admin' ? 'admin' : 'customer' : 'anonymous');
   });
 }
 
@@ -86,4 +89,32 @@ test('logging in after anonymous startup loads the resolved admin catalog', asyn
   api.me.mock.mockImplementation(async () => admin);
   await act(async () => context.login('admin@example.invalid', 'test-input'));
   await waitFor(() => assert.deepEqual(context.products, adminProducts));
+});
+
+test('expiry clears the session and late account hydration cannot restore account data or write', async () => {
+  const saved = deferred();
+  mock.method(api, 'me', async () => admin);
+  api.getSavedCart.mock.mockImplementation(() => saved.promise);
+  mount();
+  await waitFor(() => assert.equal(context.authState.status, 'admin'));
+  await act(async () => invalidateSession());
+  assert.equal(context.authState.status, 'anonymous');
+  assert.equal(localStorage.getItem('reza_session_v1'), null);
+  await act(async () => saved.resolve({ lines: [{ productId: 'private', quantity: 2 }] }));
+  assert.deepEqual(context.cartLines, []);
+  assert.equal(api.syncSavedCart.mock.callCount(), 0);
+  assert.equal(api.getWishlist.mock.callCount(), 0);
+});
+
+test('late bootstrap cannot overwrite a newer login or logout', async () => {
+  const initial = deferred();
+  mock.method(api, 'me', () => initial.promise);
+  mock.method(api, 'login', async () => ({ user: customer }));
+  mount();
+  await act(async () => context.login('customer@example.invalid', 'fixture'));
+  assert.equal(context.authState.status, 'customer');
+  await act(async () => context.logout());
+  await act(async () => initial.resolve(admin));
+  assert.equal(context.authState.status, 'anonymous');
+  assert.equal(context.user, null);
 });

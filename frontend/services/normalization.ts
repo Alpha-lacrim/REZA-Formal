@@ -57,5 +57,3 @@ export function parseStringRecord(value: unknown): Record<string, string> {
       .map(([key, item]) => [key, String(item)]),
   );
 }
-
-

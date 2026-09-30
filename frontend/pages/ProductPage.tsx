@@ -1,3 +1,4 @@
+import { errorMessage } from '../services/api';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Heart, Info, Loader2, Minus, Plus, ShoppingBag, Star, X } from 'lucide-react';
@@ -33,9 +34,10 @@ const ProductPage: React.FC = () => {
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
     const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', body: '' });
 
-    const product = detail || contextProduct;
+    const product = detail?.id === id ? detail : contextProduct;
 
     useEffect(() => {
+        const controller = new AbortController();
         window.scrollTo(0, 0);
         setDetail(contextProduct || null);
         setLoadingProduct(true);
@@ -44,13 +46,15 @@ const ProductPage: React.FC = () => {
         void (async () => {
             if (!id) return;
             try {
-                setDetail(await api.getProduct(id));
+                const loaded = await api.getProduct(id, controller.signal);
+                if (!controller.signal.aborted) setDetail(loaded);
             } catch {
                 // The already-loaded catalog item remains a valid read-only fallback.
             } finally {
-                setLoadingProduct(false);
+                if (!controller.signal.aborted) setLoadingProduct(false);
             }
         })();
+        return () => controller.abort();
     }, [id, contextProduct?.id]);
 
     useEffect(() => {
@@ -62,21 +66,24 @@ const ProductPage: React.FC = () => {
         setQuantity(1);
     }, [product?.id, product?.variants]);
 
-    const loadReviews = async () => {
+    const loadReviews = async (signal?: AbortSignal) => {
         if (!id) return;
         setReviewsLoading(true);
         try {
-            const page = await api.getProductReviews(id);
-            setReviews(page.results);
-        } catch (error: any) {
-            showToast(error?.message || 'دریافت نظرها انجام نشد');
+            const page = await api.getProductReviews(id, undefined, signal);
+            if (!signal?.aborted) setReviews(page.results);
+        } catch (error: unknown) {
+            if (!signal?.aborted) showToast(errorMessage(error, 'دریافت نظرها انجام نشد'));
         } finally {
-            setReviewsLoading(false);
+            if (!signal?.aborted) setReviewsLoading(false);
         }
     };
 
     useEffect(() => {
-        if (id) void loadReviews();
+        const controller = new AbortController();
+        setReviews([]);
+        if (id) void loadReviews(controller.signal);
+        return () => controller.abort();
     }, [id]);
 
     const selectedVariant = product?.variants?.find(variant => variant.id === selectedVariantId);
@@ -163,8 +170,8 @@ const ProductPage: React.FC = () => {
             setReviewForm({ rating: 5, title: '', body: '' });
             showToast('نظر شما ثبت شد و پس از بررسی نمایش داده می‌شود');
             await loadReviews();
-        } catch (error: any) {
-            showToast(error?.message || 'ثبت نظر انجام نشد');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ثبت نظر انجام نشد'));
         } finally {
             setReviewSubmitting(false);
         }

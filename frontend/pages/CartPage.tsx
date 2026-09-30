@@ -1,3 +1,4 @@
+import { errorMessage } from '../services/api';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Banknote, CheckCircle, Loader2, MapPin, Minus, Plus, RefreshCw, Tag, Trash2, Truck } from 'lucide-react';
@@ -87,8 +88,8 @@ const CartPage: React.FC = () => {
                     ? checkoutOptions.defaultPaymentMethod
                     : availableMethods[0] || '';
                 setPaymentMethod(defaultMethod);
-            } catch (loadError: any) {
-                setError(loadError?.message || 'روش‌های ارسال و پرداخت از سرور دریافت نشد');
+            } catch (loadError: unknown) {
+                setError(errorMessage(loadError, 'روش‌های ارسال و پرداخت از سرور دریافت نشد'));
             } finally {
                 setOptionsLoading(false);
             }
@@ -134,9 +135,9 @@ const CartPage: React.FC = () => {
         setError('');
         try {
             setQuote(await api.quoteCheckout(buildRequest(activeCoupon)));
-        } catch (quoteError: any) {
+        } catch (quoteError: unknown) {
             setQuote(null);
-            setError(quoteError?.message || 'محاسبه مبلغ سفارش انجام نشد');
+            setError(errorMessage(quoteError, 'محاسبه مبلغ سفارش انجام نشد'));
         } finally {
             setQuoteLoading(false);
         }
@@ -216,8 +217,8 @@ const CartPage: React.FC = () => {
             clearCart();
             await refreshProducts();
             showToast('سفارش با موفقیت ثبت شد');
-        } catch (checkoutError: any) {
-            const message = checkoutError?.message || 'ثبت سفارش انجام نشد';
+        } catch (checkoutError: unknown) {
+            const message = errorMessage(checkoutError, 'ثبت سفارش انجام نشد');
             setError(message);
             showToast(message);
         } finally {

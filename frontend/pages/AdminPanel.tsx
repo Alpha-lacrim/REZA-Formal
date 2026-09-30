@@ -1,3 +1,4 @@
+import { errorMessage, ApiError } from '../services/api';
 import React, { useState, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { useGlobal } from '../contexts/GlobalContext';
@@ -218,9 +219,9 @@ const AdminPanel: React.FC = () => {
             setSelectedFiles([]);
             setNewImageUrl('');
             showToast('محصول با موفقیت ذخیره شد');
-        } catch (e: any) {
+        } catch (e: unknown) {
             console.error('Save failed:', e);
-            showToast(e?.status === 409 ? 'موجودی تغییر کرده است؛ محصول را دوباره باز کنید و تغییرات را اعمال کنید' : 'خطا در ذخیره محصول');
+            showToast(e instanceof ApiError && e.status === 409 ? 'موجودی تغییر کرده است؛ محصول را دوباره باز کنید و تغییرات را اعمال کنید' : 'خطا در ذخیره محصول');
         }
     };
 
@@ -284,8 +285,8 @@ const AdminPanel: React.FC = () => {
             setOrders(current => current.map(item => item.id === updated.id ? updated : item));
             if (viewingOrder?.id === updated.id) setViewingOrder(updated);
             showToast('کد رهگیری ذخیره شد');
-        } catch (error: any) {
-            showToast(error?.message || 'ذخیره کد رهگیری انجام نشد');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ذخیره کد رهگیری انجام نشد'));
         }
     };
 
@@ -352,8 +353,8 @@ const AdminPanel: React.FC = () => {
             await action();
             await loadCommerceData();
             showToast(successMessage);
-        } catch (error: any) {
-            showToast(error?.message || 'انجام عملیات ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'انجام عملیات ناموفق بود'));
         } finally {
             setCommerceAction(null);
         }
