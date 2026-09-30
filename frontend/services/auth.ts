@@ -1,5 +1,5 @@
 import type { User } from '../types';
-import { invalidateSession, jsonBody, request, settleRefresh } from './http/client';
+import { beginSessionChange, jsonBody, request, settleRefresh } from './http/client';
 import { invalidResponse, isRecord } from './http/errors';
 
 // Transport shape stays here; components receive only User.
@@ -45,11 +45,11 @@ export function normalizeUser(value: unknown): User {
 // changing cookies. A late refresh cannot overwrite a newer login/logout cookie.
 let mutation: Promise<unknown> = Promise.resolve();
 function changeSession<T>(operation: () => Promise<T>): Promise<T> {
-  invalidateSession();
+  const finish = beginSessionChange();
   const result = mutation.catch(() => undefined).then(async () => {
     await settleRefresh();
     return operation();
-  });
+  }).finally(finish);
   mutation = result;
   return result;
 }

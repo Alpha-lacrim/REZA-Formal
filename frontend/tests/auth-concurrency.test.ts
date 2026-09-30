@@ -157,3 +157,22 @@ test('public site settings can finish while anonymous bootstrap expires the sess
   body.resolve(JSON.stringify({ hero_image: '/media/hero.png' }));
   await expect(pending).resolves.toMatchObject({ heroImage: '/media/hero.png' });
 });
+
+test('new 401s cannot start refresh while logout is deleting cookies', async () => {
+  const release = deferred<Response>();
+  let logouts = 0; let refreshes = 0;
+  const { authApi } = await import('../services/auth');
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    if (path.endsWith('/csrf/')) return Response.json({ csrfToken: 'fixture' });
+    if (path.endsWith('/logout/')) { logouts++; return release.promise; }
+    if (path.endsWith('/refresh/')) { refreshes++; return Response.json({}, { status: 401 }); }
+    return Response.json({}, { status: 401 });
+  }));
+  const logout = authApi.logout();
+  await vi.waitFor(() => expect(logouts).toBe(1));
+  await expect(client.request('/api/products/')).rejects.toMatchObject({ code: 'session_expired' });
+  expect(refreshes).toBe(0);
+  release.resolve(Response.json({})); await logout;
+  await expect(client.request('/api/auth/me/')).rejects.toMatchObject({ code: 'session_expired' });
+  expect(refreshes).toBe(1);
+});

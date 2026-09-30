@@ -8,6 +8,7 @@ let csrfRequest: Promise<string | undefined> | null = null;
 let refreshRequest: Promise<void> | null = null;
 let sessionVersion = 0;
 let refreshVersion = 0;
+let sessionChanges = 0;
 const expiryListeners = new Set<() => void>();
 
 export function onSessionExpired(listener: () => void): () => void {
@@ -19,6 +20,12 @@ export function invalidateSession(): void {
   sessionVersion++;
   csrfRequest = null;
   expiryListeners.forEach(listener => listener());
+}
+
+export function beginSessionChange(): () => void {
+  sessionChanges++;
+  invalidateSession();
+  return () => { sessionChanges--; };
 }
 
 export async function settleRefresh(): Promise<void> {
@@ -116,7 +123,8 @@ export async function request(path: string, opts: RequestInit = {}, policy: { se
     let response = await send(path, opts, sessionBound ? identity : undefined);
     if (sessionBound && identity !== sessionVersion) throw sessionChanged();
     if (response.status === 401 && eligible) {
-      if (identity !== sessionVersion) throw sessionChanged();
+      // A new public/catalog read during logout must not race its cookie deletion.
+      if (identity !== sessionVersion || sessionChanges > 0) throw sessionChanged();
       // Late 401s from the old token reuse the completed refresh as well.
       if (generation === refreshVersion) await waitForRefresh(refresh(identity), opts.signal);
       opts.signal?.throwIfAborted();
