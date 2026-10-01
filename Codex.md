@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-09-30 (Batch 5 frontend API/auth; frontend/Chrome gates; Batch 4 backend/SQL evidence retained)
+Last verified: 2026-10-01 (Batch 6 frontend state; frontend/Chrome gates; Batch 4 backend/SQL evidence retained)
 
 ## Purpose and product
 
@@ -25,10 +25,12 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 
 - Entry: `frontend/index.html` -> `frontend/index.tsx` -> `frontend/App.tsx`.
 - Routing: `HashRouter`, so browser routes live after `#` and static hosting does not need server-side route rewrites.
-- Shared state: `frontend/contexts/GlobalContext.tsx` owns authentication, products, variant-aware cart, wishlist, account synchronization, catalog-source safety, theme, site settings, and toast messages.
+- Shared state: one stable `frontend/state/AppState.tsx` provider supplies focused hooks over independent auth, cart, wishlist, theme, overlay and toast stores. `state/runtime.ts` composes lifecycles/actions; `contexts/GlobalContext.tsx` is a test compatibility facade only. No nested domain-provider tower or blanket memoization. See [state ownership, persistence inventory and query decision](docs/FRONTEND_STATE.md).
+- Server cache: TanStack Query v5 owns catalog/settings and admin collection reads. Identity-scoped keys, deduplication, explicit invalidation and cancellation replace global catalog/manual admin fetch state. The bounded in-memory cache has 30-second freshness (settings 60), no automatic retry/focus fetch, and clears identity-bound data on session changes. Forms/selections and customer screen-specific reads remain feature-local.
+- Commerce: `state/commerce.ts` independently hydrates cart/wishlist, serializes each write lane, preserves pending edits/removal tombstones through failures/reloads, and retries explicitly/on reconnect. `state/persistence.ts` validates role/user-scoped v3 buckets, migrates guest legacy keys without deleting them, and quarantines ambiguous legacy session commerce. Guest transfer uses max quantity/union once; logout never exports account data into guest state. Staff does not consume guest intent or synchronize customer commerce.
 - Catalog requests derive from resolved session state; catalog results belong to that identity. Admin catalog failures expose no partial public catalog, and logout invalidates outstanding admin loads.
 - API boundary: `frontend/services/api.ts` is the compatibility facade. `services/auth.ts` and `catalog.ts` own checked DTO conversion into `types.ts` domain models; other domain adapters migrate incrementally. `services/http/client.ts` returns unknown JSON, owns cookies/CSRF and single-flight refresh, and throws `ApiError` with status/message/fields/code. See [frontend API/session contract](docs/FRONTEND_API_AUTH.md).
-- Auth state is explicit: loading, anonymous, customer or admin. Refresh failure clears local session state and rejects obsolete identity-bound responses. Login/register/logout are serialized after pending refresh cookie writes. Catalog/account reads wait for auth; stale bootstrap, account hydration, catalog and product-detail/review reads are cancelled or ignored. Full cart-write ordering and effective Django staff capability policy remain later work.
+- Auth state is explicit: loading, anonymous, customer or admin. Refresh failure clears local session state and rejects obsolete identity-bound responses. Login/register/logout wait for pending refresh and dispatched account writes before changing cookies. Catalog/account reads wait for auth; stale bootstrap, hydration, catalog and detail/review/quote results are cancelled or ignored. Checkout form/continuations are session-bound. Independent tabs/devices retain existing server last-write semantics; effective Django staff capability policy remains later work.
 - Local fallback: `frontend/services/db.ts` exposes only a read-only emergency catalog based on `frontend/data.ts`. It is used only when the product API is unavailable and never reports local admin writes as server success.
 - Main feature surfaces: lazy-loaded routes in `frontend/pages/` and shared UI in `frontend/components/`. Tailwind is compiled locally through PostCSS; no runtime Tailwind CDN is used.
 - Static product/site assets: `frontend/public/images/`.
@@ -72,7 +74,9 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `.env.docker.example` | Names and safe examples for Docker configuration; never add real secrets. |
 | `frontend/package.json` | Frontend scripts and dependency contract. |
 | `frontend/vite.config.ts` | Vite build and development-server behavior. |
-| `frontend/contexts/GlobalContext.tsx` | Cross-application UI state and actions. |
+| `frontend/state/` | Focused React subscriptions, auth/UI lifecycles, commerce persistence/queues, catalog/settings/admin cache and composition. |
+| `frontend/contexts/GlobalContext.tsx` | Legacy aggregate hook/provider exports retained for integration regression probes. |
+| `docs/FRONTEND_STATE.md` | State classification, query decision, guest/account invariants and complete browser-key audit. |
 | `frontend/services/api.ts`, `auth.ts`, `catalog.ts` | API facade, domain transports and checked auth/catalog normalization. |
 | `frontend/services/http/client.ts`, `errors.ts` | Shared HTTP, CSRF, single-flight refresh, session invalidation and safe error contracts. |
 | `frontend/services/db.ts` | Read-only emergency product-catalog fallback only. |

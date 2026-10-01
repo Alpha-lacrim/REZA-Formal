@@ -1,12 +1,13 @@
+import { useSettings } from '../state/AppState';
 import React, { useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
-import { useGlobal } from '../contexts/GlobalContext';
+
 import { ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SEO from '../components/SEO';
 
 const AboutPage: React.FC = () => {
-    const { siteSettings } = useGlobal();
+    const { siteSettings } = useSettings();
     const navigate = useNavigate();
 
     useEffect(() => {

@@ -1,14 +1,15 @@
+import { useCatalog, useSettings } from '../state/AppState';
 import React, { useRef, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Ruler, Globe, Truck, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
-import { useGlobal } from '../contexts/GlobalContext';
+
 
 const Hero = () => {
     const navigate = useNavigate();
-    const { siteSettings } = useGlobal();
+    const { siteSettings } = useSettings();
 
     const scrollToSection = (id: string) => {
         const element = document.getElementById(id);
@@ -122,7 +123,7 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
 
 const ProductCarousel = ({ category }: { category: string }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const { products } = useGlobal();
+    const { products } = useCatalog();
     const items = products.filter(p => p.category === category);
 
     const scroll = (direction: 'next' | 'prev') => {
@@ -183,7 +184,7 @@ const ProductCarousel = ({ category }: { category: string }) => {
 
 const HomePage: React.FC = () => {
     const location = useLocation();
-    const { siteSettings } = useGlobal();
+    const { siteSettings } = useSettings();
 
     useEffect(() => {
         if (location.state && location.state.scrollTo) {

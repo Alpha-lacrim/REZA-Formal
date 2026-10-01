@@ -162,7 +162,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 3 - Tests and CI foundation (broader concurrency/hosted gates remain open)
 - [x] Batch 4 - Backend/API cleanup (scoped completion; follow-ups documented)
 - [ ] Batch 5 — API/auth frontend
-- [ ] Batch 6 — Frontend state
+- [x] Batch 6 — Frontend state (local required branch; integration/publication separate)
 - [ ] Batch 7 — Admin/media
 - [ ] Batch 8 — Performance/database
 - [ ] Batch 9 — Security
@@ -187,6 +187,8 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - Keep remediation commits off human-owned `main`; merging integration into `main` requires a separate owner-authorized action.
 
 ## Current blockers
+
+Batch 6 local implementation: `codex/batch-06-frontend-state` starts at `1e336c064b4ebfbf66976f5d844dce9dc526dfba` on the existing Batch 5 branch, preserving its API/auth prerequisite rather than dropping it by rebasing onto older integration. State classification, query choice, scoped persistence and synchronization policies are in [FRONTEND_STATE.md](FRONTEND_STATE.md). ARCH-001/FE-004/FE-007 implementation and FE-006 stale-request guards are verified; price-confirmation policy and independent-device conflict protocol remain separate. Final commit is the Batch 6 branch tip (`git rev-parse codex/batch-06-frontend-state`); no merge or push is part of this session. Handoff records final checks and owner actions.
 
 No confirmed-defect implementation or isolated-check blocker remains for Batch 2. Production readiness remains unproven: DB-002/TEST-003 and live media-serving/legacy reconciliation gates remain open. Docker daemon was unavailable during verification.
 

@@ -70,12 +70,14 @@ Order item, address, coupon and shipping snapshots preserve most history after c
 
 ## ARCH-001 - GlobalContext couples unrelated state domains
 
+2026-10-01: superseded by the [Batch 6 state decision](../FRONTEND_STATE.md). One stable provider supplies independent subscriptions; TanStack Query owns catalog/settings/admin snapshots; action-only consumers have a render-count regression. Existing RTL journeys pass. Original evidence below is retained for provenance.
+
 | Attribute | Audit record |
 | --- | --- |
 | ID | ARCH-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - maintenance debt |
+| Status | Implemented - Batch 6 ownership/subscription split; no latency claim |
 | Evidence | Static ownership inventory and 447-line provider; ProductCard consumes the same context for addToCart as auth and toast consumers. |
 | File/function references | frontend/contexts/GlobalContext.tsx:97,146,192,407; frontend/components/ProductCard.tsx:11 |
 | Current behaviour | A fresh provider value and action functions combine authentication, catalog, cart, wishlist, settings, theme and notifications. |

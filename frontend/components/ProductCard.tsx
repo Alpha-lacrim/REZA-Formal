@@ -1,13 +1,14 @@
+import { useActions } from '../state/AppState';
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { Star } from 'lucide-react';
 import ImageLoader from './ImageLoader';
 import { Product } from '../types';
 import { formatPrice, toPersianDigits } from '../utils';
-import { useGlobal } from '../contexts/GlobalContext';
+
 
 const ProductCard: React.FC<{ product: Product; className?: string }> = ({ product, className = '' }) => {
-    const { addToCart } = useGlobal();
+    const { addToCart } = useActions();
     const defaultVariant = product.variants?.find(variant => variant.active && variant.stock > 0);
     const hasVariants = Boolean(product.variants?.length);
     const isOutOfStock = hasVariants ? !defaultVariant : product.stock !== undefined && product.stock <= 0;

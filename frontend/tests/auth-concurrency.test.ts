@@ -176,3 +176,41 @@ test('new 401s cannot start refresh while logout is deleting cookies', async () 
   await expect(client.request('/api/auth/me/')).rejects.toMatchObject({ code: 'session_expired' });
   expect(refreshes).toBe(1);
 });
+
+test('login waits for a dispatched cart write before changing account cookies', async () => {
+  const release = deferred<Response>();
+  const calls: string[] = [];
+  const { authApi } = await import('../services/auth');
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    if (path.endsWith('/csrf/')) return Response.json({ csrfToken: 'fixture' });
+    if (path.endsWith('/cart/')) { calls.push('cart'); return release.promise; }
+    if (path.endsWith('/login/')) {
+      calls.push('login');
+      return Response.json({ id: 'b', email: 'b@example.invalid', role: 'user' });
+    }
+    throw new Error('Unexpected request');
+  }));
+  const write = Promise.allSettled([client.request('/api/cart/', { method: 'PUT', body: '{}' })]);
+  await vi.waitFor(() => expect(calls).toEqual(['cart']));
+  const login = authApi.login('b@example.invalid', 'fixture');
+  await Promise.resolve();
+  expect(calls).toEqual(['cart']);
+  release.resolve(Response.json({ lines: [] }));
+  await login;
+  expect((await write)[0].status).toBe('rejected');
+  expect(calls).toEqual(['cart', 'login']);
+});
+
+test('a session change in another tab expires this runtime before it can dispatch a write', async () => {
+  const expired = vi.fn();
+  const unsubscribe = client.onSessionExpired(expired);
+  vi.stubGlobal('fetch', vi.fn(async () => Response.json({ csrfToken: 'fixture' })));
+  localStorage.setItem('reza_session_epoch_v1', 'other-tab-change');
+  await expect(client.request('/api/cart/', { method: 'PUT', body: '{}' })).rejects.toMatchObject({ code: 'session_expired' });
+  expect(expired).toHaveBeenCalledTimes(1);
+  expect(vi.mocked(fetch).mock.calls.every(([url]) => String(url).endsWith('/csrf/'))).toBe(true);
+  localStorage.setItem('reza_session_epoch_v1', 'another-change');
+  window.dispatchEvent(new StorageEvent('storage', { key: 'reza_session_epoch_v1' }));
+  expect(expired).toHaveBeenCalledTimes(2);
+  unsubscribe();
+});

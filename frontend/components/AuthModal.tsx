@@ -1,10 +1,12 @@
+import { useActions, useOverlays } from '../state/AppState';
 import { errorMessage, ApiError } from '../services/api';
 import React, { useState, useEffect } from 'react';
 import { X, LogIn, UserPlus, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+
 
 const AuthModal: React.FC = () => {
-    const { isAuthModalOpen, setAuthModalOpen, login, register } = useGlobal();
+    const { isAuthModalOpen } = useOverlays();
+    const { setAuthModalOpen, login, register } = useActions();
     const [view, setView] = useState<'login' | 'register' | '2fa'>('login');
     
     const [email, setEmail] = useState('');

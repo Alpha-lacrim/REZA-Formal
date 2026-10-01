@@ -7,7 +7,7 @@ import ProductPage from '../pages/ProductPage';
 import api from '../services/api';
 import type { Product } from '../types';
 
-vi.mock('../contexts/GlobalContext', () => ({ useGlobal: () => ({
+vi.mock('../state/AppState', () => ({ useCatalog: () => ({ products: [] }), useAuth: () => ({ user: null }), useWishlist: () => ({ wishlist: [], isInWishlist: () => false }), useActions: () => ({
   products: [], user: null, wishlist: [], isInWishlist: () => false,
   addToCart: vi.fn(), toggleWishlist: vi.fn(), setAuthModalOpen: vi.fn(), showToast: vi.fn(),
 }) }));

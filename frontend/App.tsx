@@ -1,6 +1,7 @@
+import { AppStateProvider, useAuth, useToast } from './state/AppState';
 import React, { Suspense, lazy, useEffect, useState } from 'react';
 import { HashRouter, Navigate, Routes, Route } from 'react-router-dom';
-import { GlobalProvider, useGlobal } from './contexts/GlobalContext';
+
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
 import MiniCart from './components/MiniCart';
@@ -20,7 +21,7 @@ const BespokePage = lazy(() => import('./pages/BespokePage'));
 const PolicyPage = lazy(() => import('./pages/PolicyPage'));
 
 const Toast = () => {
-    const { toastMessage } = useGlobal();
+    const { toastMessage } = useToast();
     if (!toastMessage) return null;
     return (
         <div className="fixed bottom-4 right-4 z-[10000] bg-lux-black text-white px-6 py-3 rounded-lg shadow-lg animate-in slide-in-from-bottom-5 fade-in duration-300">
@@ -30,7 +31,7 @@ const Toast = () => {
 };
 
 const ProtectedRoute: React.FC<{ adminOnly?: boolean; children: React.ReactElement }> = ({ adminOnly = false, children }) => {
-    const { user, isAuthLoading } = useGlobal();
+    const { user, isAuthLoading } = useAuth();
 
     if (isAuthLoading) {
         return <PageLoader />;
@@ -99,10 +100,10 @@ const App = () => {
     }, []);
 
     return (
-        <GlobalProvider>
+        <AppStateProvider>
             <PageLoader isVisible={isBooting} />
             <AppContent />
-        </GlobalProvider>
+        </AppStateProvider>
     );
 };
 

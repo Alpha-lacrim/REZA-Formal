@@ -91,12 +91,15 @@ No browser session, visual comparison, assistive technology run or frontend test
 
 ## FE-004 - Cart and wishlist synchronization lacks identity and ordering guards
 
+2026-10-01: Role/user-scoped persistence, one-time guest transfer, independent hydration gates, serialized writes, removal tombstones, explicit/reconnect retry and cookie-write barriers are regression tested. Independent tabs/devices retain the existing backend conflict semantics. See [state ownership and verification](../FRONTEND_STATE.md). Original audit evidence below is retained for provenance.
+
+
 | Attribute | Audit record |
 | --- | --- |
 | ID | FE-004 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Implemented - Batch 6 single-runtime identity and write ordering |
 | Evidence | Static schedule: delay GET >700ms, observe PUT of pre-hydration local cart; reorder two PUT completions. Logout/login B while A hydration waits; shared keys and callbacks have no user-generation check. Browser reproduction not run. |
 | File/function references | frontend/contexts/GlobalContext.tsx:192,232,316,323,354; backend/shop/commerce_views.py:263 |
 | Current behaviour | hydratedUserId is marked before GET completes, permitting a 700ms PUT meanwhile. Background writes can overlap; local keys survive logout and are merged into the next account; async work is not cancelled. |
@@ -135,12 +138,15 @@ No browser session, visual comparison, assistive technology run or frontend test
 
 ## FE-006 - Late detail and quote responses can replace newer state
 
+2026-10-01: Batch 5 detail/review cancellation is retained. Batch 6 clears/aborts obsolete quotes and keys checkout forms/continuations to the session. Deferred quote and interrupted address-save regressions pass; a server price-change confirmation policy is a separate owner decision. See [state ownership and verification](../FRONTEND_STATE.md). Original audit evidence below is retained for provenance.
+
+
 | Attribute | Audit record |
 | --- | --- |
 | ID | FE-006 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Implemented - stale response guards; price-confirmation policy remains open |
 | Evidence | Static schedule: start A request, change to B, resolve B then A; unconditional setters accept A. For quote, change quantity and resolve requests out of order; no fingerprint links quote to submission. Browser schedule not run. |
 | File/function references | frontend/pages/ProductPage.tsx:38,65; frontend/pages/CartPage.tsx:131,145,192 |
 | Current behaviour | Changing product ID or checkout inputs starts new requests without abort/version checks; cleanup cancels only not-yet-fired timers. A previous quote remains during the debounce interval. |
@@ -157,12 +163,15 @@ No browser session, visual comparison, assistive technology run or frontend test
 
 ## FE-007 - Legacy cart migration returns before reading legacy entries
 
+2026-10-01: Absent/malformed v2 falls back to validated v1; explicit empty v2 stays empty. Legacy commerce keys are retained, and a persisted v3 guest bucket prevents repeated migration. Ambiguous former-account legacy data is quarantined. Migration and blocked-storage regressions pass. See [state ownership and verification](../FRONTEND_STATE.md). Original audit evidence below is retained for provenance.
+
+
 | Attribute | Audit record |
 | --- | --- |
 | ID | FE-007 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 6 validated legacy migration |
 | Evidence | P18 evaluates the actual reader: v1 has one product, v2 absent, loadedItems=0. |
 | File/function references | frontend/contexts/GlobalContext.tsx:62,123 |
 | Current behaviour | Missing reza_cart_v2 is parsed as [], recognized as an array and returned immediately. The v1 migration executes only when v2 is malformed/non-array. |

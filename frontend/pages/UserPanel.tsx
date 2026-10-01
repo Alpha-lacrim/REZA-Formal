@@ -1,3 +1,4 @@
+import { useActions, useAuth } from '../state/AppState';
 import { errorMessage } from '../services/api';
 import React, { useEffect, useState } from 'react';
 import {
@@ -7,7 +8,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import ImageLoader from '../components/ImageLoader';
 import SEO from '../components/SEO';
-import { useGlobal } from '../contexts/GlobalContext';
+
 import api from '../services/api';
 import { Address, Order, ReturnRequest } from '../types';
 import { formatPrice, toPersianDigits } from '../utils';
@@ -38,7 +39,8 @@ const returnLabels: Record<string, string> = {
 };
 
 const UserPanel: React.FC = () => {
-    const { user, updateUserProfile, logout, showToast, cancelUserOrder } = useGlobal();
+    const { user } = useAuth();
+    const { updateUserProfile, logout, showToast, cancelUserOrder } = useActions();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<PanelTab>('orders');
     const [orders, setOrders] = useState<Order[]>([]);

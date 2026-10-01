@@ -1,5 +1,5 @@
 import type { User } from '../types';
-import { beginSessionChange, jsonBody, request, settleRefresh } from './http/client';
+import { beginSessionChange, jsonBody, request, settleRefresh, settleAccountWrites } from './http/client';
 import { invalidResponse, isRecord } from './http/errors';
 
 // Transport shape stays here; components receive only User.
@@ -48,6 +48,7 @@ function changeSession<T>(operation: () => Promise<T>): Promise<T> {
   const finish = beginSessionChange();
   const result = mutation.catch(() => undefined).then(async () => {
     await settleRefresh();
+    await settleAccountWrites();
     return operation();
   }).finally(finish);
   mutation = result;

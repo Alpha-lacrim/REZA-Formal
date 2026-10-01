@@ -1,17 +1,18 @@
+import { useActions, useAuth, useCart, useCatalog, useTheme, useWishlist } from '../state/AppState';
 import React, { useState, useEffect, useRef } from 'react';
 import ImageLoader from './ImageLoader';
 import { Menu, X, ShoppingBag, User, Moon, Sun, Search, ArrowRight, ChevronLeft, LogOut, Settings, LayoutDashboard, Heart } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+
 import { toPersianDigits, formatPrice } from '../utils';
 import { Link, useNavigate, useLocation } from 'react-router-dom';
 
 const Navbar: React.FC = () => {
-    const { 
-        cart, toggleCart, 
-        theme, toggleTheme, 
-        user, setAuthModalOpen, logout,
-        products, wishlist 
-    } = useGlobal();
+    const { cart } = useCart();
+    const { toggleCart, toggleTheme, setAuthModalOpen, logout } = useActions();
+    const { theme } = useTheme();
+    const { user } = useAuth();
+    const { products } = useCatalog();
+    const { wishlist } = useWishlist();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');

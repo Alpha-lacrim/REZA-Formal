@@ -528,8 +528,8 @@ export const api = {
   async getCheckoutOptions(): Promise<CheckoutOptions> {
     return normalizeCheckoutOptions(await request('/api/checkout/options/'));
   },
-  async quoteCheckout(payload: CheckoutRequest): Promise<CheckoutQuote> {
-    return normalizeCheckoutQuote(await request('/api/checkout/quote/', { method: 'POST', ...jsonBody(checkoutPayload(payload)) }));
+  async quoteCheckout(payload: CheckoutRequest, signal?: AbortSignal): Promise<CheckoutQuote> {
+    return normalizeCheckoutQuote(await request('/api/checkout/quote/', { method: 'POST', signal, ...jsonBody(checkoutPayload(payload)) }));
   },
   async createCheckout(payload: CheckoutRequest): Promise<CheckoutResult> {
     return normalizeCheckoutResult(await request('/api/orders/create/', { method: 'POST', ...jsonBody(checkoutPayload(payload)) }));
@@ -616,8 +616,8 @@ export const api = {
     return normalizeNewsletter(await request('/api/newsletter/subscribe/', { method: 'POST', ...jsonBody({ email }) }));
   },
 
-  async getSettings(): Promise<SiteSettings> {
-    return normalizeSettings(await request('/api/settings/', {}, { sessionBound: false }));
+  async getSettings(signal?: AbortSignal): Promise<SiteSettings> {
+    return normalizeSettings(await request('/api/settings/', { signal }, { sessionBound: false }));
   },
   async saveSettings(data: any): Promise<SiteSettings> {
     return normalizeSettings(await request('/api/settings/', {

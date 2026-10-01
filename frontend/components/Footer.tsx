@@ -1,12 +1,13 @@
+import { useActions } from '../state/AppState';
 import { errorMessage } from '../services/api';
 import React, { useState } from 'react';
 import { Instagram, Loader2, Mail, MapPin, Phone, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { useGlobal } from '../contexts/GlobalContext';
+
 
 const Footer: React.FC = () => {
-    const { showToast } = useGlobal();
+    const { showToast } = useActions();
     const [email, setEmail] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [subscribed, setSubscribed] = useState(false);

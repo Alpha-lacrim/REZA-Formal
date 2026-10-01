@@ -91,19 +91,19 @@ test('logging in after anonymous startup loads the resolved admin catalog', asyn
   await waitFor(() => assert.deepEqual(context.products, adminProducts));
 });
 
-test('expiry clears the session and late account hydration cannot restore account data or write', async () => {
+test('expiry clears the customer session and late cart hydration cannot restore data or write', async () => {
   const saved = deferred();
-  mock.method(api, 'me', async () => admin);
+  mock.method(api, 'me', async () => customer);
   api.getSavedCart.mock.mockImplementation(() => saved.promise);
   mount();
-  await waitFor(() => assert.equal(context.authState.status, 'admin'));
+  await waitFor(() => assert.equal(context.authState.status, 'customer'));
   await act(async () => invalidateSession());
   assert.equal(context.authState.status, 'anonymous');
   assert.equal(localStorage.getItem('reza_session_v1'), null);
   await act(async () => saved.resolve({ lines: [{ productId: 'private', quantity: 2 }] }));
   assert.deepEqual(context.cartLines, []);
   assert.equal(api.syncSavedCart.mock.callCount(), 0);
-  assert.equal(api.getWishlist.mock.callCount(), 0);
+  assert.equal(api.getWishlist.mock.callCount(), 1); // Independent wishlist hydration already completed.
 });
 
 test('late bootstrap cannot overwrite a newer login or logout', async () => {

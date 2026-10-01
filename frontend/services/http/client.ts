@@ -10,10 +10,35 @@ let sessionVersion = 0;
 let refreshVersion = 0;
 let sessionChanges = 0;
 const expiryListeners = new Set<() => void>();
+const accountWrites = new Set<Promise<unknown>>();
+const SESSION_EPOCH_KEY = 'reza_session_epoch_v1';
+const readSessionEpoch = () => {
+  try { return localStorage.getItem(SESSION_EPOCH_KEY); } catch { return null; }
+};
+let sessionEpoch = readSessionEpoch();
+
+function synchronizeSessionEpoch(): void {
+  const observed = readSessionEpoch();
+  if (observed === sessionEpoch) return;
+  sessionEpoch = observed;
+  invalidateSession();
+}
+const onStorage = (event: StorageEvent) => {
+  if (event.key === SESSION_EPOCH_KEY || event.key === null) synchronizeSessionEpoch();
+};
+
+// Cookie changes wait for dispatched writes; abort cannot undo a server commit.
+export async function settleAccountWrites(): Promise<void> {
+  await Promise.allSettled([...accountWrites]);
+}
 
 export function onSessionExpired(listener: () => void): () => void {
   expiryListeners.add(listener);
-  return () => { expiryListeners.delete(listener); };
+  if (expiryListeners.size === 1) window.addEventListener('storage', onStorage);
+  return () => {
+    expiryListeners.delete(listener);
+    if (!expiryListeners.size) window.removeEventListener('storage', onStorage);
+  };
 }
 
 export function invalidateSession(): void {
@@ -24,6 +49,12 @@ export function invalidateSession(): void {
 
 export function beginSessionChange(): () => void {
   sessionChanges++;
+  // Non-secret change notification only; this value cannot authenticate a user.
+  try {
+    const epoch = `${Date.now()}:${Math.random()}`;
+    localStorage.setItem(SESSION_EPOCH_KEY, epoch);
+    sessionEpoch = epoch;
+  } catch { /* In-memory session isolation still applies when storage is disabled. */ }
   invalidateSession();
   return () => { sessionChanges--; };
 }
@@ -78,6 +109,8 @@ async function send(path: string, opts: RequestInit, identity?: number): Promise
     if (token) headers.set('X-CSRFToken', token);
   }
   opts.signal?.throwIfAborted();
+  // Also check synchronously: a queued request may run before the storage event.
+  synchronizeSessionEpoch();
   if (identity !== undefined && identity !== sessionVersion) throw sessionChanged();
   return fetch(apiUrl(path), { ...opts, method, headers, credentials: 'include' });
 }
@@ -113,7 +146,16 @@ function refresh(version: number): Promise<void> {
   return refreshRequest;
 }
 
-export async function request(path: string, opts: RequestInit = {}, policy: { sessionBound?: boolean } = {}): Promise<unknown> {
+export function request(path: string, opts: RequestInit = {}, policy: { sessionBound?: boolean } = {}): Promise<unknown> {
+  const pending = performRequest(path, opts, policy);
+  if (!SAFE_METHODS.has((opts.method || 'GET').toUpperCase()) && !AUTH_PATHS.has(path.split('?')[0])) {
+    accountWrites.add(pending);
+    void pending.finally(() => accountWrites.delete(pending)).catch(() => undefined);
+  }
+  return pending;
+}
+
+async function performRequest(path: string, opts: RequestInit = {}, policy: { sessionBound?: boolean } = {}): Promise<unknown> {
   const identity = sessionVersion;
   const generation = refreshVersion;
   const endpoint = path.split('?')[0];
