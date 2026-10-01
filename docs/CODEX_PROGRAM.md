@@ -6,19 +6,27 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 5 requested frontend API/auth scope verified; later-batch and deployment gates remain open |
+| Program status | Batch 7 admin/media scope verified; later-batch and deployment gates remain open |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 5 - Frontend API client and authentication |
-| Batch status | Complete for requested transport/session scope; local batch commits only |
-| Batch branch | `codex/batch-05-frontend-api-auth` |
-| Batch start commit | `7343e237f1282e03ca5e239a390f29a0f053814f` |
-| Final batch / integration merge | Resolve batch tip with `git rev-parse codex/batch-05-frontend-api-auth`; no Batch 5 merge performed |
-| Audit IDs handled | FE-003 addressed; FE-001 reinforced; ARCH-003/TEST-002 remain partial for remaining DTO typing |
-| Verification performed | 45 frontend tests, lint/typecheck/build, three real-Django Chrome journeys; prior Batch 4 backend evidence retained below |
+| Current batch | Batch 7 - Admin frontend and product media |
+| Batch status | Complete for requested admin/media scope; local batch commits only |
+| Batch branch | `codex/batch-07-admin-media` |
+| Batch start commit | `755653b11322167205ade43b8810ababc38c4bed` (Batch 6 prerequisite) |
+| Final batch / integration merge | Resolve batch tip with `git rev-parse codex/batch-07-admin-media`; no Batch 7 merge performed |
+| Audit IDs handled | ARCH-002 addressed; FE-002 reinforced; FE-005/PERF-002 partial for public/customer work |
+| Verification performed | Frontend/backend checks and real-Django Chrome workflows; exact final results in Handoff |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 6 - Frontend state; no further batch started; outstanding broader roadmap items remain open |
+| Next batch | Batch 8 - Performance/database; no next batch started |
+
+## Batch 7 - Admin frontend and product media
+
+- Extracted feature responsibilities from AdminPanel while retaining the visual system and Persian RTL. Editor metadata/pricing/variants/media have independent drafts and explicit validation/save/cancel/conflict behavior; shared dialogs manage focus and keyboard operation.
+- Staff screens consume server pagination/filter/sort and load only the active commerce section. Order customer data comes from the order representation. Old array helpers are bounded previews; complete management uses paginated screens.
+- Managed binary product uploads, object previews, explicit primary/gallery semantics and coordinated limits are verified. Existing gallery storage meets requirements, so no migration/data rewrite was justified. Rollout and rollback are in [ADMIN_MEDIA](ADMIN_MEDIA.md).
+- Local feature commits remain on the required batch branch. No integration merge, remote push, deployment, production-data access, dependency addition or next-batch work is included. Earlier security/financial/SQL/provider obligations remain open.
+- Verification: 74 frontend tests; lint/typecheck/build; 116 backend passes plus seven SQL-only skips (123 cases); Django check/drift; Compose config; four real-Django Chrome journeys, including managed gallery rendering after reload and desktop/mobile keyboard dialogs. Implementation commits are `ffa6d3c` and `6de1934`; the final docs/whitespace commit is the branch tip.
 
 ## Batch 5 - Frontend API client and authentication
 
@@ -163,7 +171,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 4 - Backend/API cleanup (scoped completion; follow-ups documented)
 - [ ] Batch 5 — API/auth frontend
 - [x] Batch 6 — Frontend state (local required branch; integration/publication separate)
-- [ ] Batch 7 — Admin/media
+- [x] Batch 7 — Admin/media (requested scope; broader public pagination remains open)
 - [ ] Batch 8 — Performance/database
 - [ ] Batch 9 — Security
 - [ ] Batch 10 — Production infrastructure

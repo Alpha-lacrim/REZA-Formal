@@ -2,6 +2,12 @@
 
 Source/probe baseline established 2026-09-10 by Batch 1, with documentation completion review on 2026-09-13, on unchanged application commit `94d665881e3e929c41121d057385c28f822002fe`. Start with [AUDIT_INDEX](audit/AUDIT_INDEX.md), which owns the 43-finding register and all 18 hypothesis verdicts. This roadmap schedules work; it does not authorize starting another batch in this session or claim that any finding is fixed.
 
+## Batch 7 update - 2026-10-02
+
+Admin/media scope is implemented on `codex/batch-07-admin-media`, based on the completed Batch 6 branch. AdminPanel composes coherent features; product drafts separate metadata/pricing/variants/media; managed uploads, validation and dialog lifecycle are verified. All staff collection screens use server pages. Existing gallery storage is adequate: no ProductImage model or migration. See [media trace, limits, rollout and rollback](ADMIN_MEDIA.md).
+
+ARCH-002 is addressed. FE-002/SEC-001 product safeguards are reinforced; FE-005 remains partial for customer/review pagination, and PERF-002 remains partial for public reads/stats. No arbitrary redesign, external provider, user-management expansion or next batch is included. Final checks/provenance are in Handoff and CODEX_PROGRAM.
+
 ## Batch 5 update - 2026-09-30
 
 Implemented the requested transport/session scope on `codex/batch-05-frontend-api-auth`: independent auth/catalog boundaries, checked DTOs, unknown HTTP responses, normalized errors, single-flight refresh and explicit session initialization/expiry. Selective cancellation and identity guards cover catalog/account/product reads. Visual layout is unchanged. See [contract and remaining work](FRONTEND_API_AUTH.md).

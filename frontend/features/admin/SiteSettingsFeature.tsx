@@ -100,7 +100,7 @@ return <>
                                 <SettingsIcon className="text-lux-gold"/> تنظیمات عمومی
                             </h1>
                         </div>
-                        
+
                         <div className="bg-white dark:bg-zinc-900 p-8 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm">
                             <form onSubmit={handleSaveSettings} className="space-y-8">
                                 {saveError && <p role="alert" className="text-rose-600">{saveError}</p>}

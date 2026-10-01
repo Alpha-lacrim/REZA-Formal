@@ -50,7 +50,8 @@ Existing DB indexes cover many commerce status/user/date paths. No generic claim
 | ID | PERF-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Partial - Batch 4 bounded admin APIs; screen/stats work remains |
+| Status | Partial - Batch 7 staff pages complete; public reads/stats remain |
+| Batch 7 evidence | Staff UI consumes eight-row pages with server search/filter/sort and no client-side all-record scan. Legacy array compatibility helpers are bounded to 100 records and are not used by staff feature screens. Public/account reads, revenue aggregation and SQL query-plan measurement remain later work. |
 | Batch 4 evidence | Orders/users/messages/products now use the shared 25-default/100-max page envelope with deterministic PK tie breakers and relative navigation links. Four staff adapters traverse numeric pages and reject incomplete loads; 103-record and permission/API tests plus MSW pagination tests pass. Browser collections still load all pages, public catalog/account collections and revenue aggregation remain unbounded; server-driven screen pagination is deferred. |
 | Evidence | Static queryset/serializer trace has no slice/paginator on these routes; contrast _page default25/max100 used for coupons/shipping/payments/reviews/returns/bespoke. |
 | File/function references | backend/shop/views.py:561,746,774,842,851,871; backend/shop/commerce_views.py:187,238,287 |

@@ -82,7 +82,7 @@ return <>
                                 <ShoppingBag className="text-lux-gold"/> مدیریت سفارشات
                             </h1>
                         </div>
-                        
+
                         <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-gray-100 dark:border-zinc-800 shadow-sm">
                             <div className="flex flex-col lg:flex-row gap-4 items-end lg:items-center">
                                 <div className="flex-1 w-full relative">
@@ -153,7 +153,7 @@ return <>
                                                 {getStatusBadge(order.status)}
                                             </div>
                                         </div>
-                                        
+
                                         <div className="bg-gray-50 dark:bg-zinc-800/50 rounded-xl p-4 mb-4">
                                             <div className="flex gap-2 overflow-x-auto pb-2 hide-scroll">
                                                 {order.items.map((item, idx) => (
