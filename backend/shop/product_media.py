@@ -14,6 +14,7 @@ from rest_framework import serializers
 
 
 MAX_IMAGE_BYTES = 10 * 1024 * 1024
+MAX_UPLOAD_BYTES = 40 * 1024 * 1024
 MAX_GALLERY_IMAGES = 12
 FORMATS = {'PNG': ('.png', 'image/png'), 'JPEG': ('.jpg', 'image/jpeg'),
            'WEBP': ('.webp', 'image/webp'), 'GIF': ('.gif', 'image/gif')}

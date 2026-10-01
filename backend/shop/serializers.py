@@ -160,8 +160,19 @@ class AdminProductWriteSerializer(serializers.ModelSerializer):
         gallery = attrs.get('images', self.fields['images'].to_representation(self.instance.images) if self.instance else [])
         if len(gallery) + len(attrs.get('gallery_files', [])) > MAX_GALLERY_IMAGES:
             raise serializers.ValidationError({'images': 'At most 12 gallery images are allowed.'})
-        if attrs.get('gallery_files') and 'images' not in attrs:
+        if ('image' in attrs or attrs.get('gallery_files')) and 'images' not in attrs:
             attrs['images'] = self.fields['images'].to_internal_value(gallery)
+            gallery = attrs['images']
+        if any(key in attrs for key in ('image', 'images', 'gallery_files')):
+            primary = attrs.get('image', self.instance.image if self.instance else None)
+            # URLs may be absolute API URLs or storage-relative references.
+            from urllib.parse import urlsplit
+            primary_url = primary.url if primary and hasattr(primary, 'url') else None
+            primary_path = urlsplit(primary_url).path if primary_url else None
+            gallery_count = len(gallery) + len(attrs.get('gallery_files', []))
+            primary_in_gallery = primary_path and any(isinstance(item, str) and urlsplit(item).path == primary_path for item in gallery)
+            if gallery_count + int(bool(primary) and not primary_in_gallery) > MAX_GALLERY_IMAGES:
+                raise serializers.ValidationError({'images': 'At most 12 images including the primary image are allowed.'})
         return attrs
 
 

@@ -35,12 +35,15 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
+from django.db.models import Q
+from django.utils.dateparse import parse_date
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
 from .commerce_services import CommerceError
 from .product_services import save_product
 from .selectors import product_reads, order_reads
 from .pagination import page_response
+from .product_media import MAX_GALLERY_IMAGES, MAX_UPLOAD_BYTES
 import json
 import logging
 from decimal import Decimal
@@ -165,6 +168,11 @@ def prepare_product_data(request):
         if client_name in data and model_name not in data:
             data[model_name] = data.pop(client_name)
     if request.FILES:
+        uploaded = [file for key in request.FILES for file in request.FILES.getlist(key)]
+        if len(uploaded) > MAX_GALLERY_IMAGES or len(request.FILES.getlist('image')) > 1:
+            raise ValidationError({'images': 'At most 12 images and one primary image are allowed.'})
+        if sum(file.size for file in uploaded) > MAX_UPLOAD_BYTES:
+            raise ValidationError({'images': 'Combined image uploads must be at most 40 MiB.'})
         files = [file for key in ('images', 'images[]') for file in request.FILES.getlist(key)]
         if files:
             data['gallery_files'] = files
@@ -177,6 +185,8 @@ def prepare_product_data(request):
         data.pop('images[]', None)
     if data.get('image') == '':
         data['image'] = None
+    if data.get('compare_at_price') == '':
+        data['compare_at_price'] = None
     return data
 
 
@@ -545,6 +555,26 @@ def admin_orders(request):
     from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
 
     qs = order_reads().order_by('-created_at')
+    search = request.query_params.get('search', '').strip()
+    if search:
+        qs = qs.filter(Q(id__icontains=search) | Q(shipping_address__icontains=search)
+                       | Q(recipient_name__icontains=search) | Q(user__first_name__icontains=search)
+                       | Q(user__last_name__icontains=search) | Q(user__username__icontains=search))
+    order_status = request.query_params.get('status')
+    if order_status and order_status != 'all':
+        if order_status not in dict(Order.STATUS):
+            raise ValidationError({'status': 'Invalid order status.'})
+        qs = qs.filter(status=order_status)
+    for param, lookup in [('date_start', 'created_at__date__gte'), ('date_end', 'created_at__date__lte')]:
+        value = request.query_params.get(param)
+        if value:
+            try:
+                date = parse_date(value)
+            except ValueError:
+                date = None
+            if date is None:
+                raise ValidationError({param: 'Use YYYY-MM-DD.'})
+            qs = qs.filter(**{lookup: date})
     return page_response(request, qs, CommerceOrderSerializer)
 
 @api_view(['PUT'])
@@ -598,6 +628,9 @@ def admin_messages(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     msgs = ContactMessage.objects.all().order_by('-created_at')
+    search = request.query_params.get('search', '').strip()
+    if search:
+        msgs = msgs.filter(Q(name__icontains=search) | Q(email__icontains=search) | Q(message__icontains=search))
     return page_response(request, msgs, ContactMessageSerializer)
 
 @api_view(['POST'])
@@ -619,7 +652,15 @@ def admin_products(request):
     
     if request.method == 'GET':
         qs = product_reads()
-        return page_response(request, qs.order_by('id'), AdminProductReadSerializer)
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(category__icontains=search))
+        orderings = {'default': 'id', 'price-asc': 'price', 'price-desc': '-price',
+                     'stock-asc': 'stock', 'stock-desc': '-stock', 'name-asc': 'name'}
+        ordering = request.query_params.get('ordering', 'default')
+        if ordering not in orderings:
+            raise ValidationError({'ordering': 'Invalid product ordering.'})
+        return page_response(request, qs.order_by(orderings[ordering]), AdminProductReadSerializer)
 
     # POST (Create)
     # Normalize the request; validation and the transaction own all storage writes.

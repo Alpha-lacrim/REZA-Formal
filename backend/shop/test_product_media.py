@@ -159,3 +159,69 @@ class ProductMediaTests(TestCase):
         }, format='multipart')
         self.assertEqual(response.status_code, 201, response.data)
         self.assertNotIn(b'<script>', self.files()[0].read_bytes())
+
+    def test_total_image_count_includes_primary_and_preserves_existing_references(self):
+        response = self.client.post('/api/admin/products/', {
+            'name': 'Suit', 'price': '10', 'stock': 1, 'image': upload(),
+            'images': json.dumps([f'/images/{i}.png' for i in range(12)]),
+        }, format='multipart')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(self.files(), [])
+        created = self.client.post('/api/admin/products/', {
+            'name': 'Suit', 'price': '10', 'stock': 1, 'image': upload(),
+            'images': json.dumps([f'/images/{i}.png' for i in range(11)]),
+        }, format='multipart')
+        self.assertEqual(created.status_code, 201, created.data)
+        # Existing clients may include the primary URL in the gallery: count it once.
+        edited = self.client.put(f"/api/admin/products/{created.data['id']}/", {
+            'images': json.dumps([created.data['image'], *created.data['images']]),
+        }, format='multipart')
+        self.assertEqual(edited.status_code, 200, edited.data)
+
+    def test_combined_upload_budget_is_checked_before_decoding_or_storage(self):
+        with patch('shop.views.MAX_UPLOAD_BYTES', 100):
+            with patch('shop.product_media.Image.open') as decode:
+                response = self.client.post('/api/admin/products/', {
+                    'name': 'Suit', 'price': '10', 'stock': 1, 'image': upload(), 'images[]': upload(),
+                }, format='multipart')
+        self.assertEqual(response.status_code, 400, response.data)
+        decode.assert_not_called()
+        self.assertEqual(self.files(), [])
+
+    def test_edit_can_clear_compare_price_and_replace_primary_without_inline_storage(self):
+        created = self.client.post('/api/admin/products/', {
+            'name': 'Suit', 'price': '10', 'compare_at_price': '15', 'stock': 2, 'image': upload(),
+        }, format='multipart')
+        self.assertEqual(created.status_code, 201, created.data)
+        edited = self.client.put(f"/api/admin/products/{created.data['id']}/", {
+            'compare_at_price': '', 'image': upload('replacement.png'),
+            'images': json.dumps([created.data['image']]),
+        }, format='multipart')
+        self.assertEqual(edited.status_code, 200, edited.data)
+        self.assertIsNone(edited.data['compare_at_price'])
+        self.assertNotEqual(created.data['image'], edited.data['image'])
+        self.assertEqual(edited.data['images'], [created.data['image']])
+        self.assertEqual(len(self.files()), 2)
+
+    def test_animated_images_are_rejected_and_storage_ignores_supplied_filenames(self):
+        stream = BytesIO()
+        Image.new('RGB', (2, 2), 'red').save(stream, format='GIF', save_all=True, append_images=[Image.new('RGB', (2, 2), 'blue')], duration=100)
+        response = self.client.post('/api/admin/products/', {
+            'name': 'Suit', 'price': '10', 'stock': 1, 'image': upload('animated.gif', stream.getvalue(), 'image/gif'),
+        }, format='multipart')
+        self.assertEqual(response.status_code, 400, response.data)
+        self.assertEqual(self.files(), [])
+        response = self.client.post('/api/admin/products/', {
+            'name': 'Suit', 'price': '10', 'stock': 1, 'image': upload('../../supplied.png'),
+        }, format='multipart')
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertNotIn('supplied', response.data['image'])
+        self.assertRegex(self.files()[0].name, r'^[a-f0-9]{32}\.png$')
+
+    def test_replacing_primary_validates_legacy_gallery_instead_of_crashing_or_dropping_it(self):
+        product = Product.objects.create(id='invalid-gallery', name='Legacy', price=10, images=['http://[invalid'])
+        response = self.client.put(f'/api/admin/products/{product.pk}/', {'image': upload()}, format='multipart')
+        self.assertEqual(response.status_code, 400, response.data)
+        product.refresh_from_db()
+        self.assertEqual(product.images, ['http://[invalid'])
+        self.assertEqual(self.files(), [])
