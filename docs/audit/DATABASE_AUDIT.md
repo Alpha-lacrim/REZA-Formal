@@ -1,6 +1,6 @@
 # Database audit
 
-Normal settings use `mssql` with `mssql-django`/`pyodbc`; isolated tests replace DATABASES with in-memory SQLite. No SQL Server connection, live schema inspection, query plan, production dataset, collation or isolation-level query was performed. Historical July SQL smoke tests are prior evidence only.
+Normal settings use `mssql` with `mssql-django`/`pyodbc`; isolated tests replace DATABASES with in-memory SQLite. Original Batch 1 evidence below is historical. Batch 8 ran the disposable SQL Server suite, measured SKU index shapes/plans and verified migration 0008 forward/reverse. No production schema/data/isolation inspection was performed. See [stock ownership, transactions, index assessment and measurements](../DATABASE_PERFORMANCE.md).
 
 ## Schema and relationship map
 
@@ -35,6 +35,7 @@ Cancellation/restock use variant inventory where available and Product.stock fal
 | 0005 | Normalized unique emails; clears legacy 2FA secrets | Aborts on blank/case-normalized duplicates, reports IDs not values; reverse data operation is noop |
 | 0006 | Commerce models, FKs, indexes, checks, snapshots and variants | Adds nullable order UUID, backfills each row, then makes unique/non-null. Builds legacy SKU from uppercase product ID; creates addresses from flat text. No payment/refund history backfill; most checks are installed before data backfill. Negative legacy stock/totals can fail constraints before max(...,0) code runs |
 | 0007 | Partial/full refund/payment states and bespoke scheduled choice | Primarily state field/choice evolution, not financial data repair |
+| 0008 | Remove redundant variant_sku_idx | Disposable SQL unique-index seek and round trip verified; keep unique SKU, inspect deployed schema/backup before rollout |
 
 The existing MigrationExecutor test covers one positive legacy catalog/order/address case on SQLite. Blank/duplicate emails, invalid legacy amounts, SKU collisions under SQL collation, all seven migrations on existing SQL data and rollback/restore need separate staging evidence. `RunPython.noop` reverse functions do not restore cleared secrets or recover commerce data removed by reverse schema operations. Use backups and forward corrective migrations; do not casually edit applied migrations.
 
@@ -55,7 +56,8 @@ SQL JSONField storage and query/index capabilities must be checked against the d
 | ID | DB-001 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - design risk |
+| Status | Partial - Batch 8 inventory ownership and read-only reconciliation; wider invariants remain |
+| Batch 8 evidence | [Canonical meanings, reader/writer trace, divergence and atomic boundaries](../DATABASE_PERFORMANCE.md). Bounded-sample audit_inventory reports projection/latest-movement/missing-history counts without repair on SQLite and SQL Server. No stock redesign or guessed historical correction. Default-address/settings/financial cross-record guarantees remain open. |
 | Evidence | Static constraint inventory; BE-002 and BE-006 demonstrate concrete bypasses. SiteSettings.objects.first is the singleton convention. |
 | File/function references | backend/shop/models.py:Address,SiteSettings,Order,Payment,InventoryMovement; backend/shop/admin.py |
 | Current behaviour | Schema checks protect row-level nonnegativity/uniqueness, but not one active default address, one settings row, stock projection equality, total equation or synchronized lifecycle state. |
@@ -124,7 +126,8 @@ SQL JSONField storage and query/index capabilities must be checked against the d
 | ID | DB-004 |
 | Severity | P3 |
 | Confidence | High |
-| Status | Open - maintenance debt |
+| Status | Fixed - Batch 8; redundant index removed with SQL plan/round-trip evidence |
+| Batch 8 evidence | sys.indexes confirms unique/nonunique single SKU keys; 1,000-row SHOWPLAN_XML seek uses uniqueness index before/after. New RemoveIndex 0008 verified forward/reverse on disposable SQL Server; SKU uniqueness retained. Production schema review/backup remains a rollout step. |
 | Evidence | Static field/index definitions; inspect SQL Server sys.indexes/key columns before deciding removal. |
 | File/function references | backend/shop/models.py:ProductVariant.sku,ProductVariant.Meta; migration 0006 variant_sku_idx |
 | Current behaviour | SKU unique=True and a separate single-column variant_sku_idx describe overlapping index coverage. |

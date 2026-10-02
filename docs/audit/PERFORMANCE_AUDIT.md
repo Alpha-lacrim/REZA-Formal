@@ -1,6 +1,10 @@
 # Performance audit
 
-No production timing, load test or React profiler run was performed. Findings separate observed query/request growth from unmeasured performance effects.
+No production timing, load test or React profiler run was performed. Findings separate observed query/request growth from unmeasured performance effects. The baseline table below is historical; [Batch 8 measurements and residuals](../DATABASE_PERFORMANCE.md) supersede remediated paths.
+
+## Batch 8 - 2026-10-03
+
+Repeated synthetic baseline/after probes and SQL Server budgets cover products/detail/admin, orders, reviews, users/messages, returns, cart, quotes and checkout. Cart 31 -> 2 queries / 153,219 -> 32,709 bytes; returns 77 -> 3; 30-line quote 92 -> 4; public catalog 144,401 -> 16,879 bytes with three queries including count; stats 10 -> 9 and SQL scalar net revenue. Checkout locks/writes remain unchanged (24/256 queries for 1/30 lines). Staff pages remain bounded; public/server search, catalog cards, customer orders/returns and review page controls are coordinated. Chrome asserts one product detail request and no extra expanded-order read. Main bundle grows slightly (392.64 KB baseline; final in Handoff), without a demonstrated bundle bottleneck. Saved account snapshots and historical inline media remain explicit residuals.
 
 | Surface | Baseline behavior |
 | --- | --- |
@@ -50,7 +54,8 @@ Existing DB indexes cover many commerce status/user/date paths. No generic claim
 | ID | PERF-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Partial - Batch 7 staff pages complete; public reads/stats remain |
+| Status | Partial - Batch 8 public/staff/history pages and SQL stats; saved snapshots/legacy inline media remain |
+| Batch 8 evidence | [Measured query/byte/request budgets](../DATABASE_PERFORMANCE.md); public filters/search/paging/cards and SQL revenue aggregation verified. Whole saved cart/wishlist/address contracts and historical inline payloads require separate coordination. No Redis or speculative index additions. |
 | Batch 7 evidence | Staff UI consumes eight-row pages with server search/filter/sort and no client-side all-record scan. Legacy array compatibility helpers are bounded to 100 records and are not used by staff feature screens. Public/account reads, revenue aggregation and SQL query-plan measurement remain later work. |
 | Batch 4 evidence | Orders/users/messages/products now use the shared 25-default/100-max page envelope with deterministic PK tie breakers and relative navigation links. Four staff adapters traverse numeric pages and reject incomplete loads; 103-record and permission/API tests plus MSW pagination tests pass. Browser collections still load all pages, public catalog/account collections and revenue aggregation remain unbounded; server-driven screen pagination is deferred. |
 | Evidence | Static queryset/serializer trace has no slice/paginator on these routes; contrast _page default25/max100 used for coupons/shipping/payments/reviews/returns/bespoke. |
@@ -74,7 +79,8 @@ Existing DB indexes cover many commerce status/user/date paths. No generic claim
 | ID | PERF-003 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed query growth |
+| Status | Fixed - Batch 8; two-query cart read graph and compact product copy |
+| Batch 8 evidence | Joined cart products plus targeted variant prefetch hold at two queries for 1 and 30 lines on SQLite/SQL Server; descriptions omitted, fixture bytes 153,219 -> 32,709. Cart/domain normalizers and beyond-preview product selection verified. |
 | Evidence | Static serializer access trace: select_related('variant__product') does not prefetch the reverse variants collection. No production timing asserted. |
 | File/function references | backend/shop/commerce_views.py:238,253; backend/shop/commerce_serializers.py:73 |
 | Current behaviour | Cart query joins variant/product but does not prefetch product.variants, which ProductSummarySerializer traverses for every line. |

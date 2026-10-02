@@ -121,7 +121,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-005 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Partial - Batch 7 staff pagination; customer/review screens remain |
+| Status | Addressed - Batch 8 public/customer/review pages plus Batch 7 staff pages |
+| Batch 8 evidence | Catalog 24-row server filters/search/sort, eight-row customer order/return/review navigation, five-row debounced navbar search and bounded home category previews. Tests cover >25 records, page metadata, beyond-preview cart addition and active collection request ownership. Whole saved collection synchronization remains PERF-002 scope. |
 | Batch 7 evidence | Product/order/message and all six commerce screens consume page metadata and request only the selected server page. Search/sort/status filtering occurs before pagination; failed pages retry and last-page deletion clamps navigation. Full user-directory enrichment is removed. Customer history/returns and product-review pagination remain open. |
 | Evidence | P15: 35 orders produce count=35, returned=25, total_pages=2, next=null. Client calls accept no page in myOrders/getReturns; admin load supplies none. |
 | File/function references | frontend/services/api.ts:818,869,959; frontend/pages/AdminPanel.tsx:140; frontend/pages/ProductPage.tsx:65; frontend/pages/UserPanel.tsx:loadAccount; backend/shop/commerce_views.py:84 |

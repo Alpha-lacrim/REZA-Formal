@@ -81,6 +81,8 @@ Run discovery from `backend`, not the repository root. On September 28 this nati
 
 ## CI behavior
 
+Batch 8 adds `shop.test_performance` API query/byte budgets and read-only inventory probes, plus `shop.test_sql_indexes` SQL-only SKU plan/introspection/migration round trips (two additional SQLite skips). Run the performance module on either isolated settings; run index tests only on the disposable SQL lane. [DATABASE_PERFORMANCE.md](DATABASE_PERFORMANCE.md) records fixtures, baseline/after evidence and limits. Frontend catalog/customer tests cover server page ownership, beyond-preview cart selection and embedded order expansion; Chrome counts product/order detail requests.
+
 `.github/workflows/ci.yml` runs on pull requests and pushes to `main`, `dev`, `feature/**`, and `codex/**`: lockfile install, lint, typecheck, both frontend suites, build, Django system/drift/tests and validation of both Compose topologies. It has read-only repository permissions and cancels superseded runs.
 
 `.github/workflows/extended-tests.yml` is manually dispatched with `e2e`, `sql`, or `all`. Browser reports upload on failure; SQL teardown runs even after failure. These expensive jobs are separate from the fast gates. Hosted workflow success and branch protection must be verified after publication; local success is not a hosted CI run. See the dated testing audit for actual execution evidence and unavailable lanes.
