@@ -1,10 +1,16 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { CartLine, Product, SiteSettings, User } from '../types';
 import api from '../services/api';
+import { onSessionExpired } from '../services/http/client';
 import { db } from '../services/db';
 
 export const cartLineKey = (line: Pick<CartLine, 'productId' | 'variantId'>): string =>
     `${line.productId}::${line.variantId || ''}`;
+
+export type AuthState =
+    | { status: 'loading' }
+    | { status: 'anonymous' }
+    | { status: 'customer' | 'admin'; user: User };
 
 type CatalogSource = 'server' | 'fallback' | 'none';
 
@@ -25,6 +31,7 @@ interface GlobalContextType {
 
     user: User | null;
     isAuthLoading: boolean;
+    authState: AuthState;
     login: (email: string, pass: string, code?: string) => Promise<void>;
     register: (name: string, email: string, pass: string) => Promise<void>;
     logout: () => void;
@@ -48,16 +55,6 @@ interface GlobalContextType {
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
-
-const normalizeUserForContext = (raw: any, fallbackName = ''): User => ({
-    ...raw,
-    id: String(raw?.id ?? ''),
-    name: raw?.name || [raw?.first_name, raw?.last_name].filter(Boolean).join(' ') || fallbackName || raw?.email || '',
-    email: raw?.email || '',
-    role: raw?.role || 'user',
-    address: raw?.address || '',
-    createdAt: raw?.createdAt || Date.now(),
-});
 
 const readLocalCart = (): CartLine[] => {
     try {
@@ -98,8 +95,12 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const [cartLines, setCartLines] = useState<CartLine[]>(readLocalCart);
     const [wishlist, setWishlist] = useState<string[]>(readLocalWishlist);
     const [isCartOpen, setIsCartOpen] = useState(false);
-    const [user, setUser] = useState<User | null>(null);
-    const [isAuthLoading, setIsAuthLoading] = useState(true);
+    const [authState, setAuthState] = useState<AuthState>({ status: 'loading' });
+    const user = 'user' in authState ? authState.user : null;
+    const isAuthLoading = authState.status === 'loading';
+    const authAttempt = useRef(0);
+    const applyUser = (user: User) => setAuthState({ status: user.role === 'admin' ? 'admin' : 'customer', user });
+    const catalogController = useRef<AbortController | null>(null);
     const catalogKey = isAuthLoading ? 'resolving' : JSON.stringify([user?.id ?? null, user?.role ?? null]);
     const [catalog, setCatalog] = useState<{ owner: string; products: Product[]; source: CatalogSource }>({
         owner: '', products: [], source: 'none',
@@ -114,7 +115,20 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         (localStorage.getItem('reza_theme_pref') as 'light' | 'dark') || 'light');
     const [toastMessage, setToastMessage] = useState<string | null>(null);
     const cartSyncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-    const hydratedUserId = useRef<string | null>(null);
+    const [hydratedUserId, setHydratedUserId] = useState<string | null>(null);
+    const accountController = useRef<AbortController | null>(null);
+
+    const clearSession = useCallback(() => {
+        authAttempt.current++;
+        catalogController.current?.abort();
+        accountController.current?.abort();
+        if (cartSyncTimer.current) clearTimeout(cartSyncTimer.current);
+        setHydratedUserId(null);
+        setAuthState({ status: 'anonymous' });
+        localStorage.removeItem('reza_session_v1');
+    }, []);
+
+    useEffect(() => onSessionExpired(clearSession), [clearSession]);
 
     const cart = useMemo(() => cartLines.reduce<{ [productId: string]: number }>((summary, line) => {
         summary[line.productId] = (summary[line.productId] || 0) + line.quantity;
@@ -151,16 +165,20 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
 
     const refreshProducts = useCallback(async () => {
         if (isAuthLoading || catalogIdentity.current !== catalogKey) return;
+        catalogController.current?.abort();
+        const controller = new AbortController();
+        catalogController.current = controller;
         const requestId = ++catalogRequest.current;
         const commit = (products: Product[], source: CatalogSource) => {
-            if (catalogIdentity.current === catalogKey && catalogRequest.current === requestId) {
+            if (!controller.signal.aborted && catalogIdentity.current === catalogKey && catalogRequest.current === requestId) {
                 setCatalog({ owner: catalogKey, products, source });
             }
         };
         try {
-            const serverProducts = user?.role === 'admin' ? await api.adminGetProducts() : await api.getProducts();
+            const serverProducts = user?.role === 'admin' ? await api.adminGetProducts(controller.signal) : await api.getProducts(controller.signal);
             commit(serverProducts, 'server');
         } catch {
+            if (controller.signal.aborted) return;
             if (user?.role === 'admin') {
                 commit([], 'none');
                 return;
@@ -177,6 +195,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         catalogIdentity.current = catalogKey;
         void refreshProducts();
         return () => {
+            catalogController.current?.abort();
             catalogIdentity.current = null;
             catalogRequest.current += 1;
         };
@@ -191,38 +210,37 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     };
 
     useEffect(() => {
-        let cancelled = false;
+        const controller = new AbortController();
+        const attempt = ++authAttempt.current;
         void loadSettings();
         void (async () => {
             try {
-                const resolvedUser = await api.me();
-                if (!cancelled) setUser(resolvedUser ? normalizeUserForContext(resolvedUser) : null);
+                const resolvedUser = await api.me(controller.signal);
+                if (!controller.signal.aborted && attempt === authAttempt.current) applyUser(resolvedUser);
             } catch {
-                if (!cancelled) setUser(null);
-            } finally {
-                if (!cancelled) setIsAuthLoading(false);
+                if (!controller.signal.aborted && attempt === authAttempt.current) setAuthState({ status: 'anonymous' });
             }
         })();
-        return () => { cancelled = true; };
+        return () => { controller.abort(); };
     }, []);
 
     useEffect(() => {
-        if (!user || hydratedUserId.current === user.id) return;
-        hydratedUserId.current = user.id;
-
+        if (!user) return;
+        const controller = new AbortController();
+        accountController.current = controller;
+        const attempt = authAttempt.current;
+        const current = () => !controller.signal.aborted && attempt === authAttempt.current;
+        setHydratedUserId(null);
         void (async () => {
             try {
-                const savedCart = await api.getSavedCart();
+                const savedCart = await api.getSavedCart(controller.signal);
+                if (!current()) return;
                 const localLines = readLocalCart();
                 const mergedLines = new Map<string, CartLine>();
                 [...savedCart.lines, ...localLines].forEach(({ productId, variantId, quantity }) => {
                     const key = cartLineKey({ productId, variantId });
                     const existing = mergedLines.get(key);
-                    mergedLines.set(key, {
-                        productId,
-                        variantId,
-                        quantity: Math.max(existing?.quantity || 0, quantity),
-                    });
+                    mergedLines.set(key, { productId, variantId, quantity: Math.max(existing?.quantity || 0, quantity) });
                 });
                 const mergedCart = Array.from(mergedLines.values());
                 if (mergedCart.length > 0) {
@@ -232,30 +250,34 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
             } catch {
                 // Local cart stays usable if the saved-cart service is unavailable.
             }
-
+            if (!current()) return;
             try {
-                const serverProducts = await api.getWishlist();
+                const serverProducts = await api.getWishlist(controller.signal);
+                if (!current()) return;
                 const serverIds = serverProducts.map(product => product.id);
                 const localIds = readLocalWishlist();
-                const merged = Array.from(new Set([...serverIds, ...localIds]));
-                setWishlist(merged);
+                setWishlist(Array.from(new Set([...serverIds, ...localIds])));
                 await Promise.all(localIds.filter(id => !serverIds.includes(id)).map(id => api.addToWishlist(id)));
             } catch {
                 // Local wishlist stays usable if the account service is unavailable.
             }
+            if (current()) setHydratedUserId(user.id);
         })();
+        return () => controller.abort();
     }, [user?.id]);
 
     useEffect(() => {
-        if (!user || hydratedUserId.current !== user.id) return;
-        if (cartSyncTimer.current) clearTimeout(cartSyncTimer.current);
+        if (!user || hydratedUserId !== user.id) return;
+        const attempt = authAttempt.current;
         cartSyncTimer.current = setTimeout(() => {
-            void api.syncSavedCart({ lines: cartLines, currency: 'Toman' }).catch(() => undefined);
+            if (attempt === authAttempt.current) {
+                void api.syncSavedCart({ lines: cartLines, currency: 'Toman' }).catch(() => undefined);
+            }
         }, 700);
         return () => {
             if (cartSyncTimer.current) clearTimeout(cartSyncTimer.current);
         };
-    }, [cartLines, user?.id]);
+    }, [cartLines, user?.id, hydratedUserId]);
 
     const resolveLineStock = (productId: string, variantId?: string): number => {
         const product = products.find(item => item.id === productId);
@@ -350,39 +372,54 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
     const isInWishlist = (productId: string) => wishlist.includes(productId);
 
     const login = async (email: string, pass: string, code?: string) => {
-        const response = await api.login(email, pass, code);
+        const pending = api.login(email, pass, code);
+        const attempt = ++authAttempt.current;
+        setAuthState({ status: 'loading' });
         try {
-            setUser(normalizeUserForContext(await api.me()));
-        } catch {
-            setUser(normalizeUserForContext(response?.user || response));
+            const response = await pending;
+            if (attempt !== authAttempt.current) return;
+            applyUser(response.user);
+        } catch (error) {
+            if (attempt === authAttempt.current) setAuthState({ status: 'anonymous' });
+            throw error;
         }
         setAuthModalOpen(false);
         showToast('خوش آمدید');
     };
 
     const register = async (name: string, email: string, pass: string) => {
-        const response = await api.register(name, email, pass);
-        const newUser = response?.user || response;
-        if (newUser) setUser(normalizeUserForContext(newUser, name));
+        const pending = api.register(name, email, pass);
+        const attempt = ++authAttempt.current;
+        setAuthState({ status: 'loading' });
+        try {
+            const response = await pending;
+            if (attempt !== authAttempt.current) return;
+            applyUser(response.user);
+        } catch (error) {
+            if (attempt === authAttempt.current) setAuthState({ status: 'anonymous' });
+            throw error;
+        }
         setAuthModalOpen(false);
         showToast('حساب کاربری ایجاد شد');
     };
 
     const logout = async () => {
+        clearSession();
         try {
             await api.logout();
         } catch {
             // The local session must still be cleared if the server is unreachable.
         }
-        hydratedUserId.current = null;
-        setUser(null);
         showToast('خروج با موفقیت انجام شد');
     };
 
     const updateUserProfile = async (data: Partial<User>) => {
         if (!user) return;
         try {
-            setUser(await api.updateProfile(data));
+            const attempt = authAttempt.current;
+            const updated = await api.updateProfile(data);
+            if (attempt !== authAttempt.current) return;
+            applyUser(updated);
             showToast('اطلاعات با موفقیت به‌روز شد');
         } catch (error) {
             showToast('خطا در به‌روزرسانی اطلاعات');
@@ -435,6 +472,7 @@ export const GlobalProvider: React.FC<{ children: ReactNode }> = ({ children }) 
         isInWishlist,
         user,
         isAuthLoading,
+        authState,
         login,
         register,
         logout,

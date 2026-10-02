@@ -1,3 +1,4 @@
+import { errorMessage } from '../services/api';
 import React, { useState } from 'react';
 import { Instagram, Loader2, Mail, MapPin, Phone, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
@@ -19,8 +20,8 @@ const Footer: React.FC = () => {
             setSubscribed(true);
             setEmail('');
             showToast('عضویت در خبرنامه با موفقیت ثبت شد');
-        } catch (error: any) {
-            showToast(error?.message || 'ثبت عضویت خبرنامه انجام نشد');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ثبت عضویت خبرنامه انجام نشد'));
         } finally {
             setSubmitting(false);
         }

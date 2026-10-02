@@ -110,7 +110,7 @@ test('catalog failure exposes fallback source', async () => {
 
 test('failed account synchronization preserves usable local cart and wishlist', async () => {
   server.use(
-    http.get(`${origin}/auth/me/`, () => HttpResponse.json({ id: 'buyer', email: 'buyer@example.invalid' })),
+    http.get(`${origin}/auth/me/`, () => HttpResponse.json({ id: 'buyer', email: 'buyer@example.invalid', role: 'user' })),
     http.get(`${origin}/cart/`, () => HttpResponse.json({}, { status: 503 })),
     http.put(`${origin}/cart/`, () => HttpResponse.json({}, { status: 503 })),
     http.get(`${origin}/wishlist/`, () => HttpResponse.json({}, { status: 503 })),

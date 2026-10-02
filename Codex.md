@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-09-30 (Batch 4; backend/API contracts, SQL Server and frontend/Chrome gates)
+Last verified: 2026-09-30 (Batch 5 frontend API/auth; frontend/Chrome gates; Batch 4 backend/SQL evidence retained)
 
 ## Purpose and product
 
@@ -27,7 +27,8 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Routing: `HashRouter`, so browser routes live after `#` and static hosting does not need server-side route rewrites.
 - Shared state: `frontend/contexts/GlobalContext.tsx` owns authentication, products, variant-aware cart, wishlist, account synchronization, catalog-source safety, theme, site settings, and toast messages.
 - Catalog requests derive from resolved session state; catalog results belong to that identity. Admin catalog failures expose no partial public catalog, and logout invalidates outstanding admin loads.
-- API boundary: `frontend/services/api.ts` performs HTTP calls and converts Django snake_case/nested responses into the UI's models from `frontend/types.ts`.
+- API boundary: `frontend/services/api.ts` is the compatibility facade. `services/auth.ts` and `catalog.ts` own checked DTO conversion into `types.ts` domain models; other domain adapters migrate incrementally. `services/http/client.ts` returns unknown JSON, owns cookies/CSRF and single-flight refresh, and throws `ApiError` with status/message/fields/code. See [frontend API/session contract](docs/FRONTEND_API_AUTH.md).
+- Auth state is explicit: loading, anonymous, customer or admin. Refresh failure clears local session state and rejects obsolete identity-bound responses. Login/register/logout are serialized after pending refresh cookie writes. Catalog/account reads wait for auth; stale bootstrap, account hydration, catalog and product-detail/review reads are cancelled or ignored. Full cart-write ordering and effective Django staff capability policy remain later work.
 - Local fallback: `frontend/services/db.ts` exposes only a read-only emergency catalog based on `frontend/data.ts`. It is used only when the product API is unavailable and never reports local admin writes as server success.
 - Main feature surfaces: lazy-loaded routes in `frontend/pages/` and shared UI in `frontend/components/`. Tailwind is compiled locally through PostCSS; no runtime Tailwind CDN is used.
 - Static product/site assets: `frontend/public/images/`.
@@ -72,7 +73,8 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `frontend/package.json` | Frontend scripts and dependency contract. |
 | `frontend/vite.config.ts` | Vite build and development-server behavior. |
 | `frontend/contexts/GlobalContext.tsx` | Cross-application UI state and actions. |
-| `frontend/services/api.ts` | Authoritative frontend/Django API adapter and response normalization. |
+| `frontend/services/api.ts`, `auth.ts`, `catalog.ts` | API facade, domain transports and checked auth/catalog normalization. |
+| `frontend/services/http/client.ts`, `errors.ts` | Shared HTTP, CSRF, single-flight refresh, session invalidation and safe error contracts. |
 | `frontend/services/db.ts` | Read-only emergency product-catalog fallback only. |
 | `frontend/types.ts` | Canonical UI data shapes. |
 | `backend/reza_backend/settings.py` | Django, SQL Server, CORS, JWT, static, and media configuration. |

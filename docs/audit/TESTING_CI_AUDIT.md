@@ -1,5 +1,13 @@
 # Testing, CI and operations audit
 
+## Batch 5 verification - 2026-09-30
+
+- `npm.cmd run lint` and `npm.cmd run typecheck`: pass, including no-explicit-any for extracted auth/catalog/HTTP/helper modules.
+- `npm.cmd test`: 12 Node regressions pass (5.94s), 33 Vitest tests pass (4.35s). New concurrency, DTO/error, mounted session and navigation cases exercise the actual adapter or deferred domain calls. Concurrent success/failure, late 401s, one retry, CSRF rotation, multipart replay, auth endpoint exclusions, abort isolation, logout ordering and response-body identity guards are covered.
+- `npm.cmd run build`: pass, 2.37s; main bundle 349.35 kB / 104.00 kB gzip. Initial Vitest startup failed on the already-documented sandbox esbuild directory read; authorized outside-sandbox test/build execution passes.
+- `REZA_E2E_FRONTEND_PORT=18180`, `PLAYWRIGHT_CHANNEL=chrome`, `npm.cmd run test:e2e`: three real-Django Chrome smoke journeys pass in 11.3s (catalog, customer authentication/cart/COD checkout/history, staff authentication/product edit). Temporary synthetic database/media only; no production data.
+- Source/test/contract diff reviewed; baseline-to-final whitespace and changed-file credential signature checks completed during closeout. No backend/SQL/Compose source changed, so those suites were not repeated. No production deployment or hosted CI result is claimed. Legacy commerce DTOs, full cart mutation ordering, quote races and effective staff capability policy remain scoped follow-ups.
+
 ## Batch 4 verification - 2026-09-30
 
 - SQL Server: full suite **116/116 passes, zero skips**, 28.683s, using the existing isolated `reza-sql-tests` topology and native ODBC runner. This includes the constant product query budget, large staff pages, legacy missing-payment characterization, quote/address regression and seven SQL-only cases (new concurrent newsletter creation/reactivation). Final SQL coverage also includes malformed body, multipart normalization and conflict-classification regressions.
@@ -213,7 +221,8 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | TEST-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Partial - lint gate added; strict typing deferred |
+| Status | Partial - lint and auth/catalog DTO gates added; remaining strict typing deferred |
+| Batch 5 evidence | Extracted auth/catalog/HTTP/helper modules forbid explicit any; response JSON is unknown, auth/catalog parsers reject malformed DTOs, UI catches use unknown and typed API errors. Remaining legacy commerce adapters and repository-wide strict TypeScript migration remain open. |
 | Evidence | Scripts/config inspection and 48 lexical any tokens in api.ts. This is a tooling/debt finding, not proof every assertion fails. |
 | File/function references | frontend/package.json; frontend/tsconfig.json; .github/workflows/ci.yml; frontend/services/api.ts |
 | Current behaviour | ESLint 10/typescript-eslint gate passes without broad formatting. strict/noImplicitAny/strictNullChecks and unchecked request<T>/any adapter debt remain Batch 5; hooks dependency auditing is not claimed. |

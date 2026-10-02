@@ -65,7 +65,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | --- | --- | --- | --- | --- | --- |
 | ARCH-001 | P2 | High | Open - maintenance debt | [GlobalContext couples unrelated state domains](ARCHITECTURE_AUDIT.md#arch-001) | 6 |
 | ARCH-002 | P2 | High | Open - maintenance debt | [AdminPanel combines unrelated administration features](ARCHITECTURE_AUDIT.md#arch-002) | 7 |
-| ARCH-003 | P2 | High | Partial - Batch 4 explicit backend contracts; frontend DTO debt remains | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4 |
+| ARCH-003 | P2 | High | Partial - backend and auth/catalog contracts explicit; remaining frontend DTO debt | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4/5 |
 | ARCH-004 | P3 | High | Fixed - Batch 4; routed commerce contracts retained | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
 | BE-001 | P1 | High | Fixed - Batch 2; SQL evidence open | [Stale product saves can overwrite sold stock](BACKEND_AUDIT.md#be-001) | 2 |
 | BE-002 | P1 | High | Fixed - Batch 2 | [Native Django admin bypasses inventory and lifecycle services](BACKEND_AUDIT.md#be-002) | 2 |
@@ -78,7 +78,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | BE-009 | P2 | High | Open - confirmed defect | [Customer cancellation capability describes staff transitions](BACKEND_AUDIT.md#be-009) | 5 |
 | FE-001 | P2 | High | Fixed - Batch 2; explicit priority | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 2 |
 | FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
-| FE-003 | P2 | High | Open - confirmed defect | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
+| FE-003 | P2 | High | Addressed - Batch 5 | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
 | FE-004 | P2 | High | Open - confirmed defect | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
 | FE-005 | P2 | High | Open - confirmed defect | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5 (complete staff surfaces in 7) |
 | FE-006 | P2 | High | Open - confirmed defect | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
@@ -97,7 +97,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | PERF-002 | P2 | High | Partial - Batch 4 bounded admin APIs; screen/stats work remains | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
 | PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
 | TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
-| TEST-002 | P2 | High | Partial - lint gate added; strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3 (API typing work in 5) |
+| TEST-002 | P2 | High | Partial - lint and auth/catalog DTO gates added; remaining strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3/5 |
 | TEST-003 | P1 | High | Partial - SQL baseline passes; broader races remain | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
 | OPS-001 | P2 | High | Fixed - Batch 3 branch filters; hosted run unverified | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
 | OPS-002 | P2 | High | Open - deployment hardening gap | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |

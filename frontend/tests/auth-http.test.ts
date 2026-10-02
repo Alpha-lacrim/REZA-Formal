@@ -41,7 +41,7 @@ test('login and logout send credentials and CSRF through the real adapter', asyn
       expect(request.credentials).toBe('include');
       expect(request.headers.get('X-CSRFToken')).toBe('csrf-fixture');
       expect(await request.json()).toEqual({ email: 'buyer@example.invalid', password: 'test-password' });
-      calls.push('login'); return HttpResponse.json({ user: { id: 'buyer' } });
+      calls.push('login'); return HttpResponse.json({ user: { id: 'buyer', email: 'buyer@example.invalid', role: 'user' } });
     }),
     http.post('*/api/auth/logout/', ({ request }) => {
       expect(request.headers.get('X-CSRFToken')).toBe('csrf-fixture');

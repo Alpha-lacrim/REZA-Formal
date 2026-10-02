@@ -1,3 +1,4 @@
+import { errorMessage } from '../services/api';
 import React, { useEffect, useState } from 'react';
 import {
     ChevronDown, ChevronUp, CreditCard, ExternalLink, Loader2, LogOut,
@@ -63,8 +64,8 @@ const UserPanel: React.FC = () => {
             if (results[1].status === 'fulfilled') setAddresses(results[1].value);
             if (results[2].status === 'fulfilled') setReturns(results[2].value);
             if (results.some(result => result.status === 'rejected')) showToast('بخشی از اطلاعات حساب در دسترس نیست؛ دوباره تلاش کنید');
-        } catch (error: any) {
-            showToast(error?.message || 'دریافت اطلاعات حساب کاربری ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'دریافت اطلاعات حساب کاربری ناموفق بود'));
         } finally {
             setLoading(false);
         }
@@ -90,8 +91,8 @@ const UserPanel: React.FC = () => {
         try {
             const detail = await api.getOrder(order.id);
             setOrders(current => current.map(item => item.id === detail.id ? detail : item));
-        } catch (error: any) {
-            showToast(error?.message || 'جزئیات سفارش دریافت نشد');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'جزئیات سفارش دریافت نشد'));
         } finally {
             setActionLoading(null);
         }
@@ -108,8 +109,8 @@ const UserPanel: React.FC = () => {
             await cancelUserOrder(orderId);
             await loadAccount();
             showToast('سفارش لغو شد');
-        } catch (error: any) {
-            showToast(error?.message || 'لغو سفارش ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'لغو سفارش ناموفق بود'));
         } finally {
             setActionLoading(null);
         }
@@ -121,8 +122,8 @@ const UserPanel: React.FC = () => {
         try {
             await updateUserProfile({ name, address: profileAddress });
             showToast('اطلاعات حساب به‌روزرسانی شد');
-        } catch (error: any) {
-            showToast(error?.message || 'به‌روزرسانی اطلاعات ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'به‌روزرسانی اطلاعات ناموفق بود'));
         } finally {
             setActionLoading(null);
         }
@@ -146,8 +147,8 @@ const UserPanel: React.FC = () => {
             setAddresses(await api.getAddresses());
             resetAddressForm();
             showToast('نشانی ذخیره شد');
-        } catch (error: any) {
-            showToast(error?.message || 'ذخیره نشانی ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ذخیره نشانی ناموفق بود'));
         } finally {
             setActionLoading(null);
         }
@@ -167,8 +168,8 @@ const UserPanel: React.FC = () => {
             setAddresses(current => current.filter(item => item.id !== address.id));
             if (editingAddressId === address.id) resetAddressForm();
             showToast('نشانی حذف شد');
-        } catch (error: any) {
-            showToast(error?.message || 'حذف نشانی ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'حذف نشانی ناموفق بود'));
         } finally {
             setActionLoading(null);
         }
@@ -194,8 +195,8 @@ const UserPanel: React.FC = () => {
             setReturnOrder(null);
             setActiveTab('returns');
             showToast('درخواست مرجوعی ثبت شد');
-        } catch (error: any) {
-            showToast(error?.message || 'ثبت درخواست مرجوعی ناموفق بود');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ثبت درخواست مرجوعی ناموفق بود'));
         } finally {
             setActionLoading(null);
         }

@@ -6,19 +6,26 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 4 backend/API cleanup verified; later-batch and deployment gates remain open |
+| Program status | Batch 5 requested frontend API/auth scope verified; later-batch and deployment gates remain open |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 4 - Backend/API cleanup |
-| Batch status | Complete for Batch 4 scope; verified no-ff merge and both branches published |
-| Batch branch | `codex/batch-04-backend-api` |
-| Batch start commit | `820d5ebb69dde31ddd28a729f7d8c00e4eabe6f2` |
-| Final batch / integration merge | `732ee09267dfdfb00695241f6d515f303b1adefa` / `9f5a203029b5770dc5d7277e0beabfed391a05fc` |
-| Audit IDs handled | ARCH-004, BE-007, BE-008, PERF-001 addressed; ARCH-003/PERF-002 partial; DB-003 characterized |
-| Verification performed | SQLite 109 passes/seven SQL skips; SQL Server 116/116 (28.683s); 24 frontend tests, lint/typecheck/build, three Chrome journeys, Django check/drift, Compose validation |
+| Current batch | Batch 5 - Frontend API client and authentication |
+| Batch status | Complete for requested transport/session scope; local batch commits only |
+| Batch branch | `codex/batch-05-frontend-api-auth` |
+| Batch start commit | `7343e237f1282e03ca5e239a390f29a0f053814f` |
+| Final batch / integration merge | Resolve batch tip with `git rev-parse codex/batch-05-frontend-api-auth`; no Batch 5 merge performed |
+| Audit IDs handled | FE-003 addressed; FE-001 reinforced; ARCH-003/TEST-002 remain partial for remaining DTO typing |
+| Verification performed | 45 frontend tests, lint/typecheck/build, three real-Django Chrome journeys; prior Batch 4 backend evidence retained below |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 5 - API/auth/frontend; no further batch started |
+| Next batch | Batch 6 - Frontend state; no further batch started; outstanding broader roadmap items remain open |
+
+## Batch 5 - Frontend API client and authentication
+
+- Started clean on integration `7343e237`; required branch spelling follows the owner's explicit request. Commits: `debc630` typed auth/catalog/HTTP/errors and single-flight refresh; `b7f52f7` explicit context session/expiry, UI error consumers and stale-read guards. `37f7378` suppresses newly initiated refresh during session mutations. Final documentation commit follows these application commits.
+- No visual redesign, runtime dependency, database migration or backend authorization change. OpenAPI generation evaluated against Batch 4's explicit deferral; checked DTO parsers used instead. See [contract/scope](FRONTEND_API_AUTH.md) and [verification](audit/TESTING_CI_AUDIT.md#batch-5-verification---2026-09-30).
+- FE-003 addressed with concurrent/delayed refresh, failure, CSRF, abort and logout tests. Legacy commerce typing and broader cart/quote/pagination/staff capability issues remain open; completion refers to the user's requested transport/session scope.
+- Work remains on the local batch branch. No merge, remote push, production data access or deployment occurred. No new migration/configuration action is needed for this frontend change. Exact provenance: `git log --reverse --oneline 7343e237..codex/batch-05-frontend-api-auth`.
 
 ## Batch 4 - Backend/API cleanup
 

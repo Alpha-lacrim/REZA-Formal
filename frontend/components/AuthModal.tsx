@@ -1,3 +1,4 @@
+import { errorMessage, ApiError } from '../services/api';
 import React, { useState, useEffect } from 'react';
 import { X, LogIn, UserPlus, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
 import { useGlobal } from '../contexts/GlobalContext';
@@ -37,12 +38,12 @@ const AuthModal: React.FC = () => {
         try {
             if (view === '2fa') {
                 if (!twoFactorCode || twoFactorCode.length !== 6) {
-                    throw new Error('کد تایید باید ۶ رقم باشد');
+                    throw new ApiError(0, 'کد تایید باید ۶ رقم باشد', {}, 'validation_error');
                 }
                 await login(email, password, twoFactorCode);
             } else {
                 if (!email || !password || (view === 'register' && !name)) {
-                    throw new Error('لطفاً تمام فیلدها را پر کنید');
+                    throw new ApiError(0, 'لطفاً تمام فیلدها را پر کنید', {}, 'validation_error');
                 }
 
                 if (view === 'login') {
@@ -52,12 +53,12 @@ const AuthModal: React.FC = () => {
                 }
             }
             // If successful, modal closes via context state change triggered by login/register
-        } catch (err: any) {
-            if (err.message === '2FA_REQUIRED') {
+        } catch (err: unknown) {
+            if (err instanceof ApiError && err.code === '2FA_REQUIRED') {
                 setView('2fa');
                 setError('');
             } else {
-                setError(err.message || 'خطایی رخ داد');
+                setError(errorMessage(err, 'خطایی رخ داد'));
             }
         } finally {
             setLoading(false);
