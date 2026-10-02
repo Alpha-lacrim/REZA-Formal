@@ -153,8 +153,8 @@ export function createCommerce(getProducts: () => Product[], notify: (message: s
     publishWish(account || !owner ? 'loading' : 'local');
     if (account) void retrySync();
   }
-  const stock = (productId: string, variantId?: string) => {
-    const product = getProducts().find(item => item.id === productId);
+  const stock = (productId: string, variantId?: string, suppliedProduct?: Product) => {
+    const product = suppliedProduct || getProducts().find(item => item.id === productId);
     if (!product || product.active === false) return 0;
     if (product.variants?.length) {
       const variant = product.variants.find(item => item.id === variantId && item.active);
@@ -174,13 +174,13 @@ export function createCommerce(getProducts: () => Product[], notify: (message: s
   const findLine = (key: string) => record.cartLines.find(line => cartLineKey(line) === key || line.productId === key);
   return {
     cart, wishlist, select, stop, retrySync,
-    addToCart(productId: string, qty = 1, requestedVariantId?: string) {
-      const product = getProducts().find(item => item.id === productId);
+    addToCart(productId: string, qty = 1, requestedVariantId?: string, suppliedProduct?: Product) {
+      const product = suppliedProduct || getProducts().find(item => item.id === productId);
       const variantId = requestedVariantId || product?.variants?.find(item => item.active && item.stock > 0)?.id;
       const key = cartLineKey({ productId, variantId });
       const existing = record.cartLines.find(line => cartLineKey(line) === key);
       if (!Number.isSafeInteger(qty) || qty <= 0 || !owner) return;
-      const quantity = Math.min((existing?.quantity || 0) + qty, stock(productId, variantId));
+      const quantity = Math.min((existing?.quantity || 0) + qty, stock(productId, variantId, product));
       if (quantity <= 0 || quantity === existing?.quantity) { notify('موجودی بیشتری برای این گزینه در دسترس نیست'); return; }
       const line = { productId, variantId, quantity };
       changeCart(existing ? record.cartLines.map(item => cartLineKey(item) === key ? line : item) : [...record.cartLines, line], [line]);

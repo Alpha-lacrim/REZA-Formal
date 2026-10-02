@@ -1,4 +1,4 @@
-import { useCatalog, useSettings } from '../state/AppState';
+import { useCatalogPage, useSettings } from '../state/AppState';
 import React, { useRef, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -123,8 +123,8 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
 
 const ProductCarousel = ({ category }: { category: string }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
-    const { products } = useCatalog();
-    const items = products.filter(p => p.category === category);
+    const catalog = useCatalogPage({ category, page_size: 8 });
+    const items = catalog.data?.results || [];
 
     const scroll = (direction: 'next' | 'prev') => {
         if (scrollRef.current) {

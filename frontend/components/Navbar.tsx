@@ -1,4 +1,4 @@
-import { useActions, useAuth, useCart, useCatalog, useTheme, useWishlist } from '../state/AppState';
+import { useActions, useAuth, useCart, useCatalogPage, useTheme, useWishlist } from '../state/AppState';
 import React, { useState, useEffect, useRef } from 'react';
 import ImageLoader from './ImageLoader';
 import { Menu, X, ShoppingBag, User, Moon, Sun, Search, ArrowRight, ChevronLeft, LogOut, Settings, LayoutDashboard, Heart } from 'lucide-react';
@@ -11,11 +11,16 @@ const Navbar: React.FC = () => {
     const { toggleCart, toggleTheme, setAuthModalOpen, logout } = useActions();
     const { theme } = useTheme();
     const { user } = useAuth();
-    const { products } = useCatalog();
     const { wishlist } = useWishlist();
     const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
+    const [serverSearch, setServerSearch] = useState('');
+    useEffect(() => {
+        const timer = setTimeout(() => setServerSearch(searchQuery.trim()), 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+    const search = useCatalogPage({ search: serverSearch, page_size: 5 }, isSearchOpen && serverSearch.length > 1);
     const [isUserDropdownOpen, setIsUserDropdownOpen] = useState(false);
     
     const navigate = useNavigate();
@@ -59,13 +64,7 @@ const Navbar: React.FC = () => {
         }
     };
 
-    const searchResults = searchQuery.length > 1 
-        ? products.filter(p => 
-            p.name.includes(searchQuery) || 
-            p.short?.includes(searchQuery) || 
-            p.category.includes(searchQuery)
-          ).slice(0, 5)
-        : [];
+    const searchResults = searchQuery.trim() === serverSearch && searchQuery.length > 1 ? search.data?.results || [] : [];
 
     return (
         <>

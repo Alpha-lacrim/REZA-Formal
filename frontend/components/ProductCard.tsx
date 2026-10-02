@@ -40,7 +40,7 @@ const ProductCard: React.FC<{ product: Product; className?: string }> = ({ produ
                         )}
                     </div>
                     <button
-                        onClick={() => addToCart(product.id, 1, defaultVariant?.id)}
+                        onClick={() => addToCart(product.id, 1, defaultVariant?.id, product)}
                         disabled={isOutOfStock}
                         className="px-4 py-2 rounded-lg bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-sm font-semibold hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"
                     >

@@ -532,6 +532,9 @@ export const api = {
   async myOrders(): Promise<Order[]> {
     return normalizePage(await request('/api/orders/my/'), normalizeOrder).results;
   },
+  async myOrdersPage(page = 1, signal?: AbortSignal): Promise<Page<Order>> {
+    return normalizePage(await request(withQuery('/api/orders/my/', { page, page_size: 8 }), { signal }), normalizeOrder);
+  },
   async cancelOrder(id: string): Promise<Order> {
     return normalizeOrder(await request(`/api/orders/${encodeId(id)}/cancel/`, { method: 'POST' }));
   },
@@ -582,6 +585,9 @@ export const api = {
 
   async getReturns(): Promise<ReturnRequest[]> {
     return normalizePage(await request('/api/returns/'), normalizeReturnRequest).results;
+  },
+  async getReturnsPage(page = 1, signal?: AbortSignal): Promise<Page<ReturnRequest>> {
+    return normalizePage(await request(withQuery('/api/returns/', { page, page_size: 8 }), { signal }), normalizeReturnRequest);
   },
   async createReturn(payload: Pick<ReturnRequest, 'orderId' | 'itemIds' | 'reason' | 'details'>): Promise<ReturnRequest> {
     return normalizeReturnRequest(await request('/api/returns/', {

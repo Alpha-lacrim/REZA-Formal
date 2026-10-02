@@ -1,6 +1,7 @@
 import { useActions, useAuth } from '../state/AppState';
 import { errorMessage } from '../services/api';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
+import CollectionPager from '../components/CollectionPager';
 import {
     ChevronDown, ChevronUp, CreditCard, ExternalLink, Loader2, LogOut,
     MapPin, Package, Plus, RotateCcw, Save, Trash2, Truck, User as UserIcon, XCircle,
@@ -43,6 +44,10 @@ const UserPanel: React.FC = () => {
     const { updateUserProfile, logout, showToast, cancelUserOrder } = useActions();
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<PanelTab>('orders');
+    const [orderPage, setOrderPage] = useState(1);
+    const [returnPage, setReturnPage] = useState(1);
+    const [totalPages, setTotalPages] = useState(1);
+    const loadVersion = useRef(0);
     const [orders, setOrders] = useState<Order[]>([]);
     const [addresses, setAddresses] = useState<Address[]>([]);
     const [returns, setReturns] = useState<ReturnRequest[]>([]);
@@ -58,18 +63,26 @@ const UserPanel: React.FC = () => {
     const [returnReason, setReturnReason] = useState('');
     const [returnDetails, setReturnDetails] = useState('');
 
-    const loadAccount = async () => {
+    const loadAccount = async (signal?: AbortSignal) => {
+        const version = ++loadVersion.current;
         setLoading(true);
         try {
-            const results = await Promise.allSettled([api.myOrders(), api.getAddresses(), api.getReturns()]);
-            if (results[0].status === 'fulfilled') setOrders(results[0].value);
-            if (results[1].status === 'fulfilled') setAddresses(results[1].value);
-            if (results[2].status === 'fulfilled') setReturns(results[2].value);
-            if (results.some(result => result.status === 'rejected')) showToast('بخشی از اطلاعات حساب در دسترس نیست؛ دوباره تلاش کنید');
+            if (activeTab === 'orders') {
+                const page = await api.myOrdersPage(orderPage, signal);
+                if (version !== loadVersion.current || signal?.aborted) return;
+                setOrders(page.results); setTotalPages(page.totalPages || 1); setExpandedOrderId(null);
+            } else if (activeTab === 'returns') {
+                const page = await api.getReturnsPage(returnPage, signal);
+                if (version !== loadVersion.current || signal?.aborted) return;
+                setReturns(page.results); setTotalPages(page.totalPages || 1);
+            } else if (activeTab === 'addresses') {
+                const saved = await api.getAddresses();
+                if (version === loadVersion.current && !signal?.aborted) setAddresses(saved);
+            }
         } catch (error: unknown) {
-            showToast(errorMessage(error, 'دریافت اطلاعات حساب کاربری ناموفق بود'));
+            if (version === loadVersion.current && !signal?.aborted) showToast(errorMessage(error, 'دریافت اطلاعات حساب کاربری ناموفق بود'));
         } finally {
-            setLoading(false);
+            if (version === loadVersion.current && !signal?.aborted) setLoading(false);
         }
     };
 
@@ -80,24 +93,17 @@ const UserPanel: React.FC = () => {
         }
         setName(user.name);
         setProfileAddress(user.address || '');
-        void loadAccount();
-    }, [user?.id]);
+        const controller = new AbortController();
+        void loadAccount(controller.signal);
+        return () => { controller.abort(); loadVersion.current++; };
+    }, [user?.id, activeTab, orderPage, returnPage]);
 
-    const toggleOrder = async (order: Order) => {
+    const toggleOrder = (order: Order) => {
         if (expandedOrderId === order.id) {
             setExpandedOrderId(null);
             return;
         }
         setExpandedOrderId(order.id);
-        setActionLoading(`order-${order.id}`);
-        try {
-            const detail = await api.getOrder(order.id);
-            setOrders(current => current.map(item => item.id === detail.id ? detail : item));
-        } catch (error: unknown) {
-            showToast(errorMessage(error, 'جزئیات سفارش دریافت نشد'));
-        } finally {
-            setActionLoading(null);
-        }
     };
 
     const canCancel = (order: Order) => order.allowedTransitions
@@ -193,7 +199,7 @@ const UserPanel: React.FC = () => {
         setActionLoading('return');
         try {
             await api.createReturn({ orderId: returnOrder.id, itemIds: returnItems, reason: returnReason, details: returnDetails });
-            setReturns(await api.getReturns());
+            setReturnPage(1);
             setReturnOrder(null);
             setActiveTab('returns');
             showToast('درخواست مرجوعی ثبت شد');
@@ -286,6 +292,7 @@ const UserPanel: React.FC = () => {
                     <section className="space-y-3">{returns.length === 0 ? <EmptyState icon={RotateCcw} text="درخواست مرجوعی ثبت نشده است." /> : returns.map(item => <article key={item.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold dark:text-white">مرجوعی سفارش #{toPersianDigits(item.orderId)}</h3><p className="mt-1 text-xs text-gray-500">{new Date(item.createdAt).toLocaleString('fa-IR')}</p></div><span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700">{returnLabels[item.status] || item.status}</span></div><p className="mt-4 text-sm text-gray-700 dark:text-gray-200"><b>دلیل:</b> {item.reason}</p>{item.details && <p className="mt-1 text-sm text-gray-500">{item.details}</p>}{item.adminNote && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><b>پاسخ فروشگاه:</b> {item.adminNote}</p>}{item.refundAmount !== undefined && <p className="mt-3 text-sm font-bold text-emerald-600">مبلغ بازپرداخت: {formatPrice(item.refundAmount)}</p>}</article>)}</section>
                 )}
 
+                {!loading && (activeTab === 'orders' || activeTab === 'returns') && <CollectionPager page={activeTab === 'orders' ? orderPage : returnPage} totalPages={totalPages} busy={loading} onPage={activeTab === 'orders' ? setOrderPage : setReturnPage} />}
                 {!loading && activeTab === 'profile' && (
                     <form onSubmit={handleUpdateProfile} className="mx-auto max-w-xl space-y-4 rounded-2xl border border-gray-100 bg-white p-6 dark:border-zinc-800 dark:bg-zinc-900"><h2 className="text-lg font-bold dark:text-white">مشخصات حساب</h2><label className="block text-sm font-bold text-gray-600 dark:text-gray-300">نام و نام خانوادگی<input className={`${inputClass} mt-2`} value={name} onChange={e => setName(e.target.value)} required /></label><label className="block text-sm font-bold text-gray-600 dark:text-gray-300">نشانی متنی قدیمی<textarea className={`${inputClass} mt-2`} rows={3} value={profileAddress} onChange={e => setProfileAddress(e.target.value)} /></label><p className="text-xs leading-6 text-gray-500">برای انتخاب دقیق نشانی در خریدهای بعدی، از بخش «نشانی‌ها» استفاده کنید.</p><button disabled={actionLoading === 'profile'} className="flex w-full items-center justify-center gap-2 rounded-xl bg-lux-gold py-3 font-bold text-white disabled:opacity-50"><Save size={17} /> ذخیره تغییرات</button></form>
                 )}

@@ -10,6 +10,7 @@ import { formatPrice, toPersianDigits } from '../utils';
 import ImageLoader from '../components/ImageLoader';
 import ProductCard from '../components/ProductCard';
 import SEO from '../components/SEO';
+import CollectionPager from '../components/CollectionPager';
 
 const Stars: React.FC<{ rating: number; size?: number }> = ({ rating, size = 16 }) => (
     <span className="inline-flex text-yellow-400" aria-label={`امتیاز ${rating} از ۵`}>
@@ -28,6 +29,9 @@ const ProductPage: React.FC = () => {
     const { user } = useAuth();
     const contextProduct = products.find(item => item.id === id);
     const [detail, setDetail] = useState<Product | null>(null);
+    const [reviewPaging, setReviewPaging] = useState<{ id?: string; page: number }>({ id, page: 1 });
+    const reviewPage = reviewPaging.id === id ? reviewPaging.page : 1;
+    const [reviewPages, setReviewPages] = useState(1);
     const [loadingProduct, setLoadingProduct] = useState(true);
     const [activeTab, setActiveTab] = useState<'desc' | 'reviews'>('desc');
     const [quantity, setQuantity] = useState(1);
@@ -50,6 +54,9 @@ const ProductPage: React.FC = () => {
         void (async () => {
             if (!id) return;
             try {
+                // Let an immediately disposed effect cancel before dispatching HTTP.
+                await Promise.resolve();
+                if (controller.signal.aborted) return;
                 const loaded = await api.getProduct(id, controller.signal);
                 if (!controller.signal.aborted) setDetail(loaded);
             } catch {
@@ -59,7 +66,7 @@ const ProductPage: React.FC = () => {
             }
         })();
         return () => controller.abort();
-    }, [id, contextProduct?.id]);
+    }, [id]);
 
     useEffect(() => {
         if (!product) return;
@@ -74,8 +81,10 @@ const ProductPage: React.FC = () => {
         if (!id) return;
         setReviewsLoading(true);
         try {
-            const page = await api.getProductReviews(id, undefined, signal);
-            if (!signal?.aborted) setReviews(page.results);
+            await Promise.resolve();
+            if (signal?.aborted) return;
+            const page = await api.getProductReviews(id, { page: reviewPage, page_size: 8 }, signal);
+            if (!signal?.aborted) { setReviews(page.results); setReviewPages(page.totalPages || 1); }
         } catch (error: unknown) {
             if (!signal?.aborted) showToast(errorMessage(error, 'دریافت نظرها انجام نشد'));
         } finally {
@@ -88,7 +97,7 @@ const ProductPage: React.FC = () => {
         setReviews([]);
         if (id) void loadReviews(controller.signal);
         return () => controller.abort();
-    }, [id]);
+    }, [id, reviewPage]);
 
     const selectedVariant = product?.variants?.find(variant => variant.id === selectedVariantId);
     const images = useMemo(() => {
@@ -271,7 +280,7 @@ const ProductPage: React.FC = () => {
                                 </div>
                             </div>
                         )}
-                        <button onClick={() => addToCart(product.id, quantity, selectedVariant?.id)} disabled={stockStatus === 'out_of_stock' || (hasVariants && !selectedVariant)} className="w-full md:w-auto px-8 py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg flex items-center justify-center gap-3 disabled:opacity-50">
+                        <button onClick={() => addToCart(product.id, quantity, selectedVariant?.id, product)} disabled={stockStatus === 'out_of_stock' || (hasVariants && !selectedVariant)} className="w-full md:w-auto px-8 py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg flex items-center justify-center gap-3 disabled:opacity-50">
                             <ShoppingBag size={20} /> {stockStatus === 'out_of_stock' ? 'ناموجود' : 'افزودن به سبد خرید'}
                         </button>
                     </div>
@@ -301,6 +310,7 @@ const ProductPage: React.FC = () => {
                                     </article>
                                 ))}
                             </div>
+                            <CollectionPager page={reviewPage} totalPages={reviewPages} busy={reviewsLoading} onPage={page => setReviewPaging({ id, page })} />
                             <form onSubmit={submitReview} className="bg-white dark:bg-zinc-800 p-5 rounded-lg border border-gray-100 dark:border-zinc-700 h-fit space-y-4">
                                 <h3 className="font-bold text-lg dark:text-white">نظر شما</h3>
                                 {!user && <p className="text-sm text-gray-500">برای ثبت نظر باید وارد حساب کاربری شوید.</p>}
