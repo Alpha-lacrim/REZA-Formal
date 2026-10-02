@@ -16,6 +16,7 @@ from .models import (
 from .serializers import (
     ContactMessageSerializer,
     PublicProductReadSerializer,
+    ProductCardSerializer,
     AdminProductReadSerializer,
     AdminProductWriteSerializer,
     ProductVariantInputSerializer,
@@ -35,7 +36,9 @@ from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import Q
+from django.db.models import Case, Count, DecimalField, F, Q, Sum, Value, When
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce
 from django.utils.dateparse import parse_date
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
@@ -393,8 +396,45 @@ def send_otp(request):
 @permission_classes([permissions.AllowAny])
 def products_list(request):
     qs = product_reads().filter(is_active=True)
-    serializer = PublicProductReadSerializer(qs, many=True, context={'request': request})
-    return Response(serializer.data)
+    search = request.query_params.get('search', '').strip()
+    if search:
+        qs = qs.filter(Q(name__icontains=search) | Q(short__icontains=search) | Q(category__icontains=search))
+    for field in ('category', 'fabric'):
+        value = request.query_params.get(field)
+        if value:
+            qs = qs.filter(**{field: value})
+    ids = request.query_params.get('ids')
+    if ids:
+        values = ids.split(',')
+        if len(values) > 100:
+            raise ValidationError({'ids': 'At most 100 product IDs are allowed.'})
+        qs = qs.filter(pk__in=values)
+    for parameter, lookup in [('price_min', 'price__gte'), ('price_max', 'price__lte')]:
+        value = request.query_params.get(parameter)
+        if value:
+            try:
+                price = Decimal(value)
+                if not price.is_finite() or price < 0 or price > Decimal('9999999999.99'):
+                    raise ValueError
+            except (ValueError, ArithmeticError):
+                raise ValidationError({parameter: 'Supply a nonnegative finite price.'})
+            qs = qs.filter(**{lookup: price})
+    orderings = {'default': 'id', 'price-asc': 'price', 'price-desc': '-price', 'name-asc': 'name'}
+    ordering = request.query_params.get('ordering', 'default')
+    if ordering not in orderings:
+        raise ValidationError({'ordering': 'Invalid product ordering.'})
+    return page_response(request, qs.order_by(orderings[ordering]), ProductCardSerializer)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def product_facets(request):
+    qs = Product.objects.filter(is_active=True)
+    category = request.query_params.get('category')
+    if category:
+        qs = qs.filter(category=category)
+    # Facets are bounded independently of catalog size.
+    return Response({'fabrics': list(qs.exclude(fabric='').order_by('fabric').values_list('fabric', flat=True).distinct()[:100])})
 
 @api_view(['GET','POST','PUT','DELETE'])
 @permission_classes([permissions.AllowAny])
@@ -529,18 +569,24 @@ def admin_stats(request):
     users_count = User.objects.count()
     from .models import BespokeRequest, Payment, ProductReview, ReturnRequest
 
-    revenue = Decimal('0.00')
-    for payment in Payment.objects.filter(status__in=['paid', 'partially_refunded']):
-        refunded = Decimal(str((payment.metadata or {}).get('refunded_amount', '0')))
-        revenue += max(payment.amount - refunded, Decimal('0.00'))
+    money_field = DecimalField(max_digits=18, decimal_places=2)
+    payments = Payment.objects.filter(status__in=['paid', 'partially_refunded']).annotate(
+        refunded=Coalesce(Cast(KeyTextTransform('refunded_amount', 'metadata'), money_field),
+                          Value(Decimal('0.00')), output_field=money_field),
+    )
+    revenue = payments.aggregate(total=Sum(Case(
+        When(amount__gt=F('refunded'), then=F('amount') - F('refunded')),
+        default=Value(Decimal('0.00')), output_field=money_field,
+    )))['total'] or Decimal('0.00')
+    order_counts = orders.aggregate(total=Count('pk'), pending=Count('pk', filter=Q(status='pending')))
     messages_count = ContactMessage.objects.filter(read=False).count()
     return Response({
         'productsCount': products_count,
-        'ordersCount': orders.count(),
+        'ordersCount': order_counts['total'],
         'usersCount': users_count,
         'revenue': revenue,
         'messagesCount': messages_count,
-        'pendingOrdersCount': orders.filter(status='pending').count(),
+        'pendingOrdersCount': order_counts['pending'],
         'lowStockCount': ProductVariant.objects.filter(is_active=True, stock__lte=5).count(),
         'pendingReviewsCount': ProductReview.objects.filter(status='pending').count(),
         'pendingReturnsCount': ReturnRequest.objects.filter(status='requested').count(),

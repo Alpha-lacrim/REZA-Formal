@@ -135,6 +135,21 @@ def _default_variant(product, *, lock=False, create=True):
 
 def resolve_lines(items, *, lock=False, check_stock=True):
     resolved = {}
+    # Quotes/cart validation need one bounded read graph. Locked checkout keeps
+    # its existing fresh row reads and transaction schedule.
+    if not lock:
+        explicit_ids = {item.get('variant_id') for item in items if item.get('variant_id')}
+        product_ids = {item.get('product_id') for item in items if not item.get('variant_id')}
+        from django.db.models import Q
+        variants = list(ProductVariant.objects.select_related('product').filter(
+            Q(pk__in=explicit_ids) | Q(product_id__in=product_ids, is_active=True),
+        ))
+        variants_by_id = {str(variant.pk): variant for variant in variants}
+        products_by_id = {product.pk: product for product in Product.objects.filter(pk__in=product_ids)}
+        active_by_product = {}
+        for variant in variants:
+            if variant.is_active:
+                active_by_product.setdefault(variant.product_id, []).append(variant)
     query_items = sorted(
         items,
         key=lambda item: str(item.get('variant_id') or item.get('product_id') or ''),
@@ -145,28 +160,42 @@ def resolve_lines(items, *, lock=False, check_stock=True):
         quantity = int(item['quantity'])
 
         if variant_id:
-            variant_qs = ProductVariant.objects.select_related('product')
-            if lock:
-                variant_qs = variant_qs.select_for_update()
-            try:
-                variant = variant_qs.get(pk=variant_id)
-            except ProductVariant.DoesNotExist as exc:
-                raise CommerceError('variant_not_found', 'The selected product variant does not exist.', 404) from exc
-            product_qs = Product.objects
-            if lock:
-                product_qs = product_qs.select_for_update()
-            product = product_qs.get(pk=variant.product_id)
+            if not lock:
+                variant = variants_by_id.get(str(variant_id))
+                if variant is None:
+                    raise CommerceError('variant_not_found', 'The selected product variant does not exist.', 404)
+                product = variant.product
+            else:
+                variant_qs = ProductVariant.objects.select_related('product').select_for_update()
+                try:
+                    variant = variant_qs.get(pk=variant_id)
+                except ProductVariant.DoesNotExist as exc:
+                    raise CommerceError('variant_not_found', 'The selected product variant does not exist.', 404) from exc
+                product = Product.objects.select_for_update().get(pk=variant.product_id)
             if product_id and str(product.pk) != str(product_id):
                 raise CommerceError('variant_product_mismatch', 'The variant does not belong to the supplied product.')
         else:
-            product_qs = Product.objects
             if lock:
-                product_qs = product_qs.select_for_update()
-            try:
-                product = product_qs.get(pk=product_id)
-            except Product.DoesNotExist as exc:
-                raise CommerceError('product_not_found', f'Product {product_id} was not found.', 404) from exc
-            variant = _default_variant(product, lock=lock)
+                try:
+                    product = Product.objects.select_for_update().get(pk=product_id)
+                except Product.DoesNotExist as exc:
+                    raise CommerceError('product_not_found', f'Product {product_id} was not found.', 404) from exc
+                variant = _default_variant(product, lock=True)
+            else:
+                product = products_by_id.get(product_id)
+                if product is None:
+                    raise CommerceError('product_not_found', f'Product {product_id} was not found.', 404)
+                active = active_by_product.get(product_id, [])
+                default = next((v for v in active if not v.size and not v.color), None)
+                if default:
+                    variant = default
+                elif len(active) == 1:
+                    variant = active[0]
+                elif len(active) > 1:
+                    raise CommerceError('variant_required', f'A size or color must be selected for {product.name}.')
+                else:
+                    variant = _default_variant(product)
+                    active_by_product[product_id] = [variant]
 
         if not product.is_active or not variant.is_active:
             raise CommerceError('product_unavailable', f'{product.name} is not available for purchase.', 409)

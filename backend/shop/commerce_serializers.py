@@ -88,6 +88,11 @@ class ProductSummarySerializer(serializers.ModelSerializer):
         ]
 
 
+class CartProductSerializer(ProductSummarySerializer):
+    class Meta(ProductSummarySerializer.Meta):
+        fields = [field for field in ProductSummarySerializer.Meta.fields if field != 'description']
+
+
 class ShippingMethodSerializer(AliasedModelSerializer):
     price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'), required=False)
     currency = serializers.SerializerMethodField()

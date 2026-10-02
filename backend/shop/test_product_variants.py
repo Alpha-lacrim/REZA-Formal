@@ -75,5 +75,5 @@ class ProductVariantApiTests(TestCase):
         product_list = public_client.get('/api/products/')
         product_detail = public_client.get(f"/api/products/{created.data['id']}/")
         self.assertEqual(product_list.status_code, 200)
-        self.assertEqual(product_list.data, [])
+        self.assertEqual(product_list.data['results'], [])
         self.assertEqual(product_detail.status_code, 404)

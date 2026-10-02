@@ -124,6 +124,17 @@ class PublicProductReadSerializer(serializers.ModelSerializer):
         return round(float(obj.approved_rating), 1) if obj.approved_rating is not None else None
 
 
+class ProductCardSerializer(PublicProductReadSerializer):
+    """List cards need pricing/options, but never long-form copy or a gallery."""
+    images = serializers.SerializerMethodField()
+
+    class Meta(PublicProductReadSerializer.Meta):
+        fields = [field for field in PublicProductReadSerializer.Meta.fields if field != 'description']
+
+    def get_images(self, obj):
+        return ProductGalleryField().to_representation(obj.images)[:1]
+
+
 class AdminProductReadSerializer(PublicProductReadSerializer):
     inventory_version = serializers.SerializerMethodField()
 

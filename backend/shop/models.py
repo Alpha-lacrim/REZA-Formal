@@ -63,7 +63,7 @@ class Product(models.Model):
     image = models.ImageField(upload_to='products/', blank=True, null=True)
     images = models.JSONField(default=list, blank=True)
     fabric = models.CharField(max_length=255, blank=True)
-    # Kept as the legacy/default-variant stock projection for existing clients.
+    # Compatibility projection of active SKU stock; see docs/DATABASE_PERFORMANCE.md.
     stock = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     featured = models.BooleanField(default=False)
@@ -110,7 +110,6 @@ class ProductVariant(models.Model):
         ordering = ['product_id', 'size', 'color', 'sku']
         indexes = [
             models.Index(fields=['product', 'is_active'], name='variant_prod_active_idx'),
-            models.Index(fields=['sku'], name='variant_sku_idx'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['product', 'size', 'color'], name='uniq_product_size_color'),
