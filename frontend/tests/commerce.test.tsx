@@ -120,5 +120,5 @@ test('failed account synchronization preserves usable local cart and wishlist', 
   await user.click(screen.getByText('Add small'));
   await user.click(screen.getByText('Wishlist'));
   expect(cart()).toEqual([{ productId: 'suit', variantId: 'small', quantity: 1 }]);
-  expect(JSON.parse(localStorage.getItem('reza_wishlist_v1')!)).toEqual(['suit']);
+  expect(JSON.parse(localStorage.getItem('reza_commerce_v3:customer:buyer')!).wishlist).toEqual(['suit']);
 });

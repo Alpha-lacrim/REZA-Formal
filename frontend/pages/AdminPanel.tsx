@@ -1,7 +1,9 @@
+import { useAdminData } from '../state/admin';
+import { useActions, useAuth, useCatalog, useSettings, useTheme } from '../state/AppState';
 import { errorMessage, ApiError } from '../services/api';
 import React, { useState, useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
-import { useGlobal } from '../contexts/GlobalContext';
+
 import api from '../services/api';
 import {
     AdminCapabilities, BespokeRequest, ContactMessage, CouponSummary, Order, Payment,
@@ -24,25 +26,17 @@ type AdminTab = 'dashboard' | 'products' | 'orders' | 'commerce' | 'messages' | 
 type CommerceSection = 'capabilities' | 'coupons' | 'shipping' | 'payments' | 'reviews' | 'returns' | 'bespoke';
 
 const AdminPanel: React.FC = () => {
-    const { user, products, refreshProducts, showToast, siteSettings, updateSiteSettings, theme } = useGlobal();
+    const { user } = useAuth();
+    const { products } = useCatalog();
+    const { refreshProducts, showToast, updateSiteSettings } = useActions();
+    const { siteSettings } = useSettings();
+    const { theme } = useTheme();
     const navigate = useNavigate();
 
     const [activeTab, setActiveTab] = useState<AdminTab>('dashboard');
+    const { stats, orders, users, messages, capabilities, coupons, shippingMethods, payments, reviews, returns, bespokeRequests, commerceLoading, commerceError, adminError, loadData, loadCommerceData, setOrders } = useAdminData(activeTab);
     const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
-    const [stats, setStats] = useState({ productsCount: 0, ordersCount: 0, usersCount: 0, revenue: 0, messagesCount: 0 });
-    const [orders, setOrders] = useState<Order[]>([]);
-    const [messages, setMessages] = useState<ContactMessage[]>([]);
-    const [users, setUsers] = useState<User[]>([]);
     const [commerceSection, setCommerceSection] = useState<CommerceSection>('capabilities');
-    const [commerceLoading, setCommerceLoading] = useState(false);
-    const [commerceError, setCommerceError] = useState('');
-    const [capabilities, setCapabilities] = useState<AdminCapabilities | null>(null);
-    const [coupons, setCoupons] = useState<CouponSummary[]>([]);
-    const [shippingMethods, setShippingMethods] = useState<ShippingMethod[]>([]);
-    const [payments, setPayments] = useState<Payment[]>([]);
-    const [reviews, setReviews] = useState<ProductReview[]>([]);
-    const [returns, setReturns] = useState<ReturnRequest[]>([]);
-    const [bespokeRequests, setBespokeRequests] = useState<BespokeRequest[]>([]);
     const [couponForm, setCouponForm] = useState<Partial<CouponSummary>>({ code: '', type: 'percent', value: 0, active: true });
     const [shippingForm, setShippingForm] = useState<Partial<ShippingMethod>>({ name: '', price: 0, currency: 'Toman', active: true });
     const [commerceAction, setCommerceAction] = useState<string | null>(null);
@@ -99,16 +93,6 @@ const AdminPanel: React.FC = () => {
     const [clearedSettingsImages, setClearedSettingsImages] = useState<Set<keyof SiteSettings>>(new Set());
 
     useEffect(() => {
-        if (user && user.role !== 'admin') {
-            navigate('/');
-            return;
-        }
-        if (user && user.role === 'admin') {
-            loadData();
-        }
-    }, [activeTab, user]);
-
-    useEffect(() => {
         if (siteSettings) {
             setSettingsForm(siteSettings);
         }
@@ -117,56 +101,6 @@ const AdminPanel: React.FC = () => {
     useEffect(() => {
         setCurrentPage(1);
     }, [searchTerm, activeTab, sortBy, filterStatus, filterDateStart, filterDateEnd]);
-
-    const loadData = async () => {
-        try {
-            const s = await api.adminGetStats();
-            setStats(s);
-        } catch (e) {
-            setStats({ productsCount: 0, ordersCount: 0, usersCount: 0, revenue: 0, messagesCount: 0 });
-            showToast('خطا در دریافت آمار مدیریت');
-        }
-        if (activeTab === 'orders') {
-            try {
-                const o = await api.adminGetOrders();
-                const u = await api.adminGetUsers();
-                setOrders(o);
-                setUsers(u);
-            } catch (e) {
-                setOrders([]);
-                setUsers([]);
-                showToast('خطا در دریافت سفارش‌ها');
-            }
-        } else if (activeTab === 'messages') {
-            try {
-                const m = await api.adminGetMessages();
-                setMessages(m);
-            } catch (e) {
-                setMessages([]);
-                showToast('خطا در دریافت پیام‌ها');
-            }
-        }
-        if (activeTab === 'commerce') await loadCommerceData();
-    };
-
-    const loadCommerceData = async () => {
-        setCommerceLoading(true);
-        setCommerceError('');
-        const requests = await Promise.allSettled([
-            api.adminGetCapabilities(), api.adminGetCoupons(), api.adminGetShippingMethods(),
-            api.adminGetPayments(), api.adminGetReviews(), api.adminGetReturns(), api.adminGetBespokeRequests(),
-        ]);
-        if (requests[0].status === 'fulfilled') setCapabilities(requests[0].value);
-        if (requests[1].status === 'fulfilled') setCoupons(requests[1].value.results);
-        if (requests[2].status === 'fulfilled') setShippingMethods(requests[2].value.results);
-        if (requests[3].status === 'fulfilled') setPayments(requests[3].value.results);
-        if (requests[4].status === 'fulfilled') setReviews(requests[4].value.results);
-        if (requests[5].status === 'fulfilled') setReturns(requests[5].value.results);
-        if (requests[6].status === 'fulfilled') setBespokeRequests(requests[6].value.results);
-        const failed = requests.filter(result => result.status === 'rejected').length;
-        if (failed) setCommerceError(`${toPersianDigits(failed)} بخش در دسترس نیست. پس از فعال‌سازی API دوباره تلاش کنید.`);
-        setCommerceLoading(false);
-    };
 
     // ... (Keep existing handlers: handleSaveProduct, handleFileUpload, etc. - logic is unchanged, just UI updates below)
     const handleSaveProduct = async () => {
@@ -253,6 +187,8 @@ const AdminPanel: React.FC = () => {
             await api.adminUpdateOrderStatus(orderId, status);
             const updatedOrders = await api.adminGetOrders();
             setOrders(updatedOrders);
+            await refreshProducts();
+            await loadData();
             if (viewingOrder && viewingOrder.id === orderId) {
                 setViewingOrder(updatedOrders.find(o => o.id === orderId) || null);
             }
@@ -338,10 +274,7 @@ const AdminPanel: React.FC = () => {
     const handleMarkAsRead = async (id: string) => {
         try {
             await api.adminMarkMessageRead(id);
-            const updatedMessages = await api.adminGetMessages();
-            setMessages(updatedMessages);
-            const s = await api.adminGetStats();
-            setStats(s);
+            await loadData();
         } catch (e) {
             showToast('خطا در علامت‌گذاری پیام');
         }
@@ -352,6 +285,7 @@ const AdminPanel: React.FC = () => {
         try {
             await action();
             await loadCommerceData();
+            await refreshProducts();
             showToast(successMessage);
         } catch (error: unknown) {
             showToast(errorMessage(error, 'انجام عملیات ناموفق بود'));
@@ -608,6 +542,9 @@ const AdminPanel: React.FC = () => {
 
             {/* Main Content */}
             <main className="flex-1 p-4 md:p-8 overflow-y-auto h-full" role="main">
+                {adminError && <div role="alert" className="mb-4 rounded-lg border border-red-300 p-3 text-red-700">
+                    دریافت اطلاعات مدیریت انجام نشد. <button onClick={() => void loadData()} className="underline">تلاش دوباره</button>
+                </div>}
                 {/* Mobile header: hamburger to open drawer */}
                 <div className="md:hidden flex items-center justify-between mb-4">
                     <button onClick={() => setMobileSidebarOpen(true)} className="p-2.5 bg-white dark:bg-zinc-900 rounded-lg shadow-sm border border-gray-100 dark:border-zinc-800">

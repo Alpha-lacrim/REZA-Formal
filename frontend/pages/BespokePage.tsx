@@ -1,15 +1,18 @@
+import { useActions, useAuth, useSettings } from '../state/AppState';
 import { errorMessage } from '../services/api';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+
 import api from '../services/api';
 import ImageLoader from '../components/ImageLoader';
 import SEO from '../components/SEO';
 
 const BespokePage: React.FC = () => {
     const navigate = useNavigate();
-    const { showToast, user, siteSettings } = useGlobal();
+    const { showToast } = useActions();
+    const { user } = useAuth();
+    const { siteSettings } = useSettings();
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [error, setError] = useState('');

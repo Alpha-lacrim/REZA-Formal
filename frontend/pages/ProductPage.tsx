@@ -1,8 +1,9 @@
+import { useActions, useAuth, useCatalog, useWishlist } from '../state/AppState';
 import { errorMessage } from '../services/api';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, CheckCircle, Heart, Info, Loader2, Minus, Plus, ShoppingBag, Star, X } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+
 import api from '../services/api';
 import { Product, ProductReview } from '../types';
 import { formatPrice, toPersianDigits } from '../utils';
@@ -21,7 +22,10 @@ const Stars: React.FC<{ rating: number; size?: number }> = ({ rating, size = 16 
 const ProductPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { addToCart, toggleWishlist, isInWishlist, products, user, setAuthModalOpen, showToast } = useGlobal();
+    const { addToCart, toggleWishlist, setAuthModalOpen, showToast } = useActions();
+    const { isInWishlist } = useWishlist();
+    const { products } = useCatalog();
+    const { user } = useAuth();
     const contextProduct = products.find(item => item.id === id);
     const [detail, setDetail] = useState<Product | null>(null);
     const [loadingProduct, setLoadingProduct] = useState(true);

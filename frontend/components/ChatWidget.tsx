@@ -1,9 +1,10 @@
+import { useActions } from '../state/AppState';
 import React, { useState } from 'react';
 import { MessageCircle, X, Send, Loader2 } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+
 
 const ChatWidget: React.FC = () => {
-    const { sendMessage } = useGlobal();
+    const { sendMessage } = useActions();
     const [isOpen, setIsOpen] = useState(false);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');

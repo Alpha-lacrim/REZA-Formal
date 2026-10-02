@@ -1,12 +1,17 @@
+import { useActions, useCart, useCatalog, useOverlays } from '../state/AppState';
+import { cartLineKey } from '../state/persistence';
 import React, { useEffect, useRef } from 'react';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Trash2, X } from 'lucide-react';
 import ImageLoader from './ImageLoader';
-import { cartLineKey, useGlobal } from '../contexts/GlobalContext';
+
 import { formatPrice, toPersianDigits } from '../utils';
 
 const MiniCart: React.FC = () => {
-    const { isCartOpen, toggleCart, cartLines, updateQty, removeFromCart, products } = useGlobal();
+    const { isCartOpen } = useOverlays();
+    const { toggleCart, updateQty, removeFromCart } = useActions();
+    const { cartLines } = useCart();
+    const { products } = useCatalog();
     const cartRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {

@@ -1,13 +1,16 @@
+import { useActions, useAuth, useCart, useCatalog, useRuntime } from '../state/AppState';
+import { cartLineKey } from '../state/persistence';
 import { errorMessage } from '../services/api';
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { AlertCircle, ArrowLeft, Banknote, CheckCircle, Loader2, MapPin, Minus, Plus, RefreshCw, Tag, Trash2, Truck } from 'lucide-react';
-import { cartLineKey, useGlobal } from '../contexts/GlobalContext';
+
 import api from '../services/api';
 import { Address, CheckoutOptions, CheckoutQuote, CheckoutRequest, CheckoutResult, PaymentMethod } from '../types';
 import { formatPrice, toPersianDigits } from '../utils';
 import ImageLoader from '../components/ImageLoader';
 import SEO from '../components/SEO';
+import SyncNotice from '../components/SyncNotice';
 
 const supportedManualMethods = new Set(['cod', 'bank_transfer', 'manual']);
 const paymentLabel = (method: PaymentMethod) => ({
@@ -27,21 +30,30 @@ const makeIdempotencyKey = (): string => {
     return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
 };
 
+// A new session gets fresh address, quote and checkout/idempotency form state.
 const CartPage: React.FC = () => {
-    const {
-        cartLines,
-        updateQty,
-        removeFromCart,
-        user,
-        setAuthModalOpen,
-        clearCart,
-        showToast,
-        products,
-        refreshProducts,
-        catalogSource,
-    } = useGlobal();
+    const { authState } = useAuth();
+    const runtime = useRuntime();
+    const owner = 'user' in authState ? `${authState.status}:${authState.user.id}` : authState.status;
+    return <CartContents key={`${owner}:${runtime.auth.getVersion()}`} />;
+};
+
+const CartContents: React.FC = () => {
+    const { cartLines, syncStatus } = useCart();
+    const { updateQty, removeFromCart, setAuthModalOpen, clearCart, showToast, refreshProducts } = useActions();
+    const { user } = useAuth();
+    const { products, catalogSource } = useCatalog();
     const navigate = useNavigate();
     const idempotencyKey = useRef(makeIdempotencyKey());
+    const activeSession = useRef(true);
+    const runtime = useRuntime();
+    const sessionVersion = useRef(runtime.auth.getVersion()).current;
+    const currentSession = () => activeSession.current && runtime.auth.getVersion() === sessionVersion;
+    const quoteController = useRef<AbortController | null>(null);
+    useEffect(() => {
+        activeSession.current = true;
+        return () => { activeSession.current = false; quoteController.current?.abort(); };
+    }, []);
     const [options, setOptions] = useState<CheckoutOptions | null>(null);
     const [optionsLoading, setOptionsLoading] = useState(true);
     const [addresses, setAddresses] = useState<Address[]>([]);
@@ -131,23 +143,31 @@ const CartPage: React.FC = () => {
 
     const requestQuote = async (activeCoupon = couponCode) => {
         if (!cartLines.length || !paymentMethod || (options?.shippingMethods.length && !shippingMethodId)) return;
+        quoteController.current?.abort();
+        const controller = new AbortController();
+        quoteController.current = controller;
         setQuoteLoading(true);
         setError('');
         try {
-            setQuote(await api.quoteCheckout(buildRequest(activeCoupon)));
+            const result = await api.quoteCheckout(buildRequest(activeCoupon), controller.signal);
+            if (!controller.signal.aborted && currentSession()) setQuote(result);
         } catch (quoteError: unknown) {
+            if (controller.signal.aborted || !currentSession()) return;
             setQuote(null);
             setError(errorMessage(quoteError, 'محاسبه مبلغ سفارش انجام نشد'));
         } finally {
-            setQuoteLoading(false);
+            if (!controller.signal.aborted && currentSession()) setQuoteLoading(false);
         }
     };
 
     useEffect(() => {
-        if (!options || !paymentMethod || cartLines.length === 0) return;
+        quoteController.current?.abort();
+        setQuote(null);
+        if (!options || !paymentMethod || cartLines.length === 0) { setQuoteLoading(false); return; }
+        setQuoteLoading(true);
         const timer = window.setTimeout(() => void requestQuote(), 350);
-        return () => window.clearTimeout(timer);
-    }, [cartLines, shippingMethodId, paymentMethod, options, user?.id]);
+        return () => { window.clearTimeout(timer); quoteController.current?.abort(); };
+    }, [cartLines, shippingMethodId, paymentMethod, options, user?.id, address, selectedAddressId, couponCode]);
 
     const chooseSavedAddress = (id: string) => {
         setSelectedAddressId(id);
@@ -201,18 +221,21 @@ const CartPage: React.FC = () => {
             if (!finalAddressId && saveAddress) {
                 try {
                     const saved = await api.createAddress(address);
+                    if (!currentSession()) return;
                     finalAddressId = saved.id;
                     if (saved.id) setAddresses(previous => [...previous, saved]);
                 } catch {
                     // Address persistence is optional; checkout can use its snapshot directly.
                 }
             }
+            if (!currentSession()) return;
             const request = buildRequest();
             if (finalAddressId) {
                 request.addressId = finalAddressId;
                 request.shippingAddress = undefined;
             }
             const checkoutResult = await api.createCheckout(request);
+            if (!currentSession()) return;
             setResult(checkoutResult);
             clearCart();
             await refreshProducts();
@@ -260,6 +283,7 @@ const CartPage: React.FC = () => {
             </div>
 
             <main className="container max-w-6xl mx-auto px-4 py-12">
+                <SyncNotice status={syncStatus} />
                 {cartLines.length === 0 ? (
                     <div className="text-center py-12">
                         <p className="text-xl text-gray-500 dark:text-gray-400 mb-6">سبد خرید شما خالی است.</p>
@@ -348,7 +372,7 @@ const CartPage: React.FC = () => {
                             <h2 className="font-bold text-lg dark:text-white mb-5 border-b pb-4 border-gray-200 dark:border-zinc-700">خلاصه سفارش</h2>
                             <div className="flex gap-2 mb-5">
                                 <div className="relative flex-1"><Tag size={15} className="absolute right-3 top-3 text-gray-400" /><input value={couponInput} onChange={event => setCouponInput(event.target.value.toUpperCase())} placeholder="کد تخفیف" className="w-full py-2 pr-9 pl-2 border rounded-lg dark:bg-zinc-700 dark:border-zinc-600 dark:text-white" /></div>
-                                <button onClick={() => { const code = couponInput.trim(); setCouponCode(code); void requestQuote(code); }} disabled={quoteLoading} className="px-3 bg-gray-100 dark:bg-zinc-700 dark:text-white rounded-lg text-sm">اعمال</button>
+                                <button onClick={() => { const code = couponInput.trim(); if (code === couponCode) void requestQuote(code); else setCouponCode(code); }} disabled={quoteLoading} className="px-3 bg-gray-100 dark:bg-zinc-700 dark:text-white rounded-lg text-sm">اعمال</button>
                             </div>
                             <div className="space-y-3 text-sm mb-5">
                                 <div className="flex justify-between text-gray-600 dark:text-gray-400"><span>جمع کالاها</span><span>{formatPrice(quote?.subtotal ?? localSubtotal)}</span></div>

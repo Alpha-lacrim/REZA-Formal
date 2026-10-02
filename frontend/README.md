@@ -2,6 +2,8 @@
 
 React 19 + TypeScript storefront built with Vite, route-level code splitting, and locally compiled Tailwind CSS. The Django API is authoritative; localStorage provides offline cart/wishlist/theme continuity, while writes synchronize to the authenticated account when available.
 
+State ownership, TanStack Query defaults, account isolation and browser storage migration are documented in [FRONTEND_STATE.md](../docs/FRONTEND_STATE.md). Application components use focused hooks from `state/AppState.tsx`; the aggregate `useGlobal` hook is retained for regression probes only.
+
 ## Local development
 
 Prerequisite: a current Node.js LTS release.

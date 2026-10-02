@@ -63,7 +63,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 
 | ID | Priority | Confidence | Status | Finding / canonical record | Batch |
 | --- | --- | --- | --- | --- | --- |
-| ARCH-001 | P2 | High | Open - maintenance debt | [GlobalContext couples unrelated state domains](ARCHITECTURE_AUDIT.md#arch-001) | 6 |
+| ARCH-001 | P2 | High | Implemented - Batch 6 ownership split | [GlobalContext couples unrelated state domains](ARCHITECTURE_AUDIT.md#arch-001) | 6 |
 | ARCH-002 | P2 | High | Open - maintenance debt | [AdminPanel combines unrelated administration features](ARCHITECTURE_AUDIT.md#arch-002) | 7 |
 | ARCH-003 | P2 | High | Partial - backend and auth/catalog contracts explicit; remaining frontend DTO debt | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4/5 |
 | ARCH-004 | P3 | High | Fixed - Batch 4; routed commerce contracts retained | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
@@ -79,10 +79,10 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | FE-001 | P2 | High | Fixed - Batch 2; explicit priority | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 2 |
 | FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
 | FE-003 | P2 | High | Addressed - Batch 5 | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
-| FE-004 | P2 | High | Open - confirmed defect | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
+| FE-004 | P2 | High | Implemented - Batch 6 identity/order guards | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
 | FE-005 | P2 | High | Open - confirmed defect | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5 (complete staff surfaces in 7) |
-| FE-006 | P2 | High | Open - confirmed defect | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
-| FE-007 | P2 | High | Open - confirmed defect | [Legacy cart migration returns before reading legacy entries](FRONTEND_AUDIT.md#fe-007) | 6 |
+| FE-006 | P2 | High | Implemented guards; price-confirmation policy open | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
+| FE-007 | P2 | High | Fixed - Batch 6 | [Legacy cart migration returns before reading legacy entries](FRONTEND_AUDIT.md#fe-007) | 6 |
 | FE-008 | P2 | High | Open - confirmed defect | [Frontend staff access disagrees with backend role rules](FRONTEND_AUDIT.md#fe-008) | 5 |
 | DB-001 | P2 | High | Open - design risk | [Several cross-record invariants rely on cooperative application writers](DATABASE_AUDIT.md#db-001) | 8 |
 | DB-002 | P1 | Medium | Open - unverified concurrency risk | [Lock acquisition order differs between mutation paths](DATABASE_AUDIT.md#db-002) | 2 (SQL verification in 3) |

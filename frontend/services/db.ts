@@ -30,11 +30,10 @@ class LocalCatalogFallback {
     constructor() {
         // Older browser-only builds stored fake accounts (including plaintext
         // passwords) and admin data locally. The Django API supersedes them.
-        RETIRED_LOCAL_BACKEND_KEYS.forEach(key => localStorage.removeItem(key));
-
-        if (!localStorage.getItem(PRODUCTS_KEY)) {
-            localStorage.setItem(PRODUCTS_KEY, JSON.stringify(seedProducts));
-        }
+        try {
+            RETIRED_LOCAL_BACKEND_KEYS.forEach(key => localStorage.removeItem(key));
+            if (!localStorage.getItem(PRODUCTS_KEY)) localStorage.setItem(PRODUCTS_KEY, JSON.stringify(seedProducts));
+        } catch { /* Storage is optional; bundled fallback remains usable. */ }
     }
 
     async getProducts(): Promise<Product[]> {
