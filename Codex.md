@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-02 (Batch 7 admin/media; frontend, isolated backend and Chrome gates; prior SQL evidence retained)
+Last verified: 2026-10-03 (Batch 8; frontend/backend/Chrome gates and disposable SQL query/index/migration suite)
 
 ## Purpose and product
 
@@ -55,7 +55,8 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Refund allocations/entries use existing Payment metadata plus OrderEvent records through `shop/refunds.py`; no new schema. Net item allocations derive from immutable purchase amounts, exclude shipping/tax, and reconcile rounding. Manual refunds require amount, currency, reason, per-payment reference and explicit offline-transfer confirmation. Inconsistent legacy refund history requires reconciliation.
 
 - Product mutations use `product_services.py` for atomic product/variant/ledger/media writes. Public detail mutations remain a tested staff-only compatibility route. Product read/write contracts are separate and explicit; only staff product reads expose the inventory version.
-- `selectors.py` owns reusable product aggregates/variants and order read graphs. `pagination.py` shares stable ordering, size limits and links across commerce and older staff collections. Products support server name/category search and allowlisted sorting; orders support search/status/date filters; messages support search. Staff screens consume one page at a time; public/account pagination and stats aggregation remain follow-up.
+- `selectors.py` owns approved product aggregates/variants, order graphs and paged return payment/item/refund-quantity graphs. `pagination.py` shares stable ordering, size limits and links. Public catalog uses compact cards, search/category/fabric/price/sort/IDs, server pages and a bounded fabric facet endpoint; detail/staff reads retain full copy. Customer orders/returns/reviews use eight-row screens. Cart prefetches only its products' variants; unlocked quote reads are batched, locked checkout remains fresh/atomic. Dashboard net revenue aggregates existing JSON refund totals in SQL. See [measurements, stock ownership, transaction/index review and residual contracts](docs/DATABASE_PERFORMANCE.md).
+- Inventory meaning: ProductVariant.stock is SKU stock; Product.stock projects active variants for compatibility, with documented pre-variant/deleted-variant fallbacks. `manage.py audit_inventory --limit 25` is a read-only mismatch/missing-history report, not a stock repair. Migration 0008 removes only the proven redundant SKU index; uniqueness remains. Apply after deployed-schema review/backup. Whole saved account snapshots and historical inline media remain follow-up.
 - `subscription_services.py` owns normalized idempotent newsletter subscription/reactivation. Quote input permits incomplete address forms; checkout validates delivery-address types/limits. See [API contracts and OpenAPI decision](docs/API_CONTRACTS.md); no schema dependency/endpoint is installed.
 
 ### Docker request flow

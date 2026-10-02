@@ -2,6 +2,12 @@
 
 Source/probe baseline established 2026-09-10 by Batch 1, with documentation completion review on 2026-09-13, on unchanged application commit `94d665881e3e929c41121d057385c28f822002fe`. Start with [AUDIT_INDEX](audit/AUDIT_INDEX.md), which owns the 43-finding register and all 18 hypothesis verdicts. This roadmap schedules work; it does not authorize starting another batch in this session or claim that any finding is fixed.
 
+## Batch 8 update - 2026-10-03
+
+Measured critical paths and implemented cart/return read graphs, batched unlocked quotes, SQL net revenue aggregation, compact paginated public catalog with coordinated search/filters, customer/review page controls and confirmed detail-request suppression. [Evidence, stock ownership/transaction review, index assessment, rollout and residuals](DATABASE_PERFORMANCE.md) owns before/after counts/bytes. DB-004 and PERF-003 addressed; FE-005 page consumers addressed; DB-001/PERF-002 partial for wider invariants and whole saved snapshots/legacy inline media. PERF-001 remains verified from Batch 4.
+
+Disposable SQL Server confirms the redundant SKU key/index seek and migration 0008 forward/reverse. No speculative indexes or stock redesign; checkout lock/write budget unchanged. DB-002 mixed schedules and production/hosted evidence remain open. Deploy the coordinated public page contract and apply 0008 after normal SQL backup/schema review. Current required branch is `codex/batch-08-database-performance` (the older proposed branch row below is historical).
+
 ## Batch 7 update - 2026-10-02
 
 Admin/media scope is implemented on `codex/batch-07-admin-media`, based on the completed Batch 6 branch. AdminPanel composes coherent features; product drafts separate metadata/pricing/variants/media; managed uploads, validation and dialog lifecycle are verified. All staff collection screens use server pages. Existing gallery storage is adequate: no ProductImage model or migration. See [media trace, limits, rollout and rollback](ADMIN_MEDIA.md).

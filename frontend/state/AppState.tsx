@@ -1,7 +1,8 @@
 import React, { createContext, ReactNode, useContext, useEffect, useState, useSyncExternalStore } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AppRuntime, createRuntime } from './runtime';
-import { catalogOptions, settingsOptions } from './remote';
+import { catalogOptions, catalogPageOptions, identityKey, selectedProductsOptions, settingsOptions } from './remote';
+import api from '../services/api';
 import { createStore } from './store';
 
 const RuntimeContext = createContext<AppRuntime | null>(null);
@@ -41,7 +42,24 @@ export function useCatalog() {
   const { authState } = useAuth();
   const runtime = useRuntime();
   const query = useQuery(catalogOptions(authState), runtime.queries);
-  return { products: query.data?.products || [], catalogSource: query.data?.source || 'none', catalogLoading: query.isFetching, catalogError: query.error };
+  const { cartLines } = useCart();
+  const { wishlist } = useWishlist();
+  const previewIds = new Set(query.data?.products.map(product => product.id));
+  const selected = useQuery(selectedProductsOptions(authState,
+    query.data ? [...cartLines.map(line => line.productId), ...wishlist].filter(id => !previewIds.has(id)) : []), runtime.queries);
+  const known = useStore(runtime.knownProducts);
+  const products = React.useMemo(() => [...new Map([...known, ...(query.data?.products || []), ...(selected.data || [])]
+    .map(product => [product.id, product])).values()], [query.data, known, selected.data]);
+  return { products, catalogSource: query.data?.source || 'none', catalogLoading: query.isFetching || selected.isFetching, catalogError: query.error || selected.error };
+}
+export function useCatalogPage(params: Record<string, unknown>, enabled = true) {
+  const { authState } = useAuth();
+  return useQuery(catalogPageOptions(authState, params, enabled), useRuntime().queries);
+}
+export function useProductFacets(category: string) {
+  const { authState } = useAuth();
+  return useQuery({ queryKey: ['catalog-facets', identityKey(authState), category], enabled: authState.status !== 'loading',
+    gcTime: 300_000, queryFn: ({ signal }) => api.getProductFacets(category, signal) }, useRuntime().queries);
 }
 export function useSettings() {
   const query = useQuery(settingsOptions(), useRuntime().queries);

@@ -24,6 +24,7 @@ from .commerce_serializers import (
     PaymentUpdateSerializer,
     ProductReviewSerializer,
     ProductSummarySerializer,
+    CartProductSerializer,
     ProductVariantSerializer,
     ReturnAdminUpdateSerializer,
     ReturnCreateSerializer,
@@ -66,7 +67,7 @@ from .models import (
 from .throttles import CheckoutQuoteRateThrottle, CheckoutRateThrottle, NewsletterRateThrottle
 from .subscription_services import subscribe
 from .pagination import page_response
-from .selectors import order_reads
+from .selectors import order_reads, return_reads
 
 
 def _commerce_error(exc):
@@ -215,7 +216,9 @@ def address_detail(request, pk):
 
 
 def _cart_payload(user, request):
-    items = SavedCartItem.objects.filter(user=user).select_related('variant__product').order_by('created_at')
+    items = SavedCartItem.objects.filter(user=user).select_related('variant__product').prefetch_related(
+        'variant__product__variants',
+    ).order_by('created_at')
     lines = []
     subtotal = Decimal('0.00')
     for item in items:
@@ -229,7 +232,7 @@ def _cart_payload(user, request):
             'product_id': product.pk,
             'variant_id': variant.pk,
             'quantity': item.quantity,
-            'product': ProductSummarySerializer(product, context={'request': request}).data,
+            'product': CartProductSerializer(product, context={'request': request}).data,
             'variant': ProductVariantSerializer(variant).data,
             'unit_price': unit_price,
             'line_total': line_total,
@@ -328,7 +331,7 @@ def product_reviews(request, product_id):
 @permission_classes([permissions.IsAuthenticated])
 def returns(request):
     if request.method == 'GET':
-        queryset = ReturnRequest.objects.filter(user=request.user).select_related('order', 'order_item')
+        queryset = return_reads().filter(user=request.user)
         return page_response(request, queryset, ReturnRequestSerializer)
 
     serializer = ReturnCreateSerializer(data=request.data)
@@ -625,7 +628,7 @@ def admin_returns(request):
     denied = _admin_error(request)
     if denied:
         return denied
-    queryset = ReturnRequest.objects.select_related('order', 'order_item', 'user').order_by('-requested_at')
+    queryset = return_reads().order_by('-requested_at')
     return_status = request.query_params.get('status')
     if return_status:
         queryset = queryset.filter(status=return_status)

@@ -6,19 +6,40 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 7 admin/media scope verified; later-batch and deployment gates remain open |
+| Program status | Batch 8 measured remediation verified; remaining concurrency/saved-data/deployment gates documented |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 7 - Admin frontend and product media |
-| Batch status | Complete for requested admin/media scope; local batch commits only |
-| Batch branch | `codex/batch-07-admin-media` |
-| Batch start commit | `755653b11322167205ade43b8810ababc38c4bed` (Batch 6 prerequisite) |
-| Final batch / integration merge | Resolve batch tip with `git rev-parse codex/batch-07-admin-media`; no Batch 7 merge performed |
-| Audit IDs handled | ARCH-002 addressed; FE-002 reinforced; FE-005/PERF-002 partial for public/customer work |
-| Verification performed | Frontend/backend checks and real-Django Chrome workflows; exact final results in Handoff |
+| Current batch | Batch 8 - Database and performance |
+| Batch status | Verified implementation; integration/publication closeout follows |
+| Batch branch | `codex/batch-08-database-performance` |
+| Batch start commit | `7ac1a7805ee1e1598c4027868536749fdbdd3c6a` (verified Batch 5/6/7 integration) |
+| Final batch / integration merge | Recorded literally in the post-merge closeout below |
+| Audit IDs handled | PERF-003/DB-004/FE-005 addressed; PERF-001 retained; PERF-002/DB-001 partial with residuals |
+| Verification performed | Full SQL/SQLite/frontend checks, targeted final probes, Chrome request budgets, index plans/round trip; exact results in Handoff |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 8 - Performance/database; no next batch started |
+| Next batch | Batch 9 - Security; no next batch started |
+
+## Batch 8 - Database and performance (2026-10-03)
+
+- Required branch starts at `7ac1a7805ee1e1598c4027868536749fdbdd3c6a`, after fetching unchanged origin integration `7343e237f1282e03ca5e239a390f29a0f053814f` and integrating the previously verified prerequisites below with non-fast-forward merges. Main/dev/stash/ignored configuration preserved. All later closeout operations concern program/batch branches only.
+- Backend commit `d0ff928bc6ee98addcbfd2118d3117e5c70e4467`: constant cart/return graphs, compact/public page/filter contract, batched unlocked quotes, SQL net revenue, read-only inventory report, redundant SKU-index migration and query/byte/SQL regressions.
+- Frontend commit `bb14c6e5afacfb3f83e09ef820a7a017bbdec27c`: server catalog/search/home previews, customer/review page controls, beyond-preview cart metadata and fresh stock precedence, stable product derivation, suppressed disposed/detail-context duplicate requests, embedded order expansion and regression/browser budgets.
+- [DATABASE_PERFORMANCE](DATABASE_PERFORMANCE.md) owns the full measurements, reader/writer/canonical stock trace, transactional review, SQL index plan/shape/round-trip evidence, rollout and limits. No stock redesign, Redis, speculative index addition, production mutation or provider change. Migration 0008 removes only the measured redundant SKU index, with unique SKU preserved.
+- Checks: full 130-case SQL suite, full 130-case SQLite suite (nine explicit SQL skips), six final performance/inventory probes on each engine, 9 Node + 67 Vitest checks and 20 targeted final state/catalog/cancellation checks, lint/typecheck/build, four Chrome smoke journeys plus final customer rerun, Django check/drift and both Compose configurations. Final dependency restoration/rechecks and exact timings are in Handoff. Test SQL DB/container/network and baseline worktree removed; hosted CI not claimed.
+- PERF-003/DB-004 addressed; FE-005 consumers complete; PERF-002 remains partial for whole saved snapshots/historical inline media, DB-001 partial for broader cross-record invariants, DB-002 mixed lock schedules open. Locked checkout remains 24/256 queries for 1/30 lines; no SQLite row-lock claim. Deploy coordinated public pagination/card clients and backend; backup/inspect SQL schema before applying 0008.
+
+### Prerequisite branch provenance
+
+These local verified branch tips were not yet on integration at session start. This session's authorized integration preserves each branch and its history:
+
+| Branch | Final SHA | Non-fast-forward merge SHA |
+| --- | --- | --- |
+| `codex/batch-05-frontend-api-auth` | `1e336c064b4ebfbf66976f5d844dce9dc526dfba` | `b20585020d9b8630bf1fd902bb66c3e1ae058122` |
+| `codex/batch-06-frontend-state` | `755653b11322167205ade43b8810ababc38c4bed` | `48c5bfcfbff22973b1b4dfc9559b881de7567178` |
+| `codex/batch-07-admin-media` | `6ee3771621e7f2bd46672dbb57e9017a664bb4e2` | `7ac1a7805ee1e1598c4027868536749fdbdd3c6a` |
+
+Earlier Batch 5/6/7 session statements about local-only/unmerged work describe those original sessions and are superseded by this integration record. All batch starts are retained in their original sections/Handoff. Prerequisite commits: `debc6301cce21568cd4fb5f732ca3274652e2a32`, `b7f52f7345a0c1bf30f91cc4c75dfa0c2d536d23`, `37f73780d87066b019d5f69ccb3a0a676a5bb789`, `1e336c064b4ebfbf66976f5d844dce9dc526dfba`, `755653b11322167205ade43b8810ababc38c4bed`, `ffa6d3ccea7dd16f5c370ee308cb8757f45562f1`, `6de1934e423da4bb63c45e47150a46e6f5323078`, `6ee3771621e7f2bd46672dbb57e9017a664bb4e2`.
 
 ## Batch 7 - Admin frontend and product media
 
@@ -169,10 +190,10 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 2 — Critical correctness (confirmed defects; SQL/deployment gates remain open)
 - [x] Batch 3 - Tests and CI foundation (broader concurrency/hosted gates remain open)
 - [x] Batch 4 - Backend/API cleanup (scoped completion; follow-ups documented)
-- [ ] Batch 5 — API/auth frontend
-- [x] Batch 6 — Frontend state (local required branch; integration/publication separate)
-- [x] Batch 7 — Admin/media (requested scope; broader public pagination remains open)
-- [ ] Batch 8 — Performance/database
+- [x] Batch 5 — API/auth frontend (verified scope; integrated in Batch 8)
+- [x] Batch 6 — Frontend state (verified scope; integrated in Batch 8)
+- [x] Batch 7 — Admin/media (verified scope; integrated in Batch 8)
+- [x] Batch 8 — Performance/database (measured remediation; explicit residuals)
 - [ ] Batch 9 — Security
 - [ ] Batch 10 — Production infrastructure
 - [ ] Batch 11 — UX/accessibility/SEO
@@ -195,6 +216,8 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - Keep remediation commits off human-owned `main`; merging integration into `main` requires a separate owner-authorized action.
 
 ## Current blockers
+
+Batch 8 has no verification/integration blocker. Broader stock-lock schedules, whole saved collection/media payload contracts and production/financial/security obligations remain as qualified in DATABASE_PERFORMANCE and Handoff. The following Batch 6 local-only and older Docker statements preserve historical session context; Batch 8 integrates those branches and executes disposable SQL successfully.
 
 Batch 6 local implementation: `codex/batch-06-frontend-state` starts at `1e336c064b4ebfbf66976f5d844dce9dc526dfba` on the existing Batch 5 branch, preserving its API/auth prerequisite rather than dropping it by rebasing onto older integration. State classification, query choice, scoped persistence and synchronization policies are in [FRONTEND_STATE.md](FRONTEND_STATE.md). ARCH-001/FE-004/FE-007 implementation and FE-006 stale-request guards are verified; price-confirmation policy and independent-device conflict protocol remain separate. Final commit is the Batch 6 branch tip (`git rev-parse codex/batch-06-frontend-state`); no merge or push is part of this session. Handoff records final checks and owner actions.
 

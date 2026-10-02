@@ -1,5 +1,11 @@
 # Testing, CI and operations audit
 
+## Batch 8 verification - 2026-10-03
+
+- Full disposable SQL Server suite: 130/130 pass, zero skips, 76.941s; includes independent connections/transactions, query budgets, JSON/Decimal revenue, unique SKU lookup plan and 0008 forward/reverse. Final six-test performance module (including newly added read-only inventory report case) passes on SQL in 2.671s. SQLite full 130 cases: 121 passes/nine intentional SQL-only skips, 15.376s; final six performance tests pass in 1.069s. Current discovery is 131 cases. No production DB, row-lock inference from SQLite or hosted result.
+- Frontend: 9 Node + 67 Vitest pass; final changed state/catalog/cancellation subset 20/20 passes. Lint/typecheck/build pass; baseline build main 392.64 KB/117.39 gzip, final before cleanup 395.78/118.38, AdminPanel unchanged 85.32/20.67. Four real-Django Chrome journeys pass (20.7s); final customer cache/HTTP rerun passes (7.8s), one product detail request and zero expanded-order detail requests. Test data/media disposable. Dependency junction cleanup mistake/restoration and final rechecks are recorded in Handoff.
+- Django system/drift checks and both Compose configs pass. SQL test database destruction/container/network teardown and temporary baseline worktree cleanup completed. Sandbox network/ODBC/esbuild errors passed with approved retries. Initial incomplete return fixture was corrected and baseline rerun: 77 -> 3 queries. [Full evidence/limits/rollout](../DATABASE_PERFORMANCE.md).
+
 ## Batch 5 verification - 2026-09-30
 
 - `npm.cmd run lint` and `npm.cmd run typecheck`: pass, including no-explicit-any for extracted auth/catalog/HTTP/helper modules.

@@ -1,4 +1,4 @@
-import type { Product, ProductVariant } from '../types';
+import type { Page, Product, ProductVariant } from '../types';
 import { request } from './http/client';
 import { invalidResponse, isRecord } from './http/errors';
 import { toNumber, toBoolean, optionalTimestamp, parseJsonList, parseStringRecord } from './normalization';
@@ -113,6 +113,24 @@ export function normalizeProduct(value: unknown): Product {
 
 
 export const catalogApi = {
+  async getProductsPage(params: Record<string, unknown> = {}, signal?: AbortSignal): Promise<Page<Product>> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && value !== '') query.set(key, String(value));
+    });
+    const raw = await request(`/api/products/${query.size ? `?${query}` : ''}`, { signal });
+    // Array support is retained for rolling upgrades and the read-only fallback fixtures.
+    if (Array.isArray(raw)) return { results: raw.map(normalizeProduct), count: raw.length, next: null, previous: null, page: 1, totalPages: 1 };
+    if (!isRecord(raw) || !Array.isArray(raw.results) || !Number.isFinite(Number(raw.count))) return invalidResponse();
+    return { results: raw.results.map(normalizeProduct), count: Number(raw.count),
+      next: typeof raw.next === 'string' ? raw.next : null, previous: typeof raw.previous === 'string' ? raw.previous : null,
+      page: Number(raw.page || 1), pageSize: Number(raw.page_size || 25), totalPages: Number(raw.total_pages || 1) };
+  },
+  async getProductFacets(category = '', signal?: AbortSignal): Promise<string[]> {
+    const raw = await request(`/api/products/facets/?category=${encodeURIComponent(category)}`, { signal });
+    if (!isRecord(raw) || !Array.isArray(raw.fabrics) || !raw.fabrics.every(item => typeof item === 'string')) return invalidResponse();
+    return raw.fabrics;
+  },
   async getProducts(signal?: AbortSignal): Promise<Product[]> {
     const raw = await request('/api/products/', { signal });
     const items = Array.isArray(raw) ? raw : isRecord(raw) ? raw.results : undefined;

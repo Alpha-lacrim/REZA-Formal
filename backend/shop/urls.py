@@ -15,6 +15,7 @@ urlpatterns = [
     path('auth/google/', views.google_auth),
 
     path('products/', views.products_list),
+    path('products/facets/', views.product_facets),
     path('products/<str:product_id>/reviews/', commerce_views.product_reviews),
     path('products/<str:pk>/', views.product_detail),
 

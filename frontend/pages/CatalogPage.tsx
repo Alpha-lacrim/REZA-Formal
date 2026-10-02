@@ -1,4 +1,4 @@
-import { useCatalog } from '../state/AppState';
+import { useCatalogPage, useProductFacets } from '../state/AppState';
 import React, { useState, useEffect } from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
@@ -14,19 +14,14 @@ const CatalogPage: React.FC = () => {
     const [fabricFilter, setFabricFilter] = useState('');
     const [priceFilter, setPriceFilter] = useState('');
 
-    const { products } = useCatalog();
-
-    const fabrics = Array.from(new Set(products.map(p => p.fabric).filter(Boolean)));
-
-    const filteredProducts = products.filter(p => {
-        if (categoryParam && p.category !== categoryParam) return false;
-        if (fabricFilter && p.fabric !== fabricFilter) return false;
-        if (priceFilter) {
-            const [min, max] = priceFilter.split('-').map(Number);
-            if (p.price < min || p.price > max) return false;
-        }
-        return true;
-    });
+    const [page, setPage] = useState(1);
+    const [ordering, setOrdering] = useState('default');
+    const [min, max] = priceFilter.split('-');
+    const catalog = useCatalogPage({ category: categoryParam, fabric: fabricFilter,
+        price_min: min, price_max: max, ordering, page, page_size: 24 });
+    const fabrics = useProductFacets(categoryParam).data || [];
+    const filteredProducts = catalog.data?.results || [];
+    useEffect(() => { setPage(1); }, [categoryParam, fabricFilter, priceFilter, ordering]);
 
     const categoryTitles: { [key: string]: string } = {
         'suits': 'کت و شلوار',
@@ -66,6 +61,11 @@ const CatalogPage: React.FC = () => {
 
             <main className="container max-w-7xl mx-auto px-4 py-12">
                 <div className="mb-8 flex flex-wrap items-center gap-6 bg-white dark:bg-zinc-800 p-6 rounded-xl border border-gray-100 dark:border-zinc-700 shadow-sm">
+                    <label className="text-sm">مرتب‌سازی
+                        <select aria-label="مرتب‌سازی محصولات" value={ordering} onChange={event => setOrdering(event.target.value)} className="mx-2 p-2 bg-white dark:bg-zinc-700 border rounded">
+                            <option value="default">پیش‌فرض</option><option value="price-asc">ارزان‌ترین</option><option value="price-desc">گران‌ترین</option>
+                        </select>
+                    </label>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
                         <label className="text-xs font-bold uppercase tracking-wider text-lux-black dark:text-gray-300">جنس پارچه:</label>
                         <select 
@@ -92,7 +92,7 @@ const CatalogPage: React.FC = () => {
                     </div>
                 </div>
 
-                {filteredProducts.length > 0 ? (
+                {catalog.isFetching ? <p role="status">در حال دریافت محصولات…</p> : catalog.isError ? <button onClick={() => void catalog.refetch()}>دریافت محصولات ناموفق بود؛ تلاش دوباره</button> : filteredProducts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                         {filteredProducts.map(p => <ProductCard key={p.id} product={p} />)}
                     </div>
@@ -104,6 +104,11 @@ const CatalogPage: React.FC = () => {
                         </button>
                     </div>
                 )}
+                <nav aria-label="صفحه‌بندی محصولات" className="flex justify-center items-center gap-4 mt-8">
+                    <button disabled={page <= 1 || catalog.isFetching} onClick={() => setPage(value => value - 1)}>قبلی</button>
+                    <span>{page} / {catalog.data?.totalPages || 1} ({catalog.data?.count || 0})</span>
+                    <button disabled={!catalog.data?.next || catalog.isFetching} onClick={() => setPage(value => value + 1)}>بعدی</button>
+                </nav>
             </main>
         </div>
     );

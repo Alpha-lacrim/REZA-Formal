@@ -22,9 +22,17 @@ test('storefront loads its server catalog', async ({ page }) => {
 });
 
 test('customer authenticates, adds product, checks out with COD and sees order history', async ({ page }) => {
+  let detailReads = 0;
+  let orderDetailReads = 0;
+  page.on('request', request => {
+    const path = new URL(request.url()).pathname;
+    if (request.method() === 'GET' && path === '/api/products/e2e-suit/') detailReads++;
+    if (request.method() === 'GET' && /^\/api\/orders\/ORD-[^/]+\/$/.test(path)) orderDetailReads++;
+  });
   await login(page, 'buyer');
   await page.goto('/#/product/e2e-suit');
   await page.getByRole('button', { name: /افزودن به سبد/ }).click();
+  expect(detailReads).toBe(1);
   await page.goto('/#/cart');
   // Reload closes the global mini-cart and also exercises cart persistence.
   await page.reload();
@@ -47,6 +55,7 @@ test('customer authenticates, adds product, checks out with COD and sees order h
   const persianId = order.id.replace(/\d/g, (digit: string) => '۰۱۲۳۴۵۶۷۸۹'[Number(digit)]);
   await page.getByRole('button').filter({ hasText: persianId }).click();
   await expect(page.getByText('E2E Suit', { exact: true }).first()).toBeVisible();
+  expect(orderDetailReads).toBe(0);
 });
 
 test('administrator authenticates and persists a product edit', async ({ page }) => {

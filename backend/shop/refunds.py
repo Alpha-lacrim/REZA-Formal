@@ -9,7 +9,7 @@ from .models import OrderEvent, ReturnRequest
 
 def item_allocations(order):
     """Largest-remainder allocation in cents. Shipping/tax are outside item refunds."""
-    items = list(order.items.order_by('pk'))
+    items = sorted(order.items.all(), key=lambda item: item.pk)
     gross = [int(money(item.price * item.qty) * 100) for item in items]
     subtotal = sum(gross)
     net = int(money(order.subtotal - order.discount_total) * 100)
@@ -33,9 +33,12 @@ def return_refund_amount(request, payment):
         raise CommerceError('refund_item_missing', 'The return has no order item.', 409)
     allocations = metadata.get('item_refund_allocations') or item_allocations(request.order)
     net_cents = int(Decimal(allocations[str(item.pk)]) * 100)
-    previous_qty = sum(ReturnRequest.objects.filter(
-        order_item=item, status='refunded',
-    ).exclude(pk=request.pk).values_list('quantity', flat=True))
+    if hasattr(request, 'previous_refunded_quantity'):
+        previous_qty = request.previous_refunded_quantity or 0
+    else:
+        previous_qty = sum(ReturnRequest.objects.filter(
+            order_item=item, status='refunded',
+        ).exclude(pk=request.pk).values_list('quantity', flat=True))
     if previous_qty + request.quantity > item.qty or request.quantity < 1:
         raise CommerceError('refund_quantity_exceeded', 'Returned quantity exceeds the purchased quantity.', 409)
     # Cumulative integer division allocates every penny exactly once across split returns.

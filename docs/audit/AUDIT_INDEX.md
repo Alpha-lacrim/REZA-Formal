@@ -80,22 +80,22 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
 | FE-003 | P2 | High | Addressed - Batch 5 | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
 | FE-004 | P2 | High | Implemented - Batch 6 identity/order guards | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
-| FE-005 | P2 | High | Partial - Batch 7 staff pagination; customer/review screens remain | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5 (complete staff surfaces in 7) |
+| FE-005 | P2 | High | Addressed - Batch 8 public/customer/review and Batch 7 staff pages | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5/7/8 |
 | FE-006 | P2 | High | Implemented guards; price-confirmation policy open | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
 | FE-007 | P2 | High | Fixed - Batch 6 | [Legacy cart migration returns before reading legacy entries](FRONTEND_AUDIT.md#fe-007) | 6 |
 | FE-008 | P2 | High | Open - confirmed defect | [Frontend staff access disagrees with backend role rules](FRONTEND_AUDIT.md#fe-008) | 5 |
-| DB-001 | P2 | High | Open - design risk | [Several cross-record invariants rely on cooperative application writers](DATABASE_AUDIT.md#db-001) | 8 |
+| DB-001 | P2 | High | Partial - ownership/reconciliation verified; wider invariants remain | [Several cross-record invariants rely on cooperative application writers](DATABASE_AUDIT.md#db-001) | 8 |
 | DB-002 | P1 | Medium | Open - unverified concurrency risk | [Lock acquisition order differs between mutation paths](DATABASE_AUDIT.md#db-002) | 2 (SQL verification in 3) |
 | DB-003 | P2 | High | Open - confirmed compatibility gap | [Legacy migration does not establish payment history](DATABASE_AUDIT.md#db-003) | 4 |
-| DB-004 | P3 | High | Open - maintenance debt | [SKU has an explicit index alongside a uniqueness index](DATABASE_AUDIT.md#db-004) | 8 |
+| DB-004 | P3 | High | Fixed - Batch 8 SQL index/plan/migration evidence | [SKU has an explicit index alongside a uniqueness index](DATABASE_AUDIT.md#db-004) | 8 |
 | SEC-001 | P1 | High | Fixed - Batch 2; deployment review open | [Gallery upload bypasses image validation and persists before validation](SECURITY_AUDIT.md#sec-001) | 2 (deployment in 9/10) |
 | SEC-002 | P2 | High | Open - confirmed lifecycle gap | [Logout cannot revoke a copied refresh token](SECURITY_AUDIT.md#sec-002) | 9 (coordinate API work in 5) |
 | SEC-003 | P2 | High | Open - configuration risk | [Throttle identity and cache are weak across proxies/workers](SECURITY_AUDIT.md#sec-003) | 9 |
 | SEC-004 | P2 | Medium | Open - conditional security risk | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |
 | SEC-005 | P2 | High | Open - dependency assurance gap | [Known dependency advisories and incomplete repeatable scanning](SECURITY_AUDIT.md#sec-005) | 9 (scanning foundation in 3) |
 | PERF-001 | P2 | High | Fixed - Batch 4; constant product read query budget | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
-| PERF-002 | P2 | High | Partial - Batch 7 staff pages complete; public reads/stats remain | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
-| PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
+| PERF-002 | P2 | High | Partial - paged collections/SQL stats fixed; saved snapshots/legacy media remain | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 |
+| PERF-003 | P2 | High | Fixed - Batch 8 two-query compact cart graph | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
 | TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
 | TEST-002 | P2 | High | Partial - lint and auth/catalog DTO gates added; remaining strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3/5 |
 | TEST-003 | P1 | High | Partial - SQL baseline passes; broader races remain | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |

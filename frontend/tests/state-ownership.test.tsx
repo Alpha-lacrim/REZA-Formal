@@ -36,6 +36,10 @@ async function mount() {
 beforeEach(() => {
   vi.spyOn(api, 'me').mockRejectedValue(new Error('Anonymous'));
   vi.spyOn(api, 'getProducts').mockResolvedValue([product]);
+  vi.spyOn(api, 'getProductsPage').mockImplementation(async (params) => {
+    const ids = String(params?.ids || product.id).split(',');
+    return { results: ids.map(id => ({ ...product, id })), count: ids.length, next: null, previous: null, totalPages: 1 };
+  });
   vi.spyOn(api, 'adminGetProducts').mockResolvedValue([{ ...product, id: 'private' }]);
   vi.spyOn(api, 'getSettings').mockResolvedValue({ aboutTitle: 'Original' } as never);
   vi.spyOn(api, 'getSavedCart').mockResolvedValue({ lines: [], currency: 'Toman' });

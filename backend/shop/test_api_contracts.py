@@ -7,7 +7,7 @@ from rest_framework.test import APIClient
 from . import commerce_views
 from .models import ContactMessage, Order, OrderItem, Payment, Product, ProductReview, ReturnRequest, User
 from .selectors import product_reads
-from .serializers import AdminProductReadSerializer, PublicProductReadSerializer
+from .serializers import AdminProductReadSerializer, ProductCardSerializer, PublicProductReadSerializer
 
 
 class RouteContractTests(TestCase):
@@ -30,8 +30,8 @@ class ProductContractTests(TestCase):
         self.client = APIClient()
 
     def test_public_and_staff_keys_are_deliberate(self):
-        public = self.client.get('/api/products/').data[0]
-        self.assertEqual(set(public), set(PublicProductReadSerializer.Meta.fields))
+        public = self.client.get('/api/products/').data['results'][0]
+        self.assertEqual(set(public), set(ProductCardSerializer.Meta.fields))
         self.assertNotIn('inventory_version', public)
         self.client.force_authenticate(self.staff)
         staff = self.client.get('/api/admin/products/contract-product/').data
