@@ -61,22 +61,9 @@ function normalizePage<T>(value: unknown, normalize: (item: unknown) => T): Page
   };
 }
 
-// Preserve complete collections for existing staff screens during the pagination rollout.
-// Follow our numeric page contract, never an arbitrary server-provided URL.
+// Bounded compatibility snapshot for shared catalog/older callers. Admin screens use Page APIs.
 async function readAdminCollection<T>(path: string, normalize: (item: unknown) => T, signal?: AbortSignal): Promise<T[]> {
-  const items: T[] = [];
-  for (let pageNumber = 1; ; pageNumber++) {
-    const raw = await request(withQuery(path, { page: pageNumber, page_size: 100 }), { signal });
-    const page = normalizePage(raw, normalize);
-    // Compatibility with an older backend during a coordinated deployment.
-    if (Array.isArray(raw)) return page.results;
-    if (page.page !== pageNumber || !Number.isInteger(page.totalPages) || page.totalPages! < 1
-        || (pageNumber < page.totalPages! && page.results.length === 0)) {
-      throw new ApiError(502, 'Invalid administrative pagination response', {}, 'invalid_response');
-    }
-    items.push(...page.results);
-    if (pageNumber >= page.totalPages!) return items;
-  }
+  return normalizePage(await request(withQuery(path, { page: 1, page_size: 100 }), { signal }), normalize).results;
 }
 
 function withQuery(path: string, params?: Record<string, unknown>): string {
@@ -636,6 +623,15 @@ export const api = {
   async adminGetOrders(): Promise<Order[]> {
     return readAdminCollection('/api/admin/orders/', normalizeOrder);
   },
+  async adminGetOrderPage(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<Order>> {
+    return normalizePage(await request(withQuery('/api/admin/orders/', params), { signal }), normalizeOrder);
+  },
+  async adminGetMessagePage(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<ContactMessage>> {
+    return normalizePage(await request(withQuery('/api/admin/messages/', params), { signal }), normalizeContactMessage);
+  },
+  async adminGetProductPage(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<Product>> {
+    return normalizePage(await request(withQuery('/api/admin/products/', params), { signal }), normalizeProduct);
+  },
   async adminUpdateOrderStatus(id: string, status: string): Promise<Order> {
     return normalizeOrder(await request(`/api/admin/orders/${encodeId(id)}/status/`, { method: 'PUT', ...jsonBody({ status }) }));
   },
@@ -662,22 +658,20 @@ export const api = {
     return readAdminCollection('/api/admin/products/', normalizeProduct, signal);
   },
 
-  async adminSaveProduct(product: any): Promise<Product> {
-    let payload = product;
+  async adminSaveProduct(product: FormData | Record<string, unknown>): Promise<Product> {
+    const payload = product instanceof FormData ? product : new FormData();
     if (!(product instanceof FormData)) {
-      const formData = new FormData();
       Object.keys(product).forEach(key => {
         const value = product[key];
         if (value === null || value === undefined) return;
-        if (isFile(value)) formData.append(key, value);
-        else if (Array.isArray(value) && value.length > 0 && isFile(value[0])) value.forEach(file => formData.append(key, file));
-        else if (typeof value === 'object') formData.append(key, JSON.stringify(value));
-        else formData.append(key, String(value));
+        if (isFile(value)) payload.append(key, value);
+        else if (Array.isArray(value) && value.length > 0 && value.every(isFile)) value.forEach(file => payload.append(key, file));
+        else if (typeof value === 'object') payload.append(key, JSON.stringify(value));
+        else payload.append(key, String(value));
       });
-      payload = formData;
     }
 
-    const id = payload instanceof FormData ? payload.get('id') as string | null : product.id;
+    const id = payload.get('id') as string | null;
     const path = id ? `/api/admin/products/${encodeId(id)}/` : '/api/admin/products/';
     return normalizeProduct(await request(path, { method: id ? 'PUT' : 'POST', body: payload }));
   },
@@ -685,8 +679,8 @@ export const api = {
     return request(`/api/admin/products/${encodeId(id)}/`, { method: 'DELETE' });
   },
 
-  async adminGetCoupons(params?: Record<string, unknown>): Promise<Page<CouponSummary>> {
-    return normalizePage(await request(withQuery('/api/admin/coupons/', params)), normalizeCoupon);
+  async adminGetCoupons(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<CouponSummary>> {
+    return normalizePage(await request(withQuery('/api/admin/coupons/', params), { signal }), normalizeCoupon);
   },
   async adminSaveCoupon(coupon: Partial<CouponSummary>): Promise<CouponSummary> {
     const path = coupon.id ? `/api/admin/coupons/${encodeId(coupon.id)}/` : '/api/admin/coupons/';
@@ -694,8 +688,8 @@ export const api = {
   },
   async adminDeleteCoupon(id: string) { return request(`/api/admin/coupons/${encodeId(id)}/`, { method: 'DELETE' }); },
 
-  async adminGetShippingMethods(params?: Record<string, unknown>): Promise<Page<ShippingMethod>> {
-    return normalizePage(await request(withQuery('/api/admin/shipping-methods/', params)), normalizeShippingMethod);
+  async adminGetShippingMethods(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<ShippingMethod>> {
+    return normalizePage(await request(withQuery('/api/admin/shipping-methods/', params), { signal }), normalizeShippingMethod);
   },
   async adminSaveShippingMethod(method: Partial<ShippingMethod>): Promise<ShippingMethod> {
     const path = method.id ? `/api/admin/shipping-methods/${encodeId(method.id)}/` : '/api/admin/shipping-methods/';
@@ -705,8 +699,8 @@ export const api = {
     return request(`/api/admin/shipping-methods/${encodeId(id)}/`, { method: 'DELETE' });
   },
 
-  async adminGetPayments(params?: Record<string, unknown>): Promise<Page<Payment>> {
-    return normalizePage(await request(withQuery('/api/admin/payments/', params)), normalizePayment);
+  async adminGetPayments(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<Payment>> {
+    return normalizePage(await request(withQuery('/api/admin/payments/', params), { signal }), normalizePayment);
   },
   async adminUpdatePayment(id: string, changes: Partial<Payment> & {
     refund_amount?: string; reason?: string; reference?: string; confirmed?: boolean;
@@ -714,23 +708,23 @@ export const api = {
     return normalizePayment(await request(`/api/admin/payments/${encodeId(id)}/`, { method: 'PUT', ...jsonBody(changes) }));
   },
 
-  async adminGetReviews(params?: Record<string, unknown>): Promise<Page<ProductReview>> {
-    return normalizePage(await request(withQuery('/api/admin/reviews/', params)), normalizeReview);
+  async adminGetReviews(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<ProductReview>> {
+    return normalizePage(await request(withQuery('/api/admin/reviews/', params), { signal }), normalizeReview);
   },
   async adminUpdateReview(id: string, changes: Partial<ProductReview>): Promise<ProductReview> {
     return normalizeReview(await request(`/api/admin/reviews/${encodeId(id)}/`, { method: 'PUT', ...jsonBody(changes) }));
   },
   async adminDeleteReview(id: string) { return request(`/api/admin/reviews/${encodeId(id)}/`, { method: 'DELETE' }); },
 
-  async adminGetReturns(params?: Record<string, unknown>): Promise<Page<ReturnRequest>> {
-    return normalizePage(await request(withQuery('/api/admin/returns/', params)), normalizeReturnRequest);
+  async adminGetReturns(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<ReturnRequest>> {
+    return normalizePage(await request(withQuery('/api/admin/returns/', params), { signal }), normalizeReturnRequest);
   },
   async adminUpdateReturn(id: string, changes: Partial<ReturnRequest>): Promise<ReturnRequest> {
     return normalizeReturnRequest(await request(`/api/admin/returns/${encodeId(id)}/`, { method: 'PUT', ...jsonBody(changes) }));
   },
 
-  async adminGetBespokeRequests(params?: Record<string, unknown>): Promise<Page<BespokeRequest>> {
-    return normalizePage(await request(withQuery('/api/admin/bespoke/', params)), normalizeBespokeRequest);
+  async adminGetBespokeRequests(params?: Record<string, unknown>, signal?: AbortSignal): Promise<Page<BespokeRequest>> {
+    return normalizePage(await request(withQuery('/api/admin/bespoke/', params), { signal }), normalizeBespokeRequest);
   },
   async adminUpdateBespokeRequest(id: string, changes: Partial<BespokeRequest>): Promise<BespokeRequest> {
     return normalizeBespokeRequest(await request(`/api/admin/bespoke/${encodeId(id)}/`, { method: 'PUT', ...jsonBody(changes) }));

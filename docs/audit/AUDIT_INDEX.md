@@ -64,7 +64,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | ID | Priority | Confidence | Status | Finding / canonical record | Batch |
 | --- | --- | --- | --- | --- | --- |
 | ARCH-001 | P2 | High | Implemented - Batch 6 ownership split | [GlobalContext couples unrelated state domains](ARCHITECTURE_AUDIT.md#arch-001) | 6 |
-| ARCH-002 | P2 | High | Open - maintenance debt | [AdminPanel combines unrelated administration features](ARCHITECTURE_AUDIT.md#arch-002) | 7 |
+| ARCH-002 | P2 | High | Addressed - Batch 7 feature decomposition | [AdminPanel combines unrelated administration features](ARCHITECTURE_AUDIT.md#arch-002) | 7 |
 | ARCH-003 | P2 | High | Partial - backend and auth/catalog contracts explicit; remaining frontend DTO debt | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4/5 |
 | ARCH-004 | P3 | High | Fixed - Batch 4; routed commerce contracts retained | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
 | BE-001 | P1 | High | Fixed - Batch 2; SQL evidence open | [Stale product saves can overwrite sold stock](BACKEND_AUDIT.md#be-001) | 2 |
@@ -80,7 +80,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
 | FE-003 | P2 | High | Addressed - Batch 5 | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
 | FE-004 | P2 | High | Implemented - Batch 6 identity/order guards | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
-| FE-005 | P2 | High | Open - confirmed defect | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5 (complete staff surfaces in 7) |
+| FE-005 | P2 | High | Partial - Batch 7 staff pagination; customer/review screens remain | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5 (complete staff surfaces in 7) |
 | FE-006 | P2 | High | Implemented guards; price-confirmation policy open | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
 | FE-007 | P2 | High | Fixed - Batch 6 | [Legacy cart migration returns before reading legacy entries](FRONTEND_AUDIT.md#fe-007) | 6 |
 | FE-008 | P2 | High | Open - confirmed defect | [Frontend staff access disagrees with backend role rules](FRONTEND_AUDIT.md#fe-008) | 5 |
@@ -94,7 +94,7 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | SEC-004 | P2 | Medium | Open - conditional security risk | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |
 | SEC-005 | P2 | High | Open - dependency assurance gap | [Known dependency advisories and incomplete repeatable scanning](SECURITY_AUDIT.md#sec-005) | 9 (scanning foundation in 3) |
 | PERF-001 | P2 | High | Fixed - Batch 4; constant product read query budget | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
-| PERF-002 | P2 | High | Partial - Batch 4 bounded admin APIs; screen/stats work remains | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
+| PERF-002 | P2 | High | Partial - Batch 7 staff pages complete; public reads/stats remain | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 (contract/UI groundwork in 5/7) |
 | PERF-003 | P2 | High | Open - confirmed query growth | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
 | TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
 | TEST-002 | P2 | High | Partial - lint and auth/catalog DTO gates added; remaining strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3/5 |

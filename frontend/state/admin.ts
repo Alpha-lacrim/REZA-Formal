@@ -1,41 +1,39 @@
 import { useQuery } from '@tanstack/react-query';
 import api from '../services/api';
-import { Order } from '../types';
 import { useAuth, useRuntime } from './AppState';
 import { identityKey } from './remote';
 
 // Forms, selection and pagination remain in the screen; server snapshots live here.
-export function useAdminData(tab: string) {
+export type CommerceSection = 'capabilities' | 'coupons' | 'shipping' | 'payments' | 'reviews' | 'returns' | 'bespoke';
+export function useAdminData(tab: string, section: CommerceSection = 'capabilities', page = 1) {
   const { authState } = useAuth();
   const { queries } = useRuntime();
   const prefix = ['admin', identityKey(authState)];
   const enabled = authState.status === 'admin';
-  function useRead<T>(name: string, fetch: () => Promise<T>, active = true) {
-    return useQuery({ queryKey: [...prefix, name], queryFn: fetch, enabled: enabled && active }, queries);
+  function useRead<T>(name: string, fetch: (signal: AbortSignal) => Promise<T>, active = true) {
+    return useQuery({ queryKey: [...prefix, name, name === 'stats' ? 1 : page], queryFn: ({ signal }) => fetch(signal), enabled: enabled && active, gcTime: 5 * 60_000 }, queries);
   }
   const stats = useRead('stats', () => api.adminGetStats());
-  const orders = useRead('orders', () => api.adminGetOrders(), tab === 'orders');
-  const users = useRead('users', () => api.adminGetUsers(), tab === 'orders');
-  const messages = useRead('messages', () => api.adminGetMessages(), tab === 'messages');
-  const capabilities = useRead('capabilities', () => api.adminGetCapabilities(), tab === 'commerce');
-  const coupons = useRead('coupons', () => api.adminGetCoupons(), tab === 'commerce');
-  const shipping = useRead('shipping', () => api.adminGetShippingMethods(), tab === 'commerce');
-  const payments = useRead('payments', () => api.adminGetPayments(), tab === 'commerce');
-  const reviews = useRead('reviews', () => api.adminGetReviews(), tab === 'commerce');
-  const returns = useRead('returns', () => api.adminGetReturns(), tab === 'commerce');
-  const bespoke = useRead('bespoke', () => api.adminGetBespokeRequests(), tab === 'commerce');
-  const commerce = [capabilities, coupons, shipping, payments, reviews, returns, bespoke];
+  const active = (name: string) => tab === 'commerce' && section === name;
+  const params = { page, page_size: 8 };
+  const capabilities = useRead('capabilities', () => api.adminGetCapabilities(), active('capabilities'));
+  const coupons = useRead('coupons', (signal) => api.adminGetCoupons(params, signal), active('coupons'));
+  const shipping = useRead('shipping', (signal) => api.adminGetShippingMethods(params, signal), active('shipping'));
+  const payments = useRead('payments', (signal) => api.adminGetPayments(params, signal), active('payments'));
+  const reviews = useRead('reviews', (signal) => api.adminGetReviews(params, signal), active('reviews'));
+  const returns = useRead('returns', (signal) => api.adminGetReturns(params, signal), active('returns'));
+  const bespoke = useRead('bespoke', (signal) => api.adminGetBespokeRequests(params, signal), active('bespoke'));
+  const commerce = { capabilities, coupons, shipping, payments, reviews, returns, bespoke }[section];
   const invalidate = () => queries.invalidateQueries({ queryKey: prefix });
   return {
     stats: stats.data || { productsCount: 0, ordersCount: 0, usersCount: 0, revenue: 0, messagesCount: 0 },
-    orders: orders.data || [], users: users.data || [], messages: messages.data || [],
+    commercePage: ({ coupons: coupons.data, shipping: shipping.data, payments: payments.data, reviews: reviews.data, returns: returns.data, bespoke: bespoke.data } as Record<string, { count: number; totalPages?: number } | undefined>)[section],
     capabilities: capabilities.data || null, coupons: coupons.data?.results || [],
     shippingMethods: shipping.data?.results || [], payments: payments.data?.results || [],
     reviews: reviews.data?.results || [], returns: returns.data?.results || [], bespokeRequests: bespoke.data?.results || [],
-    commerceLoading: commerce.some(query => query.isFetching),
-    commerceError: commerce.some(query => query.isError) ? 'دریافت برخی بخش‌ها انجام نشد؛ دوباره تلاش کنید.' : '',
-    adminError: [stats, ...(tab === 'orders' ? [orders, users] : tab === 'messages' ? [messages] : [])].some(query => query.isError),
+    commerceLoading: commerce.isFetching,
+    commerceError: commerce.isError ? 'دریافت این بخش انجام نشد؛ دوباره تلاش کنید.' : '',
+    adminError: stats.isError,
     loadData: invalidate, loadCommerceData: invalidate,
-    setOrders: (next: Order[] | ((previous: Order[]) => Order[])) => queries.setQueryData<Order[]>([...prefix, 'orders'], old => typeof next === 'function' ? next(old || []) : next),
   };
 }

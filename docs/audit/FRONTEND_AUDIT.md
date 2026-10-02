@@ -121,7 +121,8 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-005 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Partial - Batch 7 staff pagination; customer/review screens remain |
+| Batch 7 evidence | Product/order/message and all six commerce screens consume page metadata and request only the selected server page. Search/sort/status filtering occurs before pagination; failed pages retry and last-page deletion clamps navigation. Full user-directory enrichment is removed. Customer history/returns and product-review pagination remain open. |
 | Evidence | P15: 35 orders produce count=35, returned=25, total_pages=2, next=null. Client calls accept no page in myOrders/getReturns; admin load supplies none. |
 | File/function references | frontend/services/api.ts:818,869,959; frontend/pages/AdminPanel.tsx:140; frontend/pages/ProductPage.tsx:65; frontend/pages/UserPanel.tsx:loadAccount; backend/shop/commerce_views.py:84 |
 | Current behaviour | myOrders/getReturns return only results; admin and reviews use the first Page.results without storing pagination or requesting later pages. Backend returns next/previous=null even with more pages. |

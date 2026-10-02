@@ -87,6 +87,7 @@ export function normalizeProduct(value: unknown): Product {
       : toNumber(raw?.compareAtPrice ?? raw?.compare_at_price),
     currency,
     image,
+    primaryImage: raw.image || null,
     images: images.length > 0 ? images : (image ? [image] : []),
     short: raw?.short ?? '',
     short_fa: raw?.short_fa ?? undefined,

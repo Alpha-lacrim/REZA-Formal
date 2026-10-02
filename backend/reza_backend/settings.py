@@ -137,10 +137,11 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # ==============================================================================
 # UPLOAD LIMIT SETTINGS (ADDED TO FIX 400 Bad Request / RequestDataTooBig)
 # ==============================================================================
-# Increase maximum request body size (e.g., 50MB)
-DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024  
-# Increase maximum file upload size (e.g., 50MB)
-FILE_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024
+# Nginx caps the complete body at 50 MiB. Django's DATA limit excludes files;
+# product validation separately caps binary uploads at 40 MiB / 12 files.
+DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024
+# This is a spool-to-disk threshold, not an upload rejection limit.
+FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (

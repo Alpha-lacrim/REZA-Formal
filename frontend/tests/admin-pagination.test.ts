@@ -4,44 +4,40 @@ import api from '../services/api';
 import { server } from './setup';
 
 test.each([
-  ['orders', () => api.adminGetOrders()],
-  ['users', () => api.adminGetUsers()],
-  ['messages', () => api.adminGetMessages()],
-  ['products', () => api.adminGetProducts()],
-] as const)('%s retains all staff records across pages', async (collection, read) => {
-  const requests: number[] = [];
+  ['orders', api.adminGetOrderPage], ['messages', api.adminGetMessagePage],
+  ['products', api.adminGetProductPage], ['coupons', api.adminGetCoupons],
+  ['shipping-methods', api.adminGetShippingMethods], ['payments', api.adminGetPayments],
+  ['reviews', api.adminGetReviews], ['returns', api.adminGetReturns], ['bespoke', api.adminGetBespokeRequests],
+] as const)('%s reads only the requested server page and retains metadata', async (collection, read) => {
+  const requests: string[] = [];
   server.use(http.get(`*/api/admin/${collection}/`, ({ request }) => {
     const url = new URL(request.url);
-    const page = Number(url.searchParams.get('page'));
-    expect(url.searchParams.get('page_size')).toBe('100');
-    requests.push(page);
-    const start = (page - 1) * 100;
-    return HttpResponse.json({
-      results: Array.from({ length: page === 1 ? 100 : 3 }, (_, i) => ({ id: String(start + i), email: `user${i}@example.invalid`, role: 'user' })),
-      count: 103, page, page_size: 100, total_pages: 2,
-    });
+    requests.push(url.search);
+    return HttpResponse.json({ results: [{ id: 'page-two', price: '25.50' }], count: 17, page: 2, page_size: 8, total_pages: 3, next: '/ignored' });
   }));
-  const rows = await read();
-  expect(rows).toHaveLength(103);
-  expect(new Set(rows.map(row => row.id)).size).toBe(103);
-  expect(requests).toEqual([1, 2]);
+  const page = await read({ page: 2, page_size: 8, search: 'کت', ordering: 'price-desc' });
+  expect(page.results).toHaveLength(1);
+  expect(page.count).toBe(17);
+  expect(page.totalPages).toBe(3);
+  expect(page.page).toBe(2);
+  expect(requests).toHaveLength(1);
+  const params = new URLSearchParams(requests[0]);
+  expect(params.get('search')).toBe('کت');
+  expect(params.get('ordering')).toBe('price-desc');
+  expect(params.get('page')).toBe('2');
 });
 
-test('a failed later staff page rejects the entire collection', async () => {
+test('page failures reject without returning a partial collection or following links', async () => {
+  server.use(http.get('*/api/admin/products/', () => HttpResponse.json({ detail: 'Unavailable' }, { status: 503 })));
+  await expect(api.adminGetProductPage({ page: 2 })).rejects.toMatchObject({ status: 503 });
+});
+
+test('shared staff catalog compatibility reads a bounded snapshot without walking all pages', async () => {
+  const pages: string[] = [];
   server.use(http.get('*/api/admin/products/', ({ request }) => {
-    if (new URL(request.url).searchParams.get('page') === '2') {
-      return HttpResponse.json({ detail: 'Unavailable' }, { status: 503 });
-    }
-    return HttpResponse.json({ results: [{ id: 'first' }], count: 2, page: 1, page_size: 1, total_pages: 2 });
+    pages.push(new URL(request.url).searchParams.get('page')!);
+    return HttpResponse.json({ results: [{ id: 'first' }], count: 1000, page: 1, page_size: 100, total_pages: 10 });
   }));
-  await expect(api.adminGetProducts()).rejects.toThrow();
-});
-
-test('legacy arrays remain compatible and repeated page metadata cannot loop', async () => {
-  server.use(http.get('*/api/admin/products/', () => HttpResponse.json([{ id: 'legacy' }])));
   expect(await api.adminGetProducts()).toHaveLength(1);
-  server.use(http.get('*/api/admin/products/', () => HttpResponse.json({
-    results: [{ id: 'first' }], count: 2, page: 1, page_size: 1, total_pages: 2,
-  })));
-  await expect(api.adminGetProducts()).rejects.toThrow('Invalid administrative pagination response');
+  expect(pages).toEqual(['1']);
 });

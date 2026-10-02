@@ -7,10 +7,11 @@ import { AppStateProvider, useActions, useCatalog, useRuntime, useSettings } fro
 import { useGlobal } from '../contexts/GlobalContext';
 import { createCommerce } from '../state/commerce';
 import { cartLineKey, commerceKey, readCommerce } from '../state/persistence';
-import { Product, User } from '../types';
+import { Order, Product, User } from '../types';
 import CartPage from '../pages/CartPage';
 import { formatPrice } from '../utils';
 import { useAdminData } from '../state/admin';
+import { useAdminPage } from '../features/admin/shared';
 import { invalidateSession } from '../services/http/client';
 
 const buyer = (id: string): User => ({ id, email: `${id}@example.invalid`, name: id, role: 'user', createdAt: 0 });
@@ -293,27 +294,28 @@ test('late customer hydration and pending debounce cannot restore data after log
 test('admin queries cache across tabs, invalidate after mutations and disappear on logout', async () => {
   vi.mocked(api.me).mockResolvedValue({ ...buyer('staff'), role: 'admin' });
   vi.spyOn(api, 'adminGetStats').mockResolvedValue({ productsCount: 1 } as never);
-  vi.spyOn(api, 'adminGetOrders').mockResolvedValue([{ id: 'private-order' }] as never);
-  vi.spyOn(api, 'adminGetUsers').mockResolvedValue([]);
-  vi.spyOn(api, 'adminGetMessages').mockResolvedValue([]);
-  let admin!: ReturnType<typeof useAdminData>;
-  function AdminReader({ tab }: { tab: string }) { admin = useAdminData(tab); return null; }
-  const tree = (tab: string) => <AppStateProvider><Probe /><AdminReader tab={tab} /></AppStateProvider>;
+  vi.spyOn(api, 'adminGetOrderPage').mockResolvedValue({ results: [{ id: 'private-order' }] } as never);
+  vi.spyOn(api, 'adminGetMessagePage').mockResolvedValue({ results: [] } as never);
+  let admin!: ReturnType<typeof useAdminPage<Order>>;
+  function AdminReader() { admin = useAdminPage('orders', { page: 1 }, api.adminGetOrderPage); return null; }
+  function MessagesReader() { useAdminPage('messages', { page: 1 }, api.adminGetMessagePage); return null; }
+  function StatsReader() { useAdminData('shell'); return null; }
+  const tree = (tab: string) => <AppStateProvider><Probe /><StatsReader />{tab === 'orders' ? <AdminReader /> : <MessagesReader />}</AppStateProvider>;
   const view = render(tree('orders'));
-  await waitFor(() => expect(admin.orders[0]?.id).toBe('private-order'));
+  await waitFor(() => expect(admin.data?.results[0]?.id).toBe('private-order'));
   view.rerender(tree('messages'));
-  await waitFor(() => expect(api.adminGetMessages).toHaveBeenCalledTimes(1));
+  await waitFor(() => expect(api.adminGetMessagePage).toHaveBeenCalledTimes(1));
   view.rerender(tree('orders'));
   expect(api.adminGetStats).toHaveBeenCalledTimes(1);
-  expect(api.adminGetOrders).toHaveBeenCalledTimes(1);
-  vi.mocked(api.adminGetOrders).mockResolvedValue([{ id: 'updated-order' }] as never);
-  await act(() => admin.loadData());
-  await waitFor(() => expect(admin.orders[0]?.id).toBe('updated-order'));
-  vi.mocked(api.adminGetOrders).mockRejectedValue(new Error('unavailable'));
-  await act(() => admin.loadData());
-  await waitFor(() => expect(admin.adminError).toBe(true));
-  expect(admin.orders[0]?.id).toBe('updated-order');
+  expect(api.adminGetOrderPage).toHaveBeenCalledTimes(1);
+  vi.mocked(api.adminGetOrderPage).mockResolvedValue({ results: [{ id: 'updated-order' }] } as never);
+  await act(() => admin.invalidate());
+  await waitFor(() => expect(admin.data?.results[0]?.id).toBe('updated-order'));
+  vi.mocked(api.adminGetOrderPage).mockRejectedValue(new Error('unavailable'));
+  await act(() => admin.invalidate());
+  await waitFor(() => expect(admin.isError).toBe(true));
+  expect(admin.data?.results[0]?.id).toBe('updated-order');
   await act(() => state.logout());
-  expect(admin.orders).toEqual([]);
+  expect(admin.data).toBeUndefined();
   expect(runtime.queries.getQueryCache().findAll({ queryKey: ['admin', 'admin:staff'] })).toEqual([]);
 });

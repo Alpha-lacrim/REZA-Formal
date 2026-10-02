@@ -99,7 +99,8 @@ Order item, address, coupon and shipping snapshots preserve most history after c
 | ID | ARCH-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - maintenance debt |
+| Status | Addressed - Batch 7 feature decomposition |
+| Batch 7 evidence | AdminPanel now owns shell/navigation/composition. Independent product/editor, order, dashboard, commerce, messages and settings modules own local form/selection lifecycles. Shared native dialogs and server pagination are tested; only the selected commerce section loads. See [admin/media contracts](../ADMIN_MEDIA.md). |
 | Evidence | Static source count; loadCommerceData invokes seven requests and runCommerceAction reloads all seven. |
 | File/function references | frontend/pages/AdminPanel.tsx:25,109,140,498 |
 | Current behaviour | One 1,433-line component contains 34 useState calls, six main tabs, seven commerce sections, forms, modals, filtering, printing and network orchestration. |

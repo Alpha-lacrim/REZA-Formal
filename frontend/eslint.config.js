@@ -18,7 +18,7 @@ export default tseslint.config(
     },
   },
   {
-    files: ['services/auth.ts', 'services/catalog.ts', 'services/normalization.ts', 'services/http/*.ts', 'state/*.{ts,tsx}'],
+    files: ['services/auth.ts', 'services/catalog.ts', 'services/normalization.ts', 'services/http/*.ts', 'state/*.{ts,tsx}', 'features/**/*.{ts,tsx}'],
     rules: { '@typescript-eslint/no-explicit-any': 'error' },
   },
 );

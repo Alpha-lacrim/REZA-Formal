@@ -46,6 +46,8 @@ test('auth DTO validation rejects incomplete identities and unknown roles', () =
 });
 
 test('catalog DTO validation retains supported aliases and rejects malformed prices and variants', () => {
+  expect(normalizeProduct({ id: 'gallery-only', image: null, images: ['/media/gallery.png'] }))
+    .toMatchObject({ primaryImage: null, image: '/media/gallery.png', images: ['/media/gallery.png'] });
   expect(normalizeProduct({ id: 42, name: 'Suit', price: '120.50', compare_at_price: '150',
     is_active: true, images: '["/media/a.png"]', variants: [{ id: 'v', price: '120.50', stock: 2, is_active: true }] }))
     .toMatchObject({ id: '42', price: 120.5, compareAtPrice: 150, active: true, images: ['/media/a.png'], stock: 2 });

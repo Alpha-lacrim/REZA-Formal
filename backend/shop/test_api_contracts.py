@@ -93,6 +93,39 @@ class AdminPaginationTests(TestCase):
             ContactMessage.objects.create(name='Buyer', email='buyer@example.invalid', message='Hello')
             User.objects.create_user(f'page-{index:03}', f'page-{index:03}@example.invalid')
 
+    def test_product_search_and_ordering_apply_before_pagination(self):
+        self.client.force_authenticate(self.staff)
+        Product.objects.filter(id='page-001').update(name='Special suit', price=99)
+        Product.objects.filter(id='page-002').update(name='Special suit', price=25)
+        params = {'search': 'Special', 'ordering': 'price-desc', 'page_size': 1}
+        first = self.client.get('/api/admin/products/', params)
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(first.data['count'], 2)
+        self.assertEqual(first.data['results'][0]['id'], 'page-001')
+        second = self.client.get(first.data['next'])
+        self.assertEqual(second.data['results'][0]['id'], 'page-002')
+        self.assertEqual(second.data['count'], 2)
+        self.assertEqual(self.client.get('/api/admin/products/', {'ordering': 'private_field'}).status_code, 400)
+
+    def test_order_filters_and_message_search_use_server_counts(self):
+        from datetime import datetime, timezone
+        self.client.force_authenticate(self.staff)
+        Order.objects.filter(id='ORD-PAGE-002').update(
+            recipient_name='Specific Buyer', status='processing',
+            created_at=datetime(2025, 2, 4, 12, tzinfo=timezone.utc),
+        )
+        response = self.client.get('/api/admin/orders/', {
+            'search': 'Specific', 'status': 'processing', 'date_start': '2025-02-04', 'date_end': '2025-02-04', 'page_size': 1,
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data['count'], 1)
+        self.assertEqual(response.data['results'][0]['id'], 'ORD-PAGE-002')
+        for params in ({'date_start': '2025-02-31'}, {'date_end': 'bad'}, {'status': 'invalid'}):
+            self.assertEqual(self.client.get('/api/admin/orders/', params).status_code, 400)
+        ContactMessage.objects.create(name='Specific', email='specific@example.invalid', message='Find me')
+        response = self.client.get('/api/admin/messages/', {'search': 'Find me'})
+        self.assertEqual(response.data['count'], 1)
+
     def test_admin_collections_are_bounded_complete_and_permission_checked(self):
         for collection in ('products', 'orders', 'users', 'messages'):
             path = f'/api/admin/{collection}/'

@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-01 (Batch 6 frontend state; frontend/Chrome gates; Batch 4 backend/SQL evidence retained)
+Last verified: 2026-10-02 (Batch 7 admin/media; frontend, isolated backend and Chrome gates; prior SQL evidence retained)
 
 ## Purpose and product
 
@@ -33,6 +33,8 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Auth state is explicit: loading, anonymous, customer or admin. Refresh failure clears local session state and rejects obsolete identity-bound responses. Login/register/logout wait for pending refresh and dispatched account writes before changing cookies. Catalog/account reads wait for auth; stale bootstrap, hydration, catalog and detail/review/quote results are cancelled or ignored. Checkout form/continuations are session-bound. Independent tabs/devices retain existing server last-write semantics; effective Django staff capability policy remains later work.
 - Local fallback: `frontend/services/db.ts` exposes only a read-only emergency catalog based on `frontend/data.ts`. It is used only when the product API is unavailable and never reports local admin writes as server success.
 - Main feature surfaces: lazy-loaded routes in `frontend/pages/` and shared UI in `frontend/components/`. Tailwind is compiled locally through PostCSS; no runtime Tailwind CDN is used.
+- Admin composition: `pages/AdminPanel.tsx` owns shell/navigation; `features/admin/` owns dashboard, products/editor, orders, commerce, messages, settings and shared dialogs/pagination. Product editor domains are independent drafts; raw files and revocable object previews are separate from persisted references. Native dialogs add explicit Tab wrapping, Escape and focus restoration. Tailwind scans `features/`.
+- Admin reads consume eight-row server pages with filters/counts, cancellation and identity-scoped caching; inactive pages expire after five minutes. Commerce loads only its selected section; orders use embedded customer data instead of fetching users. Legacy array helpers return at most a 100-record compatibility preview for other staff site components. Complete product management uses the paginated screen. See [admin/media contract and rollout](docs/ADMIN_MEDIA.md).
 - Static product/site assets: `frontend/public/images/`.
 
 ### Backend
@@ -48,12 +50,12 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 - Seed command: `python manage.py seed_data`; it bootstraps catalog records only when the catalog is empty and shipping only when none exists, and never publishes or logs a fixed administrator password.
 - Hermetic tests: `backend/shop/tests.py` plus focused `test_*.py` modules use `backend/reza_backend/test_settings.py`, in-memory SQLite, and never touch configured SQL Server.
 - Uploaded files: Django media storage under `backend/media/` locally or the mounted `/app/media` volume in Docker. Runtime media is ignored by Git.
-- Product uploads use `shop/product_media.py`: decoded/re-encoded still images, bounded files/dimensions/gallery count, URL validation and cleanup of newly staged files on failed product writes. Safe inline legacy galleries convert to files on edit; existing files are retained for historical references.
+- Product uploads use `shop/product_media.py`: decoded/re-encoded still images, 10 MiB/file, 40 MiB/binary request, 12 total images including primary, 8,000 px/side and 20 million pixels, URL validation and cleanup of newly staged files on failed product writes. Safe inline legacy galleries convert to files on edit; existing files are retained for historical references. Existing primary plus JSON gallery storage is sufficient; no ProductImage migration. Django spools files after 2 MiB; Nginx retains a 50 MiB total-body limit. `Product.primaryImage` preserves the actual API primary separately from the UI `image` fallback.
 - Native Django product/variant/order/payment/return screens are inspection-only. Their write operations use the existing service-backed REST/staff UI, including stock ledger and lifecycle guards.
 - Refund allocations/entries use existing Payment metadata plus OrderEvent records through `shop/refunds.py`; no new schema. Net item allocations derive from immutable purchase amounts, exclude shipping/tax, and reconcile rounding. Manual refunds require amount, currency, reason, per-payment reference and explicit offline-transfer confirmation. Inconsistent legacy refund history requires reconciliation.
 
 - Product mutations use `product_services.py` for atomic product/variant/ledger/media writes. Public detail mutations remain a tested staff-only compatibility route. Product read/write contracts are separate and explicit; only staff product reads expose the inventory version.
-- `selectors.py` owns reusable product aggregates/variants and order read graphs. `pagination.py` shares stable ordering, size limits and links across commerce and older staff collections. Four legacy staff adapters load every numeric page; server-driven screen pagination remains follow-up.
+- `selectors.py` owns reusable product aggregates/variants and order read graphs. `pagination.py` shares stable ordering, size limits and links across commerce and older staff collections. Products support server name/category search and allowlisted sorting; orders support search/status/date filters; messages support search. Staff screens consume one page at a time; public/account pagination and stats aggregation remain follow-up.
 - `subscription_services.py` owns normalized idempotent newsletter subscription/reactivation. Quote input permits incomplete address forms; checkout validates delivery-address types/limits. See [API contracts and OpenAPI decision](docs/API_CONTRACTS.md); no schema dependency/endpoint is installed.
 
 ### Docker request flow
@@ -75,6 +77,7 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `frontend/package.json` | Frontend scripts and dependency contract. |
 | `frontend/vite.config.ts` | Vite build and development-server behavior. |
 | `frontend/state/` | Focused React subscriptions, auth/UI lifecycles, commerce persistence/queues, catalog/settings/admin cache and composition. |
+| `frontend/features/admin/`, `docs/ADMIN_MEDIA.md` | Admin features, independent product drafts, managed media trace, limits and compatibility/rollback. |
 | `frontend/contexts/GlobalContext.tsx` | Legacy aggregate hook/provider exports retained for integration regression probes. |
 | `docs/FRONTEND_STATE.md` | State classification, query decision, guest/account invariants and complete browser-key audit. |
 | `frontend/services/api.ts`, `auth.ts`, `catalog.ts` | API facade, domain transports and checked auth/catalog normalization. |
