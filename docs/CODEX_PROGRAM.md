@@ -11,10 +11,10 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 8 - Database and performance |
-| Batch status | Verified implementation; integration/publication closeout follows |
+| Batch status | Complete for measured scope; verified non-fast-forward merge and normal atomic publication |
 | Batch branch | `codex/batch-08-database-performance` |
 | Batch start commit | `7ac1a7805ee1e1598c4027868536749fdbdd3c6a` (verified Batch 5/6/7 integration) |
-| Final batch / integration merge | Recorded literally in the post-merge closeout below |
+| Final batch / integration merge | `23ede44436df788a42bf76f5e8d5e17e4a8e2d6f` / `d28aabd363a460ef87123b884e2afebaac7b4ec8` |
 | Audit IDs handled | PERF-003/DB-004/FE-005 addressed; PERF-001 retained; PERF-002/DB-001 partial with residuals |
 | Verification performed | Full SQL/SQLite/frontend checks, targeted final probes, Chrome request budgets, index plans/round trip; exact results in Handoff |
 | Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
@@ -30,6 +30,15 @@ pre-codex-remediation-2026-09-10
 - PERF-003/DB-004 addressed; FE-005 consumers complete; PERF-002 remains partial for whole saved snapshots/historical inline media, DB-001 partial for broader cross-record invariants, DB-002 mixed lock schedules open. Locked checkout remains 24/256 queries for 1/30 lines; no SQLite row-lock claim. Deploy coordinated public pagination/card clients and backend; backup/inspect SQL schema before applying 0008.
 
 ### Prerequisite branch provenance
+
+### Batch 8 closeout provenance
+
+- Batch start: `7ac1a7805ee1e1598c4027868536749fdbdd3c6a`; application commits `d0ff928bc6ee98addcbfd2118d3117e5c70e4467` and `bb14c6e5afacfb3f83e09ef820a7a017bbdec27c`; batch documentation/final tip `23ede44436df788a42bf76f5e8d5e17e4a8e2d6f`.
+- Verified non-fast-forward merge `d28aabd363a460ef87123b884e2afebaac7b4ec8`; parents are the exact start and final tip above. `git diff --quiet codex/batch-08-database-performance d28aabd` returns zero: merge tree equals tested batch tree. Full diff/whitespace, credential signatures and documentation path checks pass. Main `449c5a142c0f840b55b468d88e6b17f8d7ff329d`, dev `f76f232ab658e836f594fb9dc40ff53b1ddececf` and stash `bd371510428d76e6587eaa20913c23bfd12af3c8` preserved.
+- Normal atomic push succeeded: created remote Batch 5/6/7 at preserved tips in the table below, created remote Batch 8 at `23ede44436df788a42bf76f5e8d5e17e4a8e2d6f`, advanced integration from `7343e237f1282e03ca5e239a390f29a0f053814f` to merge `d28aabd363a460ef87123b884e2afebaac7b4ec8`. No main update, force push, branch deletion, deployment or hosted CI claim.
+- This documentation-only closeout follows that observed push. A commit cannot embed its own literal SHA; resolve it as the first first-parent child of merge `d28aabd363a460ef87123b884e2afebaac7b4ec8`, expected subject `docs(perf): record Batch 8 merge and publication`. Its normal publication and exact final local/remote tip check follow committing it and are reported in the final response.
+
+### Prerequisite integration record
 
 These local verified branch tips were not yet on integration at session start. This session's authorized integration preserves each branch and its history:
 
