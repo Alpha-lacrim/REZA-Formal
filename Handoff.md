@@ -4,6 +4,12 @@ Last updated: 2026-10-04
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-10-04 - Batch 12 final architecture review and program closeout
+
+- Objective: independently review the accumulated implementation against the original audit, prove any obsolete artifacts before cleanup, reconcile documentation, run the strongest safe configured suite, and integrate/publish the candidate without changing main.
+- Starting state: clean nested repository on Batch 11 at `31e72ea`; integration remains `db565f6` (Batch 8). Batch 10 has a later unintegrated runtime-security commit `82a9459`. Read AGENTS/Codex/Handoff; created required `codex/batch-12-final-review`. Preserve the separate operations worktree, ignored configuration, persistent application volumes, main/dev/stash and unrelated workspace files.
+- In progress: reconcile the Batch 10 follow-up with Batch 11 before final review; record actual findings, verification, residual owner decisions and publication results here at closeout.
+
 ## 2026-10-03 - Batch 11 UX, accessibility, RTL and SEO
 
 Session started 2026-10-03; final review/checks completed 2026-10-04.
