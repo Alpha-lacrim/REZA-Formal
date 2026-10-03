@@ -2,6 +2,7 @@
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
+import https from 'node:https';
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { resolve, join, basename, sep } from 'node:path';
@@ -14,7 +15,8 @@ const network = prefix + '-network';
 const db = prefix + '-db';
 const backend = prefix + '-backend';
 const frontend = prefix + '-frontend';
-const volumes = ['media', 'static', 'restored-media'].map(name => prefix + '-' + name);
+const edge = prefix + '-tls-edge';
+const volumes = ['media', 'static', 'restored-media', 'certificates', 'legacy-restored'].map(name => prefix + '-' + name);
 const backendImage = process.env.OPS_BACKEND_IMAGE || 'reza-b10-backend:local';
 const frontendImage = process.env.OPS_FRONTEND_IMAGE || 'reza-b10-frontend:local';
 const sqlImage = readFileSync(join(root, 'docker-compose.sql-test.yml'), 'utf8').match(/image: (\S+)/)[1];
@@ -50,15 +52,18 @@ const backendEnv = join(temporary, 'backend.env');
 const password = randomBytes(30).toString('hex') + '!aA1';
 const runtimePassword = randomBytes(30).toString('hex') + '!aA1';
 const key = randomBytes(40).toString('hex');
+const caBundle = join(temporary, 'fixture-ca-bundle.crt');
+const sqlConfig = join(temporary, 'mssql.conf');
 function configureBackend(bootstrap) {
   writeFileSync(backendEnv, Object.entries({
     DEBUG: 'False', DJANGO_SECRET_KEY: key, ALLOWED_HOSTS: 'localhost,127.0.0.1,backend',
     DB_HOST: 'db', DB_PORT: '1433', DB_NAME: 'reza_ops_fixture',
     DB_USER: bootstrap ? 'sa' : 'reza_ops_runtime', DB_PASSWORD: bootstrap ? password : runtimePassword,
-    DB_DRIVER: 'ODBC Driver 18 for SQL Server', DB_ENCRYPT: 'yes', DB_TRUST_SERVER_CERTIFICATE: 'yes',
+    DB_DRIVER: 'ODBC Driver 18 for SQL Server', DB_ENCRYPT: 'yes', DB_TRUST_SERVER_CERTIFICATE: 'no',
     DB_CONNECTION_TIMEOUT: '3', DB_WAIT_TIMEOUT: '180', DB_AUTO_CREATE: bootstrap ? 'true' : 'false',
     RUN_MIGRATIONS: bootstrap ? 'true' : 'false', RUN_COLLECTSTATIC: bootstrap ? 'true' : 'false',
     RUN_SEED_DATA: 'false', LOG_LEVEL: 'INFO',
+    AUTH_COOKIE_SECURE: 'True', SESSION_COOKIE_SECURE: 'True', CSRF_COOKIE_SECURE: 'True',
   }).map(([name, value]) => name + '=' + value).join('\n'), { mode: 0o600 });
 }
 function startBackend() {
@@ -66,27 +71,122 @@ function startBackend() {
   docker('run', '-d', '--name', backend, ...common, '--init', '--stop-timeout', '45',
     '--network-alias', 'backend', '--env-file', backendEnv, '-p', '127.0.0.1::8000',
     '--mount', 'type=volume,src=' + volumes[0] + ',dst=/app/media',
-    '--mount', 'type=volume,src=' + volumes[1] + ',dst=/app/staticfiles', backendImage);
+    '--mount', 'type=volume,src=' + volumes[1] + ',dst=/app/staticfiles',
+    '--mount', 'type=bind,src=' + caBundle + ',dst=/etc/ssl/certs/ca-certificates.crt,readonly', backendImage);
+}
+function secureRequest(url, extra = {}) {
+  return new Promise((resolve, reject) => {
+    const req = https.get(url, { ca: readFileSync(caBundle), ...extra }, response => {
+      response.resume();
+      response.on('end', () => resolve(response));
+      response.on('error', reject);
+    });
+    req.setTimeout(7000, () => req.destroy(new Error('TLS fixture request timed out')));
+    req.on('error', reject);
+  });
 }
 try {
   docker('network', 'create', network); createdNetwork = true;
   for (const name of volumes) { docker('volume', 'create', name); createdVolumes.push(name); }
+  // Model a root-owned legacy volume, then make and verify a recovery archive
+  // before permissions change. Never mount an existing application volume.
+  docker('run', '--rm', '--user', '0:0', '--entrypoint', 'python', '--network', 'none',
+    '--mount', 'type=volume,src=' + volumes[0] + ',dst=/volume', backendImage, '-c',
+    'from pathlib import Path; import os; p=Path("/volume/legacy/private.txt"); p.parent.mkdir(); p.write_bytes(b"synthetic legacy media"); os.chown(p,0,0); os.chmod(p,0o600); os.chown(p.parent,0,0); os.chmod(p.parent,0o700)');
+  const prepareArgs = ['run', '--rm', '--user', '0:0', '--network', 'none', '--read-only',
+    '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--cap-add', 'FOWNER', '--cap-add', 'DAC_OVERRIDE',
+    '--security-opt', 'no-new-privileges:true', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[0] + ',dst=/volume',
+    '--mount', 'type=bind,src=' + temporary + ',dst=/backup',
+    '--mount', 'type=bind,src=' + join(root, 'scripts/prepare-volume-ownership.py') + ',dst=/prepare.py,readonly',
+    backendImage, '/prepare.py'];
+  const preparation = JSON.parse(docker(...prepareArgs, '--apply'));
+  assert.equal(JSON.parse(docker(...prepareArgs)).needs_preparation, 0);
+  const recoveryManifest = JSON.parse(readFileSync(join(temporary, preparation.recovery_id + '.json')));
+  assert.ok(recoveryManifest.files['legacy/private.txt']);
+  docker('run', '--rm', '--user', '0:0', '--entrypoint', 'tar',
+    '--mount', 'type=volume,src=' + volumes[4] + ',dst=/volume',
+    '--mount', 'type=bind,src=' + temporary + ',dst=/backup,readonly', backendImage,
+    '-xf', '/backup/' + preparation.recovery_id + '.tar', '-C', '/volume');
+  docker('run', '--rm', '--user', '0:0', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[4] + ',dst=/volume,readonly', backendImage, '-c',
+    'from pathlib import Path; import stat; p=Path("/volume/legacy/private.txt"); assert p.read_bytes()==b"synthetic legacy media"; assert p.stat().st_uid==0; assert stat.S_IMODE(p.stat().st_mode)==0o600');
+  docker('run', '--rm', '--user', '0:0', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[0] + ',dst=/volume', backendImage, '-c',
+    'from pathlib import Path; Path("/volume/escape").symlink_to("/tmp",target_is_directory=True)');
+  assert.throws(() => docker(...prepareArgs, '--apply'), /Docker fixture command failed/);
+  docker('run', '--rm', '--user', '0:0', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[0] + ',dst=/volume', backendImage, '-c',
+    'from pathlib import Path; Path("/volume/escape").unlink()');
+  docker('run', '--rm', '--user', '10001:10001', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[0] + ',dst=/volume,readonly', backendImage, '-c',
+    'from pathlib import Path; assert Path("/volume/legacy/private.txt").read_bytes()==b"synthetic legacy media"');
+  console.log('Runtime fixture: legacy ownership preparation and verified recovery archive pass');
+
+  // A short-lived CA is trusted only inside these fixtures, never on the host.
+  docker('run', '--rm', '--user', '0:0', '--network', 'none', '--entrypoint', 'sh',
+    '--mount', 'type=volume,src=' + volumes[3] + ',dst=/certificates', backendImage, '-ec', `
+      cd /certificates; umask 077; mkdir db edge
+      openssl req -x509 -newkey rsa:2048 -nodes -days 2 -subj '/CN=REZA disposable fixture CA' -addext 'basicConstraints=critical,CA:TRUE' -addext 'keyUsage=critical,keyCertSign,cRLSign' -keyout ca.key -out ca.crt
+      for service in db edge; do
+        if [ "$service" = db ]; then name=db; uid=10001; else name=localhost; uid=101; fi
+        openssl req -new -newkey rsa:2048 -nodes -subj "/CN=$name" -keyout "$service/server.key" -out "$service/server.csr"
+        printf 'basicConstraints=critical,CA:FALSE\nkeyUsage=critical,digitalSignature,keyEncipherment\nextendedKeyUsage=serverAuth\nsubjectAltName=DNS:%s,DNS:localhost,IP:127.0.0.1\n' "$name" > "$service/extensions.cnf"
+        openssl x509 -req -in "$service/server.csr" -CA ca.crt -CAkey ca.key -CAcreateserial -days 2 -extfile "$service/extensions.cnf" -out "$service/server.crt"
+        chown -R "$uid:$uid" "$service"; chmod 700 "$service"; chmod 600 "$service/server.key"; chmod 644 "$service/server.crt"
+      done
+      cat /etc/ssl/certs/ca-certificates.crt ca.crt > ca-bundle.crt; chmod 644 ca-bundle.crt
+    `);
+  writeFileSync(caBundle, docker('run', '--rm', '--user', '0:0', '--entrypoint', 'cat',
+    '--mount', 'type=volume,src=' + volumes[3] + ',dst=/certificates,readonly', backendImage, '/certificates/ca-bundle.crt'));
+  writeFileSync(sqlConfig, '[network]\ntlscert = /certificates/db/server.crt\ntlskey = /certificates/db/server.key\ntlsprotocols = 1.2\nforceencryption = 1\n');
   const dbEnv = join(temporary, 'sql.env');
   writeFileSync(dbEnv, 'ACCEPT_EULA=Y\nMSSQL_PID=Developer\nMSSQL_SA_PASSWORD=' + password, { mode: 0o600 });
   containers.add(db);
-  docker('run', '-d', '--name', db, '--network', network, '--network-alias', 'db', '--env-file', dbEnv, sqlImage);
+  docker('run', '-d', '--name', db, '--network', network, '--network-alias', 'db', '--network-alias', 'wrong-db', '--env-file', dbEnv,
+    '--mount', 'type=volume,src=' + volumes[3] + ',dst=/certificates,readonly',
+    '--mount', 'type=bind,src=' + sqlConfig + ',dst=/var/opt/mssql/mssql.conf,readonly', sqlImage);
   await waitFor(() => sql('SELECT 1').includes('1'), 'SQL Server');
   console.log('Runtime fixture: isolated SQL ready');
   configureBackend(true); startBackend();
   await waitFor(async () => (await request(port(backend, 8000) + '/api/health/ready/')).ok, 'bootstrap and Gunicorn');
   assert.equal(docker('exec', backend, 'id', '-u'), '10001');
+  const connect = 'import os,pyodbc; connection=pyodbc.connect("DRIVER={ODBC Driver 18 for SQL Server};SERVER=db,1433;DATABASE=reza_ops_fixture;UID="+os.environ["DB_USER"]+";PWD="+os.environ["DB_PASSWORD"]+";Encrypt=yes;TrustServerCertificate=no;"+extra,timeout=4)';
+  docker('exec', backend, 'python', '-c', 'extra=""; ' + connect + '; assert connection.cursor().execute("SELECT encrypt_option FROM sys.dm_exec_connections WHERE session_id=@@SPID").fetchone()[0]=="TRUE"');
+  docker('exec', backend, 'python', '-c', 'extra=""\ntry:\n ' + connect.replace('SERVER=db,1433', 'SERVER=wrong-db,1433') + '\nexcept pyodbc.Error as error:\n assert "certificate" in str(error).lower(); raise SystemExit(0)\nraise SystemExit("SQL hostname verification unexpectedly bypassed")');
+  docker('run', '--rm', '--network', network, '--env-file', backendEnv, '--entrypoint', 'python', backendImage, '-c',
+    'extra=""\ntry:\n ' + connect + '\nexcept pyodbc.Error as error:\n assert "certificate" in str(error).lower(); raise SystemExit(0)\nraise SystemExit("Untrusted SQL CA unexpectedly accepted")');
+  console.log('Runtime fixture: encrypted SQL with trusted CA, hostname rejection and untrusted CA rejection pass');
   docker('exec', backend, 'python', '-c',
     'from pathlib import Path; import base64; Path("/app/media/fixture.png").write_bytes(base64.b64decode("iVBORw0KGgoAAAANSUhEUgAAAAEAAAADCAIAAADZSiLoAAAADUlEQVQIHWP4z8DwHwAFgAI/ScLbtAAAAABJRU5ErkJggg=="))');
   containers.add(frontend);
-  docker('run', '-d', '--name', frontend, ...common, '--stop-timeout', '45', '-p', '127.0.0.1::8080',
+  docker('run', '-d', '--name', frontend, ...common, '--network-alias', 'frontend', '--stop-timeout', '45', '-p', '127.0.0.1::8080',
     '--mount', 'type=volume,src=' + volumes[0] + ',dst=/var/www/media,readonly', frontendImage);
   const origin = port(frontend, 8080);
   await waitFor(async () => (await request(origin + '/api/health/ready/')).ok, 'edge readiness');
+  const edgeConfig = join(temporary, 'tls-edge.conf');
+  writeFileSync(edgeConfig, `server { listen 8080; return 308 https://localhost$request_uri; }
+    server { listen 8443 ssl; server_name localhost;
+      ssl_certificate /certificates/edge/server.crt; ssl_certificate_key /certificates/edge/server.key;
+      ssl_protocols TLSv1.2 TLSv1.3; add_header Strict-Transport-Security "max-age=300" always;
+      location / { proxy_set_header Host localhost; proxy_pass http://frontend:8080; }
+    }`);
+  containers.add(edge);
+  docker('run', '-d', '--name', edge, ...common, '-p', '127.0.0.1::8080', '-p', '127.0.0.1::8443',
+    '--mount', 'type=volume,src=' + volumes[3] + ',dst=/certificates,readonly',
+    '--mount', 'type=bind,src=' + edgeConfig + ',dst=/etc/nginx/conf.d/default.conf,readonly', frontendImage);
+  const tlsOrigin = port(edge, 8443).replace('http:', 'https:');
+  await waitFor(async () => (await secureRequest(tlsOrigin + '/api/health/ready/')).statusCode === 200, 'verified HTTPS ingress');
+  const tlsResponse = await secureRequest(tlsOrigin + '/api/auth/csrf/');
+  assert.equal(tlsResponse.statusCode, 200);
+  assert.equal(tlsResponse.headers['strict-transport-security'], 'max-age=300');
+  assert.ok(tlsResponse.headers['set-cookie'].some(cookie => /; Secure(?:;|$)/.test(cookie)));
+  const redirect = await request(port(edge, 8080) + '/api/health/ready/', { redirect: 'manual' });
+  assert.equal(redirect.status, 308);
+  assert.equal(redirect.headers.get('location'), 'https://localhost/api/health/ready/');
+  await assert.rejects(secureRequest(tlsOrigin + '/', { ca: undefined }));
+  await assert.rejects(secureRequest(tlsOrigin + '/', { servername: 'wrong.example.invalid' }), { code: 'ERR_TLS_CERT_ALTNAME_INVALID' });
+  console.log('Runtime fixture: trusted HTTPS, redirect/HSTS/Secure cookies and rejected CA/hostname pass');
   assert.equal(docker('exec', frontend, 'id', '-u'), '101');
   assert.ok((await request(origin + '/media/fixture.png')).ok);
   assert.ok((await request(origin + '/static/admin/css/base.css')).ok, 'WhiteNoise manifest is reachable');

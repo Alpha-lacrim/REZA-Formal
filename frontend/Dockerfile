@@ -15,6 +15,16 @@ RUN case "$VITE_API_BASE" in ""|"/api"|"/api/") ;; *) exit 1 ;; esac \
 
 FROM nginxinc/nginx-unprivileged:1.28-alpine@sha256:7377697a821c131a924a7105fafbe7414db4e9fcc77a6f08f776f33f141ec3f8
 
+# The pinned upstream image can lag security fixes in its Alpine release.
+# Update within that release, then scan/archive the resulting runtime image.
+USER 0:0
+ARG NGINX_PACKAGE_VERSION=1.28.3-r7
+# No dynamic modules are loaded by this application's Nginx configuration.
+# Replace the upstream-pinned packages with Alpine's maintained security build.
+RUN apk del nginx-module-geoip nginx-module-image-filter nginx-module-njs nginx-module-xslt \
+    && apk upgrade --no-cache \
+    && apk add --no-cache "nginx=${NGINX_PACKAGE_VERSION}"
+
 COPY nginx-main.conf /etc/nginx/nginx.conf
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html

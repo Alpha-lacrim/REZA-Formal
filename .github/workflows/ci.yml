@@ -77,10 +77,16 @@ jobs:
         with:
           python-version: '3.11.17'
       - run: python scripts/validate-production-config.py
+      - name: Validate workflow syntax and expressions locally
+        run: |
+          curl --fail --location --retry 3 https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_amd64.tar.gz -o "$RUNNER_TEMP/actionlint.tar.gz"
+          echo '8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8  '"$RUNNER_TEMP/actionlint.tar.gz" | sha256sum --check
+          tar -xzf "$RUNNER_TEMP/actionlint.tar.gz" -C "$RUNNER_TEMP" actionlint
+          "$RUNNER_TEMP/actionlint"
 
   containers:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 65
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
@@ -91,6 +97,8 @@ jobs:
           docker build -t reza-b10-backend:local backend
           docker build -t reza-b10-frontend:local frontend
       - name: Proxy regression gate
+        env:
+          NGINX_TEST_IMAGE: reza-b10-frontend:local
         run: node scripts/test-nginx-security.mjs
       - name: Isolated startup, shutdown, persistence and recovery drill
         run: node scripts/test-production-runtime.mjs
@@ -101,6 +109,12 @@ jobs:
           tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
       - name: Gate fixable high/critical runtime image vulnerabilities
         run: |
-          "$RUNNER_TEMP/trivy" image --timeout 15m --db-repository ghcr.io/aquasecurity/trivy-db:2 --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 reza-b10-backend:local
-          "$RUNNER_TEMP/trivy" image --timeout 15m --db-repository ghcr.io/aquasecurity/trivy-db:2 --scanners vuln --severity HIGH,CRITICAL --ignore-unfixed --exit-code 1 reza-b10-frontend:local
+          node scripts/scan-runtime-images.mjs --trivy "$RUNNER_TEMP/trivy"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: runtime-image-scans
+          path: .ops-reports/**/*.json
+          if-no-files-found: warn
+          retention-days: 14
       # Deliberately no login, image push, remote environment or deployment job.
