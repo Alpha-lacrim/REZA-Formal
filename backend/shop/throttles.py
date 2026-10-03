@@ -71,6 +71,17 @@ class RefreshRateThrottle(ScopedIPRateThrottle):
     scope = 'refresh'
 
 
+class NativeAdminLoginRateThrottle(ScopedIPRateThrottle):
+    scope = 'admin_login'
+
+
+class NativeAdminLoginAccountRateThrottle(ScopedIPRateThrottle):
+    scope = 'admin_login_account'
+
+    def get_ident(self, request):
+        return request.POST.get('username', '').strip().casefold()[:150]
+
+
 class RegisterRateThrottle(ScopedIPRateThrottle):
     scope = 'register'
 

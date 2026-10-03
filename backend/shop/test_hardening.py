@@ -15,7 +15,7 @@ from rest_framework.test import APIClient, APIRequestFactory
 from .models import Address, AuthSession, Order, SiteSettings, ThrottleBucket, User
 from .sessions import new_session
 from .test_product_media import png_bytes, upload
-from .throttles import LoginAccountRateThrottle, RegisterRateThrottle, client_ip
+from .throttles import LoginAccountRateThrottle, RegisterRateThrottle, NativeAdminLoginAccountRateThrottle, client_ip
 from .urls import urlpatterns
 
 
@@ -67,6 +67,18 @@ class SharedThrottleTests(TestCase):
         self.assertEqual(second.status_code, 429)
         self.assertGreater(int(second['Retry-After']), 0)
 
+    def test_native_admin_login_cannot_bypass_account_limits_by_changing_ip(self):
+        client = APIClient()
+        with patch.object(NativeAdminLoginAccountRateThrottle, 'get_rate', return_value='1/hour'):
+            first = client.post('/admin/login/', {'username': 'native-fixture', 'password': 'synthetic-invalid'}, REMOTE_ADDR='192.0.2.1')
+            second = client.post('/admin/login/', {'username': 'NATIVE-FIXTURE', 'password': 'synthetic-invalid'}, REMOTE_ADDR='192.0.2.2')
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 429)
+        self.assertGreater(int(second['Retry-After']), 0)
+        self.assertIn('no-store', second['Cache-Control'])
+        self.assertEqual(second['X-Frame-Options'], 'DENY')
+        self.assertNotIn('synthetic-invalid', second.content.decode())
+
     def test_cleanup_removes_only_expired_security_state(self):
         user = User.objects.create_user('cleanup', 'cleanup@example.invalid', 'Test-only-493!')
         new_session(user)
@@ -78,6 +90,70 @@ class SharedThrottleTests(TestCase):
         call_command('prune_security_state', stdout=StringIO())
         self.assertEqual(AuthSession.objects.count(), 1)
         self.assertEqual(list(ThrottleBucket.objects.values_list('key', flat=True)), ['active'])
+
+
+class AuthorizationMatrixTests(TestCase):
+    def setUp(self):
+        self.customer = User.objects.create_user('matrix-buyer', 'matrix@example.invalid', 'Test-only-493!')
+        self.staff = User.objects.create_user('matrix-staff', 'matrix-staff@example.invalid', 'Test-only-493!', is_staff=True)
+
+    def test_every_staff_route_checks_anonymous_customer_and_effective_staff(self):
+        import re
+        client = APIClient()
+        for entry in urlpatterns:
+            route = str(entry.pattern)
+            if not route.startswith('admin/'):
+                continue
+            url = '/api/' + re.sub(r'<int:[^>]+>', '1', re.sub(r'<str:[^>]+>', 'missing-record', route))
+            for method in entry.callback.cls.http_method_names:
+                if method in {'options', 'head'}:
+                    continue
+                for actor, expected in [(None, 401), (self.customer, 403), (self.staff, None)]:
+                    with self.subTest(route=route, method=method, actor='anonymous' if actor is None else actor.username):
+                        client.force_authenticate(actor)
+                        result = getattr(client, method)(url, {}, format='json')
+                        if expected:
+                            self.assertEqual(result.status_code, expected)
+                        else:
+                            self.assertNotIn(result.status_code, (401, 403, 500))
+
+    def test_public_write_routes_require_staff_and_profile_cannot_escalate(self):
+        client = APIClient()
+        for actor in (None, self.customer):
+            client.force_authenticate(actor)
+            for method, url in [('put', '/api/settings/'), ('post', '/api/products/missing/'),
+                                ('put', '/api/products/missing/'), ('delete', '/api/products/missing/')]:
+                self.assertEqual(getattr(client, method)(url, {}, format='json').status_code, 403)
+        client.force_authenticate(self.customer)
+        self.assertEqual(client.put('/api/auth/me/update/', {'role': 'admin', 'is_staff': True}, format='json').status_code, 200)
+        self.customer.refresh_from_db()
+        self.assertFalse(self.customer.is_admin())
+        client.force_authenticate(self.staff)
+        self.assertEqual(client.get('/api/auth/me/').data['role'], 'admin')
+        self.staff.refresh_from_db()
+        self.assertEqual(self.staff.role, 'user')
+
+    def test_other_customer_objects_cannot_be_read_changed_or_cancelled(self):
+        other = User.objects.create_user('other-buyer', 'other@example.invalid', 'Test-only-493!')
+        address = Address.objects.create(user=other, recipient_name='Other', phone='123', province='X', city='X', line1='X')
+        order = Order.objects.create(id='PRIVATE-ORDER', user=other, total=10)
+        client = APIClient()
+        client.force_authenticate(self.customer)
+        for method in ('get', 'put', 'delete'):
+            self.assertEqual(getattr(client, method)(f'/api/addresses/{address.pk}/', {}, format='json').status_code, 404)
+        self.assertEqual(client.get(f'/api/orders/{order.pk}/').status_code, 404)
+        self.assertEqual(client.post(f'/api/orders/{order.pk}/cancel/').status_code, 404)
+        self.assertEqual(client.post('/api/returns/', {'order_id': order.pk, 'item_ids': [], 'reason': 'other'}, format='json').status_code, 400)
+        self.assertEqual(client.get('/api/orders/my/').data['count'], 0)
+
+    def test_native_user_admin_does_not_allow_staff_to_elevate_accounts(self):
+        self.staff.user_permissions.add(*Permission.objects.filter(codename__in=['add_user', 'change_user', 'delete_user']))
+        request = APIRequestFactory().get('/admin/')
+        request.user = self.staff
+        model_admin = admin.site._registry[User]
+        self.assertFalse(model_admin.has_add_permission(request))
+        self.assertFalse(model_admin.has_change_permission(request, self.customer))
+        self.assertFalse(model_admin.has_delete_permission(request, self.customer))
 
 
 class SiteImageHardeningTests(TestCase):
@@ -125,3 +201,44 @@ class SiteImageHardeningTests(TestCase):
             response = self.client.put('/api/settings/', {'hero_image': upload(), 'about_image': upload()}, format='multipart')
         self.assertEqual(response.status_code, 400)
         decode.assert_not_called()
+
+
+class ProductionBoundaryTests(TestCase):
+    @override_settings(CORS_ALLOWED_ORIGINS=['https://shop.example.invalid'])
+    def test_cors_only_credentials_for_explicit_origin_and_headers_on_errors(self):
+        client = APIClient()
+        for origin, allowed in [('https://shop.example.invalid', True), ('https://evil.example.invalid', False)]:
+            response = client.get('/api/auth/me/', HTTP_ORIGIN=origin)
+            self.assertEqual(response.status_code, 401)
+            self.assertEqual(response.get('Access-Control-Allow-Origin'), origin if allowed else None)
+            self.assertIn('no-store', response['Cache-Control'])
+            self.assertEqual(response['X-Content-Type-Options'], 'nosniff')
+            self.assertEqual(response['X-Frame-Options'], 'DENY')
+            self.assertIn("frame-ancestors 'none'", response['Content-Security-Policy'])
+            self.assertIn('camera=()', response['Permissions-Policy'])
+
+    def test_health_does_not_disclose_failures_or_process_auth_tokens(self):
+        client = APIClient()
+        client.credentials(HTTP_AUTHORIZATION='Bearer synthetic-invalid')
+        self.assertEqual(client.get('/api/health/live/').data, {'status': 'ok'})
+        with patch('shop.health.connection.cursor', side_effect=RuntimeError('private diagnostic marker')):
+            result = client.get('/api/health/ready/')
+        self.assertEqual(result.status_code, 503)
+        self.assertEqual(result.data, {'status': 'unavailable'})
+
+    @override_settings(SECURE_HSTS_SECONDS=3600)
+    def test_django_hsts_only_on_verified_secure_requests(self):
+        client = APIClient()
+        self.assertNotIn('Strict-Transport-Security', client.get('/api/health/live/'))
+        self.assertIn('max-age=3600', client.get('/api/health/live/', secure=True)['Strict-Transport-Security'])
+
+
+class OriginConfigurationTests(SimpleTestCase):
+    def test_wildcards_credentials_paths_and_malformed_origins_fail_configuration(self):
+        from django.core.exceptions import ImproperlyConfigured
+        from reza_backend.settings import _trusted_origins
+        for origin in ['*', 'https://*.example.invalid', 'https://user:pass@example.invalid',
+                       'https://example.invalid/path', 'https://[invalid', 'https://example.invalid:bad', 'null']:
+            with self.assertRaises(ImproperlyConfigured):
+                _trusted_origins('ALLOWED_ORIGINS', origin)
+        self.assertEqual(_trusted_origins('ALLOWED_ORIGINS', 'https://shop.example.invalid'), ['https://shop.example.invalid'])

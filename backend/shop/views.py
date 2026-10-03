@@ -398,7 +398,7 @@ def product_detail(request, pk=None):
                 status=response_status,
             )
         
-        logger.warning('Product detail error: %s', serializer.errors)
+        logger.warning('Product validation rejected')
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
@@ -626,7 +626,7 @@ def admin_products(request):
             status=status.HTTP_201_CREATED,
         )
     
-    logger.warning('Product admin create error: %s', serializer.errors)
+    logger.warning('Product validation rejected')
     return Response(serializer.errors, status=400)
 
 @api_view(['GET','PUT','DELETE'])
@@ -664,7 +664,7 @@ def admin_product_detail(request, pk=None):
                     return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
                 return Response(AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data)
             
-            logger.warning('Product admin update error: %s', serializer.errors)
+            logger.warning('Product validation rejected')
             return Response(serializer.errors, status=400)
             
         except Product.DoesNotExist:

@@ -38,9 +38,9 @@ while True:
             conn.cursor().execute("SELECT 1")
         print("SQL Server is available", flush=True)
         sys.exit(0)
-    except Exception as exc:
+    except Exception:
         if time.time() >= deadline:
-            print(f"Timed out waiting for SQL Server: {exc}", file=sys.stderr, flush=True)
+            print("Timed out waiting for SQL Server; check database availability and configuration", file=sys.stderr, flush=True)
             sys.exit(1)
         print(".", end="", flush=True)
         time.sleep(2)

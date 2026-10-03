@@ -7,7 +7,7 @@ Server instance.
 import os
 
 
-os.environ.setdefault('DJANGO_SECRET_KEY', 'test-only-secret-key-that-is-not-for-production')
+os.environ.setdefault('DJANGO_SECRET_KEY', 'test-only-secret-key-for-isolated-tests-never-use-in-production-493')
 os.environ.setdefault('DEBUG', 'False')
 
 from .settings import *  # noqa: E402,F403
@@ -33,8 +33,8 @@ AUTH_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
-# Endpoint throttling is covered by focused tests. Keep the shared in-memory
-# throttle cache from making otherwise independent suite tests order-dependent.
+# Focused tests exercise real limits. Keep scoped DB counters and general cache
+# quotas high here so unrelated fixtures do not consume each other's quota.
 REST_FRAMEWORK = {
     **REST_FRAMEWORK,
     'DEFAULT_THROTTLE_RATES': {
@@ -43,6 +43,8 @@ REST_FRAMEWORK = {
         'user': '10000/min',
         'login': '10000/min',
         'login_account': '10000/min',
+        'admin_login': '10000/min',
+        'admin_login_account': '10000/min',
         'refresh': '10000/min',
         'register': '10000/min',
         'contact': '10000/min',
