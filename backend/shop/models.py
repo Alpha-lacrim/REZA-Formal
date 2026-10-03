@@ -40,6 +40,14 @@ class AuthSession(models.Model):
     revoked_at = models.DateTimeField(null=True, blank=True)
 
 
+class ThrottleBucket(models.Model):
+    """Shared fixed-window counters; identities are HMAC digests."""
+
+    key = models.CharField(max_length=64, primary_key=True)
+    count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(db_index=True)
+
+
 # Ensure any Django superuser is treated as admin (keeps role/is_staff in sync).
 from django.db.models.signals import post_save
 from django.dispatch import receiver

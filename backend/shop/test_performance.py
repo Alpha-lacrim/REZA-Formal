@@ -77,7 +77,9 @@ class PerformanceTests(TestCase):
                 response = client.post('/api/checkout/quote/', payload, format='json')
                 response.render()
             self.assertEqual(response.status_code, 200, response.data)
-            self.assertLessEqual(len(queries), 4)
+            # Persistent abuse controls add constant work independent of line
+            # count: at most five queries to create a window, two thereafter.
+            self.assertLessEqual(len(queries), 9 if size == 1 else 6)
             print(f'PERF quote-{size}: queries={len(queries)} bytes={len(response.content)}')
 
     def test_one_row_pages_and_single_cart_line_have_same_budgets(self):

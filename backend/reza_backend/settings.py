@@ -1,4 +1,5 @@
 import os
+import ipaddress
 from pathlib import Path
 import environ
 from datetime import timedelta
@@ -144,6 +145,7 @@ DATA_UPLOAD_MAX_MEMORY_SIZE = 50 * 1024 * 1024
 FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 
 REST_FRAMEWORK = {
+    'NUM_PROXIES': 0,
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'shop.auth.CookieJWTAuthentication',
         'shop.auth.SessionJWTAuthentication',
@@ -159,15 +161,27 @@ REST_FRAMEWORK = {
         'anon': '120/min',
         'user': '600/min',
         'login': '10/min',
+        'login_account': '20/hour',
+        'refresh': '60/min',
         'register': '5/hour',
         'contact': '10/hour',
         'checkout': '30/hour',
         'checkout_quote': '300/hour',
         'newsletter': '5/hour',
+        'review': '10/hour',
+        'bespoke': '10/hour',
+        'return': '20/hour',
     },
     # Optional: Increase Django REST Framework specific upload limits if needed
     # (Usually falls back to Django settings, but good to know)
 }
+
+TRUSTED_PROXY_CIDRS = env.list('TRUSTED_PROXY_CIDRS', default=[])
+try:
+    for cidr in TRUSTED_PROXY_CIDRS:
+        ipaddress.ip_network(cidr)
+except ValueError:
+    raise ImproperlyConfigured('TRUSTED_PROXY_CIDRS must contain IP networks') from None
 
 SIMPLE_JWT = {
     'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),

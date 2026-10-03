@@ -32,7 +32,6 @@ STORAGES = {
 AUTH_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
-GOOGLE_OAUTH_CLIENT_ID = 'test-client-id.apps.googleusercontent.com'
 
 # Endpoint throttling is covered by focused tests. Keep the shared in-memory
 # throttle cache from making otherwise independent suite tests order-dependent.
@@ -43,10 +42,15 @@ REST_FRAMEWORK = {
         'anon': '10000/min',
         'user': '10000/min',
         'login': '10000/min',
+        'login_account': '10000/min',
+        'refresh': '10000/min',
         'register': '10000/min',
         'contact': '10000/min',
         'checkout': '10000/min',
         'checkout_quote': '10000/min',
         'newsletter': '10000/min',
+        'review': '10000/min',
+        'bespoke': '10000/min',
+        'return': '10000/min',
     },
 }

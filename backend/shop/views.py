@@ -39,7 +39,7 @@ from django.db.models import Case, Count, DecimalField, F, Q, Sum, Value, When
 from django.db.models.fields.json import KeyTextTransform
 from django.db.models.functions import Cast, Coalesce
 from django.utils.dateparse import parse_date
-from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
+from .throttles import ContactRateThrottle, LoginRateThrottle, LoginAccountRateThrottle, RegisterRateThrottle, RefreshRateThrottle
 from .auth import enforce_csrf
 from .sessions import new_session, revoke_cookies, revoke_token, rotate_session
 from .commerce_services import CommerceError
@@ -264,6 +264,7 @@ def login(request):
         # Enrollment, replay protection and recovery were never implemented.
         # Fail closed for legacy MFA-marked accounts instead of bypassing MFA.
         return Response({'detail': 'This sign-in method is unavailable.', 'code': 'feature_unavailable'}, status=503)
+@throttle_classes([RefreshRateThrottle])
     revoke_cookies(request.COOKIES)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': serialize_user(user)})
