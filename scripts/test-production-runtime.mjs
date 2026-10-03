@@ -91,6 +91,12 @@ try {
     'Backend runtime must not retain setuid/setgid executables');
   console.log('Runtime fixture: no setuid/setgid executables in backend runtime');
   docker('network', 'create', network); createdNetwork = true;
+  // Let Docker select an unused subnet, then configure it explicitly. Engines
+  // on Linux require explicit IPAM before the DNS drill can reserve the old IP.
+  const subnet = JSON.parse(docker('network', 'inspect', '--format', '{{json .IPAM.Config}}', network))[0].Subnet;
+  assert.match(subnet, /^\d+\.\d+\.\d+\.\d+\/\d+$/);
+  docker('network', 'rm', network); createdNetwork = false;
+  docker('network', 'create', '--subnet', subnet, network); createdNetwork = true;
   for (const name of volumes) { docker('volume', 'create', name); createdVolumes.push(name); }
   // Model a root-owned legacy volume, then make and verify a recovery archive
   // before permissions change. Never mount an existing application volume.
@@ -230,6 +236,7 @@ try {
   const blocker = prefix + '-old-address'; containers.add(blocker);
   docker('run', '-d', '--name', blocker, '--network', network, '--ip', oldIp, '--entrypoint', 'sleep', frontendImage, '300');
   configureBackend(false); startBackend();
+  assert.notEqual(Object.values(JSON.parse(docker('inspect', '--format', '{{json .NetworkSettings.Networks}}', backend)))[0].IPAddress, oldIp);
   await waitFor(async () => (await request(origin + '/api/health/ready/')).ok, 'DNS rediscovery', 90_000);
   assert.ok((await request(origin + '/media/fixture.png')).ok);
   assert.ok((await request(origin + '/static/admin/css/base.css')).ok);
