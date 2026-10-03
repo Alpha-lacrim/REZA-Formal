@@ -3,8 +3,16 @@ dist
 build
 .env
 .env.local
+.env.*
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 README.md
+coverage
+playwright-report
+test-results
+*.pem
+*.key
+*.pfx
+*.p12

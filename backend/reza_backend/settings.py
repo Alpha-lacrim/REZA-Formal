@@ -5,6 +5,7 @@ import environ
 from datetime import timedelta
 from django.core.exceptions import ImproperlyConfigured
 from urllib.parse import urlsplit
+from .observability import logging_config
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
 ]
 
 MIDDLEWARE = [
+    'reza_backend.observability.RequestLogMiddleware',
     'corsheaders.middleware.CorsMiddleware',
     'django.middleware.security.SecurityMiddleware',
     'shop.middleware.SecurityResponseMiddleware',
@@ -127,6 +129,8 @@ USE_TZ = True
 
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+FILE_UPLOAD_PERMISSIONS = 0o644
+FILE_UPLOAD_DIRECTORY_PERMISSIONS = 0o755
 MEDIA_URL = env('MEDIA_URL', default='/media/')
 media_root = Path(env('MEDIA_ROOT', default=str(BASE_DIR / 'media')))
 MEDIA_ROOT = media_root if media_root.is_absolute() else BASE_DIR / media_root
@@ -251,3 +255,8 @@ SECURE_HSTS_INCLUDE_SUBDOMAINS = env.bool('SECURE_HSTS_INCLUDE_SUBDOMAINS', defa
 SECURE_HSTS_PRELOAD = env.bool('SECURE_HSTS_PRELOAD', default=False)
 if env.bool('TRUST_X_FORWARDED_PROTO', default=False):
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+LOG_LEVEL = env('LOG_LEVEL', default='INFO').strip().upper() or 'INFO'
+if LOG_LEVEL not in {'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'}:
+    raise ImproperlyConfigured('LOG_LEVEL must be DEBUG, INFO, WARNING, ERROR, or CRITICAL')
+LOGGING = logging_config(LOG_LEVEL)

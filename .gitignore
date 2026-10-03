@@ -41,6 +41,13 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 cookies*.txt
+*.pem
+*.key
+*.pfx
+*.p12
+*.bak
+*.trn
+backups/
 tmp_*.py
 
 # Local deployment/tool state and archives

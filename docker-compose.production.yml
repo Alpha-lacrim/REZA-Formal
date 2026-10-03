@@ -1,0 +1,49 @@
+# Reviewable self-hosted template, never an automatic deployment command.
+# Combine with docker-compose.yml using Compose >= 2.24.4.
+# Each environment MUST use its own project name, env file and volumes.
+services:
+  db:
+    container_name: !reset null
+    ports: !reset []
+    environment:
+      MSSQL_PID: "${PRODUCTION_MSSQL_PID:?Owner must choose a licensed production SQL edition}"
+
+  backend:
+    container_name: !reset null
+    ports: !reset []
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    environment:
+      DEBUG: "False"
+      DB_AUTO_CREATE: "false"
+      RUN_MIGRATIONS: "false"
+      RUN_SEED_DATA: "false"
+      RUN_COLLECTSTATIC: "false"
+      DJANGO_SUPERUSER_EMAIL: ""
+      DJANGO_SUPERUSER_PASSWORD: ""
+      ALLOWED_HOSTS: "${PRODUCTION_ALLOWED_HOSTS:?Set exact production hosts, including internal probe hosts}"
+      ALLOWED_ORIGINS: ""
+      CSRF_TRUSTED_ORIGINS: "${PRODUCTION_CSRF_TRUSTED_ORIGINS:?Set exact HTTPS storefront origins}"
+      DB_USER: "${PRODUCTION_DB_USER:?Provision a restricted runtime database login}"
+      DB_PASSWORD: "${PRODUCTION_DB_PASSWORD:?Provide the runtime database login secret}"
+      DB_ENCRYPT: "yes"
+      DB_TRUST_SERVER_CERTIFICATE: "no"
+      AUTH_COOKIE_SECURE: "True"
+      SESSION_COOKIE_SECURE: "True"
+      CSRF_COOKIE_SECURE: "True"
+      # This Nginx receives plain HTTP on a PRIVATE loopback ingress socket.
+      # TLS ingress redirects externally; Django must not create redirect loops.
+      TRUST_X_FORWARDED_PROTO: "False"
+      SECURE_SSL_REDIRECT: "False"
+      SECURE_HSTS_SECONDS: "0"
+      SECURE_HSTS_INCLUDE_SUBDOMAINS: "False"
+      SECURE_HSTS_PRELOAD: "False"
+
+  frontend:
+    container_name: !reset null
+    ports: !override
+      - "127.0.0.1:${FRONTEND_PORT:-3000}:8080"
+    build:
+      args:
+        VITE_API_BASE: /api

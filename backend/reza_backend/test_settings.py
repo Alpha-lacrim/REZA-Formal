@@ -33,6 +33,10 @@ AUTH_COOKIE_SECURE = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 
+# Expected negative API cases should not flood test output. Focused logging
+# assertions explicitly enable their own capture level.
+LOGGING = logging_config('CRITICAL')
+
 # Focused tests exercise real limits. Keep scoped DB counters and general cache
 # quotas high here so unrelated fixtures do not consume each other's quota.
 REST_FRAMEWORK = {
