@@ -1,17 +1,23 @@
 # Backend API contracts and schema decision
 
-Batch 4, 2026-09-30. The project remains a Django modular monolith. Routes in
+Established in Batch 4, 2026-09-30; reconciled through Batch 12, 2026-10-04.
+The project remains a Django modular monolith. Routes in
 `backend/shop/urls.py`, request/read serializers and `frontend/services/api.ts`
-are the executable contract. No database migration or provider integration is introduced.
+are the executable contract. This document introduces no schema/provider change;
+[FINAL_REVIEW](audit/FINAL_REVIEW.md) records remaining contract and rollout limits.
 
 ## Boundaries
 
 - `commerce_services.py` owns checkout, money limits and order/payment/return transitions.
 - `product_services.py` owns the atomic product/variant/ledger/media write orchestration.
   Views parse aliases and multipart files, validate serializers, authorize staff, invoke
-  the service and map errors. Both staff and public-detail compatibility mutations use it.
+  the service and map errors. Staff and public-detail compatibility creation/updates
+  use it; authorized catalog DELETE paths use Django's ORM collector directly.
+  Snapshot SET_NULL and retained media/deleted-variant semantics remain documented
+  in DATABASE_PERFORMANCE, with mixed deletion/write races still DB-002 coverage work.
 - `subscription_services.py` owns normalized, idempotent subscribe/reactivate transactions.
-- `selectors.py` contains only the reused product aggregate/variant and order read graphs.
+- `site_services.py` stages rollback-safe site settings/image writes using the shared decoder.
+- `selectors.py` contains the reused product aggregate/variant, order and return read graphs.
   Product approved review count/average and variant loading use two queries for 1 or 100 products.
   Simple endpoint queries remain in their views. Existing cart/address/return creation
   transactions are retained for incremental follow-up, not broadly rewritten.
@@ -25,7 +31,11 @@ media; variants and inventory-version input are parsed separately and enforced b
 Database additions cannot automatically expand these contracts. Contact/settings/account
 fields are also explicit. Commerce order reads and checkout writes remain separate.
 
-Public product arrays retain their shape. Only active products are publicly readable.
+Public product lists now return paginated compact `ProductCardSerializer` records
+with filters/search/sort/IDs; detail returns `PublicProductReadSerializer` and staff
+pages return full admin records. Legacy arrays remain understood by the frontend
+for deployment overlap; deploy the coordinated client/server page contract.
+Only active products are publicly readable.
 Staff catalog includes inactive products and requires authentication plus `user.is_admin()`
 (custom admin role or Django staff flag). Both mutation routes retain the same staff guard;
 native commerce admin remains inspection-only. Product stock/variant edits still require
@@ -53,12 +63,13 @@ results array. All pages have deterministic primary-key tie breakers; this is of
 pagination, not a frozen snapshot across concurrent inserts/deletes. Links are relative
 API URLs and preserve query parameters. Existing commerce collections use the same helper.
 
-The four existing staff adapter methods load successive numeric pages at size 100,
-normalize each record and reject the complete load if any page fails or repeats invalid
-metadata. Legacy arrays remain readable for deployment overlap. This prevents silent
-truncation without redesigning the admin/global catalog UI in this batch. API responses
-are bounded, but browser memory and total fetching are still proportional to the
-collection; server-driven screen pagination remains PERF-002/FE-005 follow-up.
+Staff screens now request filtered eight-row server pages; customer orders/returns
+and public reviews also expose paging controls. The older array-returning staff
+helpers return at most a 100-record compatibility preview, not a complete collection.
+Selected cart/wishlist metadata is fetched by product ID beyond the preview; no
+admin screen should rely on a preview as a complete staff catalog. FE-005 is addressed.
+PERF-002 remains partial for whole saved-account collections and historical inline
+media; see [measured contracts](DATABASE_PERFORMANCE.md).
 
 ## Validation and errors
 
@@ -103,7 +114,7 @@ DRF project without a framework rewrite.
 
 Adoption gate: annotate supported routes/methods, request/response media types, aliases,
 page/error envelopes, cookie/header auth and CSRF semantics; distinguish unsupported online
-payment (503), OTP delivery (501), and conditional Google auth; validate generation in CI
+payment (503), OTP/Google (501), and fail-closed legacy MFA; validate generation in CI
 and compare schema examples with actual response/permission tests before publishing.
 No new schema dependency, schema endpoint or generated client is presented as authoritative
 by this batch. Frontend DTO strictness remains ARCH-003/TEST-002 follow-up.

@@ -17,6 +17,8 @@ Batch 1 established documentation and evidence only. Its original source/probe o
 | [Testing/CI/operations](TESTING_CI_AUDIT.md) | Exact baseline commands/results, test inventory, reproducible probes and infrastructure gaps |
 | [UX/accessibility/SEO](UX_A11Y_SEO_AUDIT.md) | Static markup/RTL/routing/metadata review and limits |
 | [Dead code/debt](DEAD_CODE_DEBT.md) | Routed versus retained compatibility implementations and removal preconditions |
+| [Final review](FINAL_REVIEW.md) | Current system, all residual priorities/owners, verification and production blockers as of 2026-10-04 |
+| [Historical roadmap](PROGRAM_ROADMAP_HISTORY.md) | Original batch sequencing and dated updates preserved at closeout |
 | [Roadmap](../ROADMAP.md) | Priority, dependencies, acceptance gates and owner decisions |
 | [Program](../CODEX_PROGRAM.md) | Batch/Git tracking |
 | [Handoff](../../Handoff.md) | Chronological session record |
@@ -33,6 +35,16 @@ File/function line references describe the unchanged application baseline. A fin
 Severity is remediation priority, **not confidence or a vulnerability scanner's severity**. Confidence is High (direct code/probe evidence for stated behavior) or Medium (credible conditional mechanism requiring target-environment verification). All records were Open at Batch 1; current status is in the register. Architectural size/coupling is not classified as a confirmed application defect.
 
 **43 findings: P0 0; P1 8; P2 33; P3 2.** P1 entries include DB-002 (unverified SQL concurrency risk) and TEST-003 (coverage gap); do not report all P1 entries as reproduced bugs. No production incident or successful deployed exploit was demonstrated.
+
+**Batch 12 final review (2026-10-04): 15 remaining open/partial records: P0 0,
+P1 2, P2 13, P3 0; 28 addressed/contained at their recorded source scope.**
+Remaining IDs: ARCH-003, BE-009, FE-006, DB-001/002/003, SEC-005, PERF-002,
+TEST-002/003, OPS-002/003/004 and UX-001/002. FE-006 includes the open price-change
+policy despite implemented race guards; disabled SEC-004 is contained, not a
+completed identity integration. Rollout/owner obligations on fixed records remain
+in [FINAL_REVIEW](FINAL_REVIEW.md). Fresh image scan completes with 44 unfixed
+backend HIGHs across eight IDs and blocks release under OPS-002; scanner severity
+does not renumber/reclassify original audit priorities. Program is partially complete.
 
 ## Supplied hypotheses: verdicts
 

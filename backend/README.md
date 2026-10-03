@@ -15,7 +15,7 @@ Use the project-tested Python 3.11/3.12 baseline. The Docker image uses 3.11 and
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 python -m pip check
 ```
 
@@ -40,7 +40,7 @@ Use an available Python 3.11/3.12 executable, then:
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 ```
 
 The Microsoft ODBC driver still must be installed through the operating system.
@@ -71,6 +71,8 @@ Google/OTP endpoints return 501; legacy MFA-marked accounts fail closed rather t
 Run the hermetic backend tests without connecting to the configured SQL Server:
 
 ```powershell
+python manage.py check --settings=reza_backend.test_settings
+python manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings
 python manage.py test --settings=reza_backend.test_settings
 ```
 
@@ -83,7 +85,7 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
-The repository CI runs these checks plus frontend type/build checks and Compose validation. Provider sandbox/browser automation still belongs in the deployment pipeline once providers are selected.
+The repository CI runs isolated checks plus frontend lint/tests/type/build, Compose and disposable container/recovery/security gates. Browser/SQL integration lanes are separately dispatched; see [TESTING](../docs/TESTING.md). External provider sandbox evidence remains pending provider selection. The strict image release gate currently blocks the backend; see [FINAL_REVIEW](../docs/audit/FINAL_REVIEW.md).
 
 ## Docker
 

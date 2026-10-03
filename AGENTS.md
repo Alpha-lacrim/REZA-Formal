@@ -17,6 +17,7 @@ If several agents work in parallel, the primary agent owns `Codex.md`, `AGENTS.m
 - `Codex.md` is the durable project map: architecture, important files, data flows, configuration names, commands, and stable implementation constraints. Update it whenever those facts change. It is not a chronological changelog.
 - `Handoff.md` is the chronological session record. Every session must state what changed, what was verified, what remains incomplete, and what the repository owner must do. Keep the newest entry first and never silently drop an unresolved item.
 - `AGENTS.md` is this operating contract. Update it if the maintenance workflow, required checks, or responsibilities of the other two files change.
+- `docs/CODEX_PROGRAM.md` owns remediation status and Git provenance; `docs/audit/` preserves findings and historical evidence; `docs/adr/` records consequential decisions; `docs/ROADMAP.md` owns remaining future work. Keep these roles distinct when reconciling documentation.
 
 ## Working rules
 
@@ -27,6 +28,7 @@ If several agents work in parallel, the primary agent owns `Codex.md`, `AGENTS.m
 - Prices and stock must remain server-authoritative. Order writes and stock restoration must be transactional.
 - Do not expose development credentials in UI or documentation. Production secrets belong only in ignored environment files or the deployment platform's secret store.
 - Do not rewrite Git history, delete persistent data, remove volumes, or rotate external credentials without explicit owner approval. Redact a tracked secret from the current tree and report the required rotation/history cleanup instead.
+- Remediation integration belongs on `codex/remediation-program` as a candidate for human review into main. Preserve main during automatic integration. Record failing release gates and unobserved hosted CI separately from successful local functional checks; never label a partially remediated program production-ready.
 - Use `apply_patch` for hand-edited files, keep changes scoped, and avoid committing generated output, local environments, uploaded media, cookie jars, or ad-hoc debug artifacts.
 
 ## Expected verification

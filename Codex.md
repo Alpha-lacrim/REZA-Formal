@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-04 (Batch 12 candidate combines Batch 11 UX and Batch 10 Debian 13/runtime-security follow-up; final review in progress)
+Last verified: 2026-10-04 (Batch 12 architecture review; full frontend/browser/SQLite/SQL/proxy/runtime checks; completed image scan blocks release)
 
 ## Purpose and product
 
@@ -8,7 +8,12 @@ REZA Formal is a Persian-first, RTL e-commerce site for formal menswear. It has 
 
 This file contains durable project context for later coding sessions. Put chronological work notes in `Handoff.md`, and put session behavior rules in `AGENTS.md`.
 
-The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.md](docs/audit/AUDIT_INDEX.md). [docs/ROADMAP.md](docs/ROADMAP.md) owns batch sequencing and decision gates; [docs/CODEX_PROGRAM.md](docs/CODEX_PROGRAM.md) owns program/Git provenance. Keep detailed findings out of this project map.
+The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.md](docs/audit/AUDIT_INDEX.md). [docs/audit/FINAL_REVIEW.md](docs/audit/FINAL_REVIEW.md) owns the current closeout findings/evidence and no-further-refactor boundaries. [docs/ROADMAP.md](docs/ROADMAP.md) owns remaining future work; its previous batch plan is preserved in audit history. [docs/CODEX_PROGRAM.md](docs/CODEX_PROGRAM.md) owns program status/Git provenance. Keep detailed findings out of this project map.
+
+The remediation program is partially complete. `codex/remediation-program` is the
+human-review candidate; automatic integration never updates main. Functional and
+disposable operations success does not clear the strict runtime-image release
+blocker or grant production approval. No new Batch 12 application migration exists.
 
 ## Repository boundaries
 

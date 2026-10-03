@@ -1,5 +1,12 @@
 # Dead code and compatibility debt
 
+Batch 12 revalidation (2026-10-04): [FINAL_REVIEW](FINAL_REVIEW.md#second-order-debt-and-deletion-proof)
+records current call-site/key/route evidence and retained artifacts. No runtime
+artifact is deleted at closeout. The table below is the **original Batch 1 inventory**:
+its import locations, conditional Google path and removal preconditions are historical.
+Batch 4 removed the unrouted handlers/UserSerializer; Batch 9 disabled identity routes;
+the live fallback now belongs to state/remote.ts. Dated evidence supersedes those rows.
+
 Batch 9 revalidation (2026-10-03): Google issuance/linking helpers, pyotp/google-auth dependencies and the incomplete frontend MFA challenge are removed. Routed Google/OTP return 501; preserved legacy MFA markers fail closed at password login. Native admin login is throttled. See [current security policies](../SECURITY_HARDENING.md). The inventory below preserves earlier reachability evidence.
 
 See [architecture](ARCHITECTURE_AUDIT.md) for live boundaries. Reachability was checked against repository routes, imports, client call sites and tests, not inferred from names.

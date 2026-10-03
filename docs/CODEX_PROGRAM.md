@@ -6,19 +6,55 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 11 UX/browser/metadata verified; assistive and SEO/production rollout gates remain |
+| Program status | Partially complete - final source review finished; 15 original findings remain; production release blocked |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 11 - UX, accessibility, RTL and SEO |
-| Batch status | Targeted source/browser scope verified; HashRouter retained through ADR 0001; no deployment |
-| Batch branch | `codex/batch-11-ux-a11y-seo` |
-| Batch start commit | `a2865f5` (clean Batch 10 follow-up head) |
-| Final batch / integration merge | Final local head: `git rev-parse codex/batch-11-ux-a11y-seo`; no integration merge/push |
-| Audit IDs handled | UX-001 partial (assistive review pending); UX-002 partial (domain/rendering/routing/sitemap rollout); UX-003 addressed in client |
-| Verification performed | 80 frontend cases, 16 Chrome/axe journeys, 166 isolated SQLite cases (12 SQL-only skips), lint/typecheck/build/Compose/npm gates; prior operations/SQL evidence retained |
-| Remaining risks | 63 unfixed backend HIGH/CRITICAL package findings across 23 advisory IDs, hosted CI, actual TLS/IP trust, SQL certificate/license/grants/capacity, legacy volume preparation, real backup objectives, expiring build advisory and historical secrets/financial/provider work |
-| Next batch | Batch 12 - final review; not started |
+| Current batch | Batch 12 - final architecture review and program closeout |
+| Batch status | Review/docs and functional/SQL/browser/operations verification complete; image release gate fails as documented; integration/publication recorded below |
+| Batch branch | `codex/batch-12-final-review` |
+| Batch start commit | `31e72ea` (clean Batch 11 head); integration initially `db565f6` |
+| Final batch / integration merge | Resolve final batch and integration refs; closeout provenance below |
+| Audit IDs handled | All 43 reassessed; 28 addressed/contained at recorded scope, 15 open/partial (P0 0, P1 2, P2 13, P3 0) |
+| Verification performed | 80 frontend cases, 16 Chrome/axe journeys, SQLite 154 pass/12 deliberate skips, SQL 166/166, lint/typecheck/build/check/drift, both images, proxy/runtime/restore/TLS, configuration/dependency/policy/actionlint gates |
+| Remaining risks | 44 unfixed backend HIGHs across eight advisory IDs (zero CRITICAL); strict image gate blocks release. Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, hosted CI, historical secrets/financial/provider work and expiring build advisory remain |
+| Next batch | No automatic next batch; owner-reviewed follow-up milestones in ROADMAP; human PR into main |
+
+## Batch 12 - Final review and closeout (2026-10-04)
+
+- [FINAL_REVIEW](audit/FINAL_REVIEW.md) maps all system owners, compares the original
+  audit, records remaining severities/owner decisions/retained tradeoffs and gives
+  explicit boundaries against further speculative refactoring. No runtime artifact
+  was deleted, no new abstraction/schema/dependency introduced and no production
+  system or application volume modified.
+- Branch created at clean Batch 11 `31e72ea`; startup log `ec683d7`. Merge `be915be`
+  preserves Batch 10 follow-up `82a9459` and Batch 11 history, resolving only
+  continuity/program documentation conflicts. Batches 9–11 are included in the
+  resulting application tree. The separate operations worktree remains intact.
+- Rerun results: frontend 9 Node + 71 Vitest, 16 real-Django/synthetic-read-stress
+  Chrome/axe journeys; SQLite 166 discovered/154 pass/12 deliberate SQL skips;
+  full disposable SQL 166/166 (157.427s), check and drift; locked image builds,
+  proxy/TLS/ownership/restart/SQL+media recovery and synthetic configuration gates.
+  Runtime npm/Python advisory reports are clear; full npm retains five exact
+  temporary build-only entries. Actionlint and three strict image-policy cases pass.
+- Fresh full image scan completes, rather than failing to download: backend 44
+  unfixed HIGH package findings across eight IDs, zero CRITICAL; frontend zero
+  findings. Strict release gate exits 1. Integration of the reviewed candidate
+  carries that visible blocker; it does not accept risk or approve deployment.
+- Documentation roles reconciled: operating contract in AGENTS, durable map in
+  Codex, chronological Handoff, this control board, historical/canonical audit,
+  routing ADR and remaining ROADMAP. Previous roadmap updates remain in
+  [PROGRAM_ROADMAP_HISTORY](audit/PROGRAM_ROADMAP_HISTORY.md). All unresolved
+  historical rollout, provider, secret and financial obligations remain.
+- Program is **partially complete**, not fully remediated: DB-002/TEST-003 P1
+  evidence remains; 13 P2 records retain explicit closure gates. Local source
+  verification does not establish deployed production safety or hosted CI success.
+
+### Batch 12 integration and publication
+
+Pending final documentation/whitespace/status/ref review, then the authorized
+non-fast-forward merge into `codex/remediation-program` and normal push of batch
+and integration refs. No main/dev/stash update, force push or deployment.
 
 ## Batch 11 - UX, accessibility, RTL and SEO (2026-10-03)
 

@@ -1,5 +1,12 @@
 # Security audit
 
+Batch 12 (2026-10-04): current npm production and resolved Python hash-lock scans
+report no known vulnerabilities; five exact build-only npm entries still expire
+2026-11-02. Completed runtime-image scanning is separate: backend 44 unfixed HIGHs
+across eight IDs blocks release under OPS-002; frontend reports zero findings.
+No VEX/exception is approved. [FINAL_REVIEW](FINAL_REVIEW.md) records current
+verification and retained historical credential/media/deployment obligations.
+
 ## Batch 9 revalidation - 2026-10-03
 
 SEC-002/SEC-003 and FE-008 are fixed in the application; SEC-004 exposed identity

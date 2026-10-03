@@ -1,5 +1,15 @@
 # Testing, CI and operations audit
 
+## Batch 12 verification - 2026-10-04
+
+[FINAL_REVIEW](FINAL_REVIEW.md#verification-and-ci-coverage) records the final combined
+candidate: frontend 80 cases, Chrome/axe 16/16, SQLite 154 pass/12 explicit SQL skips,
+SQL Server 166/166 plus check/drift, both image builds, proxy/runtime/TLS/restore and
+configuration/dependency/actionlint gates pass. The full image scan completes but
+strict release policy fails on 44 unfixed backend HIGHs (zero CRITICAL), across eight
+IDs; frontend scan is clear. Hosted CI, production provisioning/capacity/recovery
+and wider mixed SQL schedules remain unverified. Earlier dated results are history.
+
 ## Batch 9 verification - 2026-10-03
 
 Full disposable SQL Server: 161/161, zero skips (46.458s); SQLite: 161 cases, 149 pass/12 SQL skips (11.754s). Frontend 9 Node + 69 Vitest, lint/type/build and four Chrome journeys pass. Ten real Nginx status/header/media cases plus two spoofed forwarding probes pass; native admin account/IP throttle negative passes. Production npm/resolved Python advisory reports are clear; full npm retains five dev-only high entries under an exact gate expiring 2026-11-02. PR/push/weekly/manual security workflow added; hosted CI/image OS scans and actual TLS ingress remain unverified. See [security evidence and rollout](../SECURITY_HARDENING.md) and Handoff for iterations/provenance.

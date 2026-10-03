@@ -2,6 +2,12 @@
 
 REZA Formal is a full-stack Persian/RTL commerce site for formal menswear. It combines a React/Vite storefront with a Django REST API, Microsoft SQL Server persistence, CSRF-protected cookie JWT authentication, and a health-checked Docker stack.
 
+The remediation candidate is `codex/remediation-program`, for human review into
+main. [Final architecture review](docs/audit/FINAL_REVIEW.md) records the current
+system and verification; [remaining roadmap](docs/ROADMAP.md) owns follow-up work.
+The program is partially complete and production release remains blocked by the
+runtime-image advisory gate and owner deployment obligations.
+
 The provider-free store is functional with product variants and inventory history, saved carts and wishlists, structured addresses, server-priced quotes, coupons and shipping methods, idempotent COD/manual checkout, payment and fulfillment state, immutable order snapshots, verified-purchase reviews, returns/refunds, bespoke leads, newsletters, policy pages, and customer/staff dashboards. Real online payments, carrier labels, and transactional email/SMS remain explicit provider integrations; the site never simulates those services as successful.
 
 ## Stack
@@ -55,7 +61,7 @@ Copy-Item .env.example .env
 # Edit .env with the local SQL Server connection and Django secret.
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 python manage.py migrate
 python manage.py seed_data
 python manage.py runserver

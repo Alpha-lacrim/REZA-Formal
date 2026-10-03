@@ -1,5 +1,10 @@
 # Backend audit
 
+Batch 12 (2026-10-04): [FINAL_REVIEW](FINAL_REVIEW.md) rechecks current writers and
+full SQLite/SQL suites. BE-009 remains a reproduced source-trace mismatch between
+generic allowed transitions and customer cancellation; no authority is widened.
+Original behavior/probes below remain historical; dated status/evidence prevails.
+
 See [architecture workflow traces](ARCHITECTURE_AUDIT.md), [database](DATABASE_AUDIT.md), [security](SECURITY_AUDIT.md) and [verification/probes](TESTING_CI_AUDIT.md). Descriptive observations are the historical Batch 1 baseline; canonical entries include dated Batch 2 fixes and regression results.
 
 ## Verified strengths and boundaries
