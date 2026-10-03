@@ -16,7 +16,7 @@ const db = prefix + '-db';
 const backend = prefix + '-backend';
 const frontend = prefix + '-frontend';
 const edge = prefix + '-tls-edge';
-const volumes = ['media', 'static', 'restored-media', 'certificates', 'legacy-restored'].map(name => prefix + '-' + name);
+const volumes = ['media', 'static', 'restored-media', 'certificates', 'legacy-restored', 'legacy-backup'].map(name => prefix + '-' + name);
 const backendImage = process.env.OPS_BACKEND_IMAGE || 'reza-b10-backend:local';
 const frontendImage = process.env.OPS_FRONTEND_IMAGE || 'reza-b10-frontend:local';
 const sqlImage = readFileSync(join(root, 'docker-compose.sql-test.yml'), 'utf8').match(/image: (\S+)/)[1];
@@ -101,16 +101,27 @@ try {
     '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--cap-add', 'FOWNER', '--cap-add', 'DAC_OVERRIDE',
     '--security-opt', 'no-new-privileges:true', '--entrypoint', 'python',
     '--mount', 'type=volume,src=' + volumes[0] + ',dst=/volume',
-    '--mount', 'type=bind,src=' + temporary + ',dst=/backup',
+    '--mount', 'type=volume,src=' + volumes[5] + ',dst=/backup',
     '--mount', 'type=bind,src=' + join(root, 'scripts/prepare-volume-ownership.py') + ',dst=/prepare.py,readonly',
     backendImage, '/prepare.py'];
   const preparation = JSON.parse(docker(...prepareArgs, '--apply'));
   assert.equal(JSON.parse(docker(...prepareArgs)).needs_preparation, 0);
-  const recoveryManifest = JSON.parse(readFileSync(join(temporary, preparation.recovery_id + '.json')));
+  // The maintenance tool deliberately writes root-only recovery files. Keep them
+  // in an owned Linux volume instead of reading them as the unprivileged CI host.
+  const recoveryManifest = JSON.parse(docker('run', '--rm', '--user', '0:0',
+    '--network', 'none', '--read-only', '--cap-drop', 'ALL', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[5] + ',dst=/backup,readonly', backendImage, '-c',
+    'from pathlib import Path; import stat,sys; p=Path("/backup")/sys.argv[1]; assert p.stat().st_uid==0; assert stat.S_IMODE(p.stat().st_mode)==0o600; print(p.read_text())',
+    preparation.recovery_id + '.json'));
   assert.ok(recoveryManifest.files['legacy/private.txt']);
+  docker('run', '--rm', '--user', '10001:10001', '--network', 'none', '--read-only',
+    '--cap-drop', 'ALL', '--entrypoint', 'python',
+    '--mount', 'type=volume,src=' + volumes[5] + ',dst=/backup,readonly', backendImage, '-c',
+    'from pathlib import Path; import sys\ntry:\n (Path("/backup")/sys.argv[1]).read_bytes()\nexcept PermissionError:\n raise SystemExit(0)\nraise SystemExit("Recovery manifest unexpectedly readable by application user")',
+    preparation.recovery_id + '.json');
   docker('run', '--rm', '--user', '0:0', '--entrypoint', 'tar',
     '--mount', 'type=volume,src=' + volumes[4] + ',dst=/volume',
-    '--mount', 'type=bind,src=' + temporary + ',dst=/backup,readonly', backendImage,
+    '--mount', 'type=volume,src=' + volumes[5] + ',dst=/backup,readonly', backendImage,
     '-xf', '/backup/' + preparation.recovery_id + '.tar', '-C', '/volume');
   docker('run', '--rm', '--user', '0:0', '--entrypoint', 'python',
     '--mount', 'type=volume,src=' + volumes[4] + ',dst=/volume,readonly', backendImage, '-c',
@@ -233,13 +244,17 @@ try {
   const rows = sql('SET NOCOUNT ON; SELECT COUNT(*) FROM reza_ops_fixture.dbo.django_migrations;');
   assert.equal(sql('SET NOCOUNT ON; SELECT COUNT(*) FROM reza_ops_restored.dbo.django_migrations;'), rows);
   assert.ok(Number(rows) > 10);
-  // Stream the archive; Docker Desktop cp can fail on read-only/tmpfs roots.
-  writeFileSync(join(temporary, 'media.tar'), execFileSync('docker',
-    ['exec', backend, 'tar', '-cf', '-', '-C', '/app/media', '.'],
-    { stdio: ['ignore', 'pipe', 'pipe'], timeout: 60_000 }));
-  docker('run', '--rm', '--entrypoint', 'tar',
+  // Keep this archive in the same owned backup volume too: a Linux runner's
+  // private temporary directory is not traversable by the application UID.
+  docker('run', '--rm', '--user', '0:0', '--network', 'none', '--read-only',
+    '--cap-drop', 'ALL', '--entrypoint', 'sh',
+    '--mount', 'type=volume,src=' + volumes[0] + ',dst=/app/media,readonly',
+    '--mount', 'type=volume,src=' + volumes[5] + ',dst=/backup', backendImage,
+    '-ec', 'umask 077; exec tar -cf /backup/media.tar -C /app/media .');
+  docker('run', '--rm', '--user', '0:0', '--network', 'none', '--read-only',
+    '--cap-drop', 'ALL', '--cap-add', 'CHOWN', '--cap-add', 'FOWNER', '--cap-add', 'DAC_OVERRIDE', '--entrypoint', 'tar',
     '--mount', 'type=volume,src=' + volumes[2] + ',dst=/app/media',
-    '--mount', 'type=bind,src=' + temporary + ',dst=/backup,readonly', backendImage,
+    '--mount', 'type=volume,src=' + volumes[5] + ',dst=/backup,readonly', backendImage,
     '-xf', '/backup/media.tar', '-C', '/app/media');
   const restored = docker('run', '--rm', '--entrypoint', 'python',
     '--mount', 'type=volume,src=' + volumes[2] + ',dst=/app/media', backendImage,

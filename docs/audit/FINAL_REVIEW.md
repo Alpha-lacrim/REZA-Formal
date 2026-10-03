@@ -3,8 +3,9 @@
 Reviewed 2026-10-04 (Asia/Tehran) on `codex/batch-12-final-review`.
 Verdict: **partially complete remediation; suitable as a human-review candidate,
 blocked for production release**. No P0 was established. Functional, database,
-browser and disposable operations checks pass; the image release gate correctly
-fails on 44 unfixed backend HIGH package findings. No risk exception was added.
+browser and disposable operations checks pass. A separately requested container
+follow-up clears the image gate on supported Alpine/ODBC artifacts; production
+owner obligations and 15 original findings remain. No risk exception was added.
 
 ## Scope and evidence
 
@@ -18,8 +19,10 @@ The clean starting application was Batch 11 `31e72ea`; integration still ended a
 Batch 8 `db565f6`. Batch 10's later `82a9459` security follow-up was merged without
 rewriting either branch at `be915be`. That candidate contains Batches 9, 10 and 11,
 including Debian 13, the stricter image gate and the UX work. Only documentation
-changes follow this tested application tree. Batch 12 adds no runtime abstraction,
-dependency, schema migration, persistence deletion or production change.
+changes follow that original tested application tree. The initial Batch 12 review
+adds no runtime abstraction, dependency, schema migration, persistence deletion or
+production change. The later requested container repair is recorded below and in
+[ADR 0002](../adr/0002-backend-runtime-base.md); earlier evidence remains historical.
 
 Final review commit `0a99f80` merged into `codex/remediation-program` at `ecb7867`;
 the merge tree equals the reviewed branch and includes all Batch 9–12 ancestors.
@@ -105,7 +108,7 @@ deployment gap under every repaired defect. Scanner severity is not audit priori
 | DB-003 / P2 | Legacy orders with no Payment remain readable and reject refunds; verified financial import/reconciliation and capability policy are absent. Never fabricate a paid record from an order total. | Finance/business owner, backend maintainer |
 | SEC-005 / P2 | Five exact dev-only npm advisory entries have a temporary gate expiring 2026-11-02 00:00 UTC. Runtime npm/Python scans are clear; runtime image findings are additionally tracked by OPS-002. | Dependency/security maintainer |
 | PERF-002 / P2 | Wishlist/address/saved-cart whole snapshots and historical inline media can remain large. Coordinate a bounded synchronization contract if measured usage requires it. | API/frontend maintainer |
-| OPS-002 / P2 | 44 backend HIGH package findings across eight IDs block release. Production SQL certificate/login/license, immutable artifact promotion, capacity and existing-volume permissions require owner evidence. | Security/release and infrastructure owners |
+| OPS-002 / P2 | Supported Alpine/ODBC artifacts clear the original image blocker. Production SQL certificate/login/license, immutable artifact promotion, capacity, arm64 validation if selected and existing-volume permissions require owner evidence. | Security/release and infrastructure owners |
 | OPS-003 / P2 | Actual TLS ingress, trusted client-IP chain, redirect/HSTS/cookies and per-location headers require deployed verification. Disposable checks do not establish the real topology. | Infrastructure/security owner |
 | OPS-004 / P2 | Real off-host backup schedule/retention/RPO/RTO, monitoring/alerts, finance recovery and selected provider/outbox delivery remain unprovisioned. | Operations/business/provider owners |
 | UX-001 / P2 | Keyboard/axe/RTL evidence exists; NVDA/VoiceOver/inclusive user review and wider real-device/browser/zoom coverage remain. | UX/accessibility owner |
@@ -124,8 +127,9 @@ The exact temporary build-only advisory exception is documented in
 [SECURITY_HARDENING](../SECURITY_HARDENING.md); it is neither indefinite nor a runtime
 release waiver. Independent tabs/devices retain last-write commerce semantics.
 
-**No blanket production risk acceptance is granted.** Backend image HIGHs have no
-approved VEX/exception and remain a release blocker. Historical exposed credential
+**No blanket production risk acceptance is granted.** Earlier Debian image HIGHs
+remain blocked without an approved VEX/exception; the tested supported replacement
+clears the policy with zero findings. Historical exposed credential
 revocation/history cleanup, legacy refund/payment/stock reconciliation, historical
 upload inspection, actual ingress/storage/backup/security rollout and hosted CI
 require owner evidence. A clean current tree or disposable restore cannot close them.
@@ -203,15 +207,55 @@ this run confirms the same residual IDs, not new vendor fix availability.
 Configured CI covers installs/checks/unit/build, Compose/workflow validation,
 locked images, proxy/recovery, dependencies and the strict image gate. Browser/SQL
 are separate manual lanes. Normal authorized branch pushes trigger configured
-workflows; no hosted outcome is claimed here. The current image gate is expected
-to block a release. There is no measured production load/capacity, universal SQL
+workflows; no hosted outcome was claimed by that initial review. The historical
+Debian image gate blocks a release. The container follow-up below supersedes that
+image and hosted evidence. There is no measured production load/capacity, universal SQL
 race proof, external provider integration or assistive-user certification.
+
+### Requested container CI follow-up (2026-10-04)
+
+GitHub push run `37159093982` and PR run `37159344315` on `77f1292` both failed
+before scanning images: Linux runner access to the maintenance tool's root-owned
+mode-0600 recovery manifest raised EACCES. Docker Desktop bind permissions had
+masked that boundary in the original local run. The fixture now keeps both legacy
+and media recovery archives in one uniquely owned Docker backup volume. Restricted
+containers verify root/mode preservation and denial to application UID 10001,
+then restore into NEW fixture volumes. Production permissions are unchanged.
+
+A fresh no-cache Debian rebuild reproduced all 44 HIGHs. The supported Alpine
+3.23/Python 3.11.17/ODBC 18.7.1.1 replacement uses the same 16-package hash lock,
+numeric UID, startup/storage/health contract and strict scanner policy.
+[ADR 0002](../adr/0002-backend-runtime-base.md) records Microsoft signature/checksum
+provenance, musl compatibility and the separate arm64 validation requirement.
+No advisory suppression, VEX waiver, unstable package or application migration
+was introduced. OPS-002 remains partial for actual production obligations.
+
+Final local builds use `--pull --no-cache`. Nginx probes, production configuration,
+build-input checks, actionlint, three image-policy cases and the complete final
+runtime/TLS/ownership/SQL+media recovery fixture pass. Built-image Django check and
+drift pass; SQLite discovers 166 cases, with 154 pass/12 intentional SQL-only skips
+(18.061s). Fresh full Trivy reports **zero advisories at every severity for both
+images**, exit 0. The final built image also passes disposable SQL check/drift and
+**166/166 tests, zero skips (39.364s)**. Hosted results follow publication.
+
+Full scan JSON/provenance: `.ops-reports/2026-10-03T23-01-55-283Z-d10fc3f8/`;
+official Docker Hub DB updated `2026-10-03T19:02:38Z`, downloaded
+`2026-10-03T23:02:37Z`. Summary identifies parent `77f1292` and a dirty worktree
+containing this pending fix. Final local selected Docker identities:
+
+- Backend: `sha256:904cbf6b37f248d83f321d9a9ad549305f955dcad938e46897af63b6d6ab98dd`.
+- Frontend: `sha256:befe0f3002e6a47383bf5b349b05a15f3daf0ed356e09d2e131f1a3c9b8de83b`.
+
+The program remains **partially complete**, with unchanged residual counts
+P0 0/P1 2/P2 13/P3 0. Clearing a container check is neither production acceptance
+nor evidence for the deferred owner policies, wider SQL schedules or real ingress,
+capacity and backup rollout. Main remains outside automatic integration.
 
 ## Production limitations and next 3–6 months
 
 1. **First month:** assign release/security/database/operations/business owners;
-   resolve image HIGHs through supported vendor fixes or independently reviewed
-   artifact-specific VEX before changing any policy. Retire the temporary build
+   preserve the supported-runtime fix and unchanged scan policy on immutable
+   artifacts. Retire the temporary build
    exception before 2026-11-02. Obtain hosted CI and branch-protection evidence.
 2. **Months 1–2:** characterize/fix BE-009 without widening permissions; prioritize
    DB-002/TEST-003 mixed SQL schedules and a documented lock order. Reconcile

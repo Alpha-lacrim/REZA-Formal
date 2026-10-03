@@ -7,8 +7,11 @@ candidate: frontend 80 cases, Chrome/axe 16/16, SQLite 154 pass/12 explicit SQL 
 SQL Server 166/166 plus check/drift, both image builds, proxy/runtime/TLS/restore and
 configuration/dependency/actionlint gates pass. The full image scan completes but
 strict release policy fails on 44 unfixed backend HIGHs (zero CRITICAL), across eight
-IDs; frontend scan is clear. Hosted CI, production provisioning/capacity/recovery
-and wider mixed SQL schedules remain unverified. Earlier dated results are history.
+IDs; frontend scan is clear. The subsequent requested container repair fixes Linux
+runner backup ownership and clears that image blocker with supported Alpine/ODBC
+artifacts under the unchanged policy; see FINAL_REVIEW for final and hosted evidence.
+Production provisioning/capacity/recovery and wider mixed SQL schedules remain
+unverified. Earlier dated results are history.
 
 ## Batch 9 verification - 2026-10-03
 

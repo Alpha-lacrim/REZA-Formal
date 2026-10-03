@@ -11,16 +11,39 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 12 - final architecture review and program closeout |
-| Batch status | Review/docs and functional/SQL/browser/operations verification complete; image release gate fails as documented; integration/publication recorded below |
+| Batch status | Review/docs complete; requested container CI repair clears the image gate on supported Alpine/ODBC artifacts; verification/publication recorded below |
 | Batch branch | `codex/batch-12-final-review` |
 | Batch start commit | `31e72ea` (clean Batch 11 head); integration initially `db565f6` |
 | Final batch / integration merge | Batch `0a99f80`; non-fast-forward integration merge `ecb7867`; documentation-only publication record follows on integration |
 | Audit IDs handled | All 43 reassessed; 28 addressed/contained at recorded scope, 15 open/partial (P0 0, P1 2, P2 13, P3 0) |
 | Verification performed | 80 frontend cases, 16 Chrome/axe journeys, SQLite 154 pass/12 deliberate skips, SQL 166/166, lint/typecheck/build/check/drift, both images, proxy/runtime/restore/TLS, configuration/dependency/policy/actionlint gates |
-| Remaining risks | 44 unfixed backend HIGHs across eight advisory IDs (zero CRITICAL); strict image gate blocks release. Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, hosted CI, historical secrets/financial/provider work and expiring build advisory remain |
+| Remaining risks | Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, arm64 validation if selected, hosted evidence, historical secrets/financial/provider work and expiring build advisory remain. Original Debian image blocker cleared without an exception |
 | Next batch | No automatic next batch; owner-reviewed follow-up milestones in ROADMAP; human PR into main |
 
 ## Batch 12 - Final review and closeout (2026-10-04)
+
+### Requested container CI repair
+
+- Starts from clean published candidate `77f1292`, fast-forwarding the required
+  Batch 12 branch. PR/push container failures are the same Linux EACCES reading
+  root-only recovery files, before image scanning. Owned Docker backup volumes
+  replace host-directory access; fixture checks root/mode preservation and denial
+  to the application UID. Production backups/data are untouched.
+- Fresh Debian no-cache rebuild reproduces the historical 44 HIGHs. Supported
+  Alpine 3.23/Python 3.11.17/ODBC 18.7.1.1 clears every image advisory with the
+  original dependency hash lock and unchanged strict policy. Both vendor APKs
+  were detached-signature verified before checksum pinning; [ADR 0002](adr/0002-backend-runtime-base.md)
+  records compatibility and arm64 limits. No application/schema redesign or waiver.
+- Both final no-cache builds, proxy/configuration/build-input/actionlint/policy,
+  runtime/TLS/ownership/recovery, built-image SQLite check/drift/full suite and
+  completed full image scan pass. Final built-image disposable SQL check/drift and
+  166/166 tests (zero skips, 39.364s) pass. Hosted outcomes/publication follow in
+  Handoff/[FINAL_REVIEW](audit/FINAL_REVIEW.md).
+- Residual counts remain 15 (P0 0/P1 2/P2 13/P3 0). OPS-002 still requires actual
+  production owners/artifact promotion/capacity/grants/volume evidence. Historical
+  review and scan results below remain intact.
+
+### Initial review
 
 - [FINAL_REVIEW](audit/FINAL_REVIEW.md) maps all system owners, compares the original
   audit, records remaining severities/owner decisions/retained tradeoffs and gives
@@ -37,7 +60,7 @@ pre-codex-remediation-2026-09-10
   proxy/TLS/ownership/restart/SQL+media recovery and synthetic configuration gates.
   Runtime npm/Python advisory reports are clear; full npm retains five exact
   temporary build-only entries. Actionlint and three strict image-policy cases pass.
-- Fresh full image scan completes, rather than failing to download: backend 44
+- Initial full image scan completes, rather than failing to download: backend 44
   unfixed HIGH package findings across eight IDs, zero CRITICAL; frontend zero
   findings. Strict release gate exits 1. Integration of the reviewed candidate
   carries that visible blocker; it does not accept risk or approve deployment.
@@ -69,10 +92,12 @@ pre-codex-remediation-2026-09-10
   `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` are preserved. Earlier Batch 9–11
   local-only/unmerged statements describe their original sessions and are superseded
   by this authorized candidate integration/publication, not by a production rollout.
-- Candidate verification is successful at application/database/browser/operations
+- Initial candidate verification is successful at application/database/browser/operations
   scope. The independently executed image release gate remains visibly blocked;
   integration accepts the partial review outcome, not the production security risk.
   Human PR/review into main and the remaining ROADMAP gates are the next owner steps.
+  The later requested container repair supersedes this historical image blocker;
+  it preserves the strict policy and all prior scan evidence.
 
 ## Batch 11 - UX, accessibility, RTL and SEO (2026-10-03)
 

@@ -110,22 +110,23 @@ cookie assumptions. Source maps are disabled and Nginx blocks map requests. Inde
 HTML revalidates, Vite hashed assets cache immutably for a year, non-hashed public
 assets retain seven-day caching and media retains one-hour caching.
 
-All base images, including SQL test images, use digests. The Microsoft repository
-bootstrap is checksum-verified and ODBC Driver 18 is version-pinned. Runtime images
-exclude compilers/development headers, Python package installers and frontend Node dependencies. Debian apt
-packages/security repositories and image metadata still prevent a claim of byte-for-byte
+All base images, including SQL test images, use digests. Microsoft ODBC Driver 18
+is version/checksum-pinned after detached-signature verification. Runtime images
+exclude compilers/development headers, Python package installers and frontend Node dependencies. OS
+package/security repositories and image metadata still prevent a claim of byte-for-byte
 reproducible whole images. Archive the tested application images, their digests,
 Git SHA, lockfiles, scan reports, migration plan and rollback image before release.
 Refresh digest/ODBC/OS inputs deliberately and rerun gates; a frozen vulnerable
 image is not an acceptable long-term update policy.
 
-The backend now uses Debian 13 with the same Python 3.11.17/ODBC 18.6.2.1 pins and
-Python hash lock. Same-release apt upgrades apply fixes newer than the pinned base;
+The backend uses supported Alpine 3.23, Python 3.11.17, ODBC 18.7.1.1 and the unchanged
+Python hash lock. Same-release APK upgrades apply fixes newer than the pinned base;
 use `--pull --no-cache` for security refreshes. Runtime setuid/setgid executable bits
-are removed; application/maintenance jobs do not require them. The local scan removes
-all five reported CRITICAL findings but retains 44 HIGH package findings across eight
-IDs. These block release. See the [vendor matrix and required next steps](RUNTIME_VULNERABILITIES.md)
-before considering rollout; source-level scanner findings are not silently waived.
+are removed; application/maintenance jobs do not require them. The tested amd64
+images report zero advisories under the unchanged all-HIGH/CRITICAL gate.
+[ADR 0002](adr/0002-backend-runtime-base.md) records compatibility, signed-package
+provenance and the separate arm64 validation requirement. The [advisory record](RUNTIME_VULNERABILITIES.md)
+preserves earlier Debian results; production owner gates remain.
 
 The frontend removes unused dynamic Nginx modules and updates packages within the
 pinned base's Alpine release. Nginx itself uses the explicit maintained Alpine
@@ -399,9 +400,11 @@ The initial Batch 10 scans failed database downloads. The local follow-up comple
 through the official Docker Hub source and found fixable frontend OS/Nginx findings;
 the rebuilt runtime is re-scanned after patching. See Handoff for exact image IDs,
 severity counts and report locations. The later Debian 13 remediation leaves zero
-CRITICAL and 44 HIGH backend findings; the strict gate fails as intended. Full scans
-also retain lower severities. Local evidence does not prove deployed TLS or observed
-GitHub-hosted execution.
+CRITICAL and 44 HIGH backend findings; the strict gate fails as intended on those
+historical artifacts. The subsequent supported Alpine/ODBC repair clears the
+unchanged gate with zero findings in both final images and fixes Linux runner
+backup ownership in the disposable fixture. See [current verification](audit/FINAL_REVIEW.md#requested-container-ci-follow-up-2026-10-04)
+for actual local/hosted results. Local evidence does not prove deployed TLS.
 
 ## Primary references
 
