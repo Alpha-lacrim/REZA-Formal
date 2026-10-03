@@ -2,6 +2,21 @@
 
 Run commands from the nested `REZA-Formal` Git root. Node 22 and Python 3.11 are the CI baselines. Install Python dependencies from `backend/requirements.txt` into a virtual environment. No command below uses the application SQL Server database.
 
+## Frontend accessibility checks (Batch 11)
+
+Batch 11 adds `frontend/e2e/accessibility.spec.ts` and order/dialog axe checks to the
+browser suite below. It scans WCAG 2/2.1 A/AA rules without exclusions, tests actual
+keyboard cycles/initial skip navigation, and checks 320/390/768/1280px with long
+Persian/Latin content and light/dark forms. Per-state JSON scans/screenshots appear
+in the ignored HTML report/test output. New Vitest cases cover metadata transitions
+and Persian native validation/draft correction. These tests do not establish full
+WCAG conformance or replace NVDA/VoiceOver/user testing. Return delivery-read and
+long-gallery stress responses are explicit UI overrides, not successful lifecycle
+writes. Carousel card reads also use an explicit stress fixture to exercise RTL
+arrows; newsletter tests retry from a simulated outage to a real isolated write.
+Real COD checkout/admin mutations retain their original Django assertions.
+See [UX evidence](audit/UX_A11Y_SEO_AUDIT.md) and [routing ADR](adr/0001-storefront-routing.md).
+
 ## Production infrastructure gates (Batch 10)
 
 CI pins the patch versions in the runtime builders and installs the complete Python

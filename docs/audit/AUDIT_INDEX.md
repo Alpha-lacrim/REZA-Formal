@@ -103,9 +103,9 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | OPS-002 | P2 | High | Partial - runtimes/locks/production template verified; owner provisioning/capacity gates | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |
 | OPS-003 | P2 | High | Partial - proxy headers/ingress contract verified; real TLS/IP trust remains | [TLS forwarding and security header inheritance need an explicit ingress design](TESTING_CI_AUDIT.md#ops-003) | 10 |
 | OPS-004 | P2 | High | Partial - isolated SQL/media recovery verified; real objectives/providers remain | [Recovery and provider-dependent workflows lack launch evidence](TESTING_CI_AUDIT.md#ops-004) | 10 (provider work requires explicit scoped batch) |
-| UX-001 | P2 | High | Open - accessibility gap | [Dialogs and controls lack consistent keyboard and naming semantics](UX_A11Y_SEO_AUDIT.md#ux-001) | 11 |
-| UX-002 | P2 | High | Open - SEO limitation | [Hash routes and client-only metadata limit storefront discoverability](UX_A11Y_SEO_AUDIT.md#ux-002) | 11 |
-| UX-003 | P2 | High | Open - confirmed navigation/metadata gap | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
+| UX-001 | P2 | High | Partial - keyboard/semantics verified; assistive review pending | [Dialogs and controls lack consistent keyboard and naming semantics](UX_A11Y_SEO_AUDIT.md#ux-001) | 11 |
+| UX-002 | P2 | High | Partial - metadata/robots improved; routing deferred | [Hash routes and client-only metadata limit storefront discoverability](UX_A11Y_SEO_AUDIT.md#ux-002) | 11 |
+| UX-003 | P2 | High | Addressed - client fallback/metadata verified | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
 
 ## Batch 4 update - 2026-09-30
 

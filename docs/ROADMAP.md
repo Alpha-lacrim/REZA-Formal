@@ -2,6 +2,18 @@
 
 Source/probe baseline established 2026-09-10 by Batch 1, with documentation completion review on 2026-09-13, on unchanged application commit `94d665881e3e929c41121d057385c28f822002fe`. Start with [AUDIT_INDEX](audit/AUDIT_INDEX.md), which owns the 43-finding register and all 18 hypothesis verdicts. This roadmap schedules work; it does not authorize starting another batch in this session or claim that any finding is fixed.
 
+## Batch 11 update - 2026-10-03
+
+Targeted keyboard/dialog/label/feedback, RTL/responsive and metadata/not-found fixes
+preserve the existing identity on `codex/batch-11-ux-a11y-seo`, starting at `a2865f5`.
+[Current evidence and limits](audit/UX_A11Y_SEO_AUDIT.md#batch-11-implementation-and-verification)
+mark UX-003 addressed and UX-001/002 partial. Automated axe/browser checks supplement
+the frontend and isolated backend baseline; assistive-technology/user review remains.
+[ADR 0001](adr/0001-storefront-routing.md) retains hash deep links across supported
+hosting pending origin/rendering/legacy-link decisions. Crawlable product canonicals,
+XML sitemap, true public HTTP statuses and initial product/social metadata remain
+an explicit future rollout, not a cosmetic URL migration. No deployment/merge/push.
+
 ## Batch 10 update - 2026-10-03
 
 Verified source/isolated operations scope on required `codex/batch-10-production-ops`
@@ -91,7 +103,7 @@ Batch 2 must include the defect-specific tests needed to prove its fixes, includ
 | 8 / codex/batch-08-performance-database | PERF-001 product aggregates, PERF-002 bounded lists/stats, PERF-003 cart queries; DB-001 enforce/reconcile invariants, DB-004 index review | Query-count/response-byte budgets on representative data; SQL plans before index changes; clients must understand pagination before endpoints are bounded |
 | 9 / codex/batch-09-security | SEC-002 session revocation policy, SEC-003 trusted-IP/shared throttles, SEC-004 dormant identity policy, SEC-005 dependency triage; SEC-001 defense/serving review | Threat/applicability review, dependency updates with fresh checks, replay/CSRF/CORS/provider-negative tests and real proxy abuse tests; no claim of rotation/history cleanup without external evidence |
 | 10 / codex/batch-10-production-ops | OPS-002 runtime hardening, OPS-003 TLS/headers, OPS-004 recovery/operations; scoped provider work only after owner choices | Source/template and isolated image/runtime/recovery gates verified; actual ingress, certificates/login/license/capacity, legacy ownership and real recovery objectives remain owner launch gates. Provider integrations require separate explicit scope |
-| 11 / codex/batch-11-ux-a11y-seo | UX-001 keyboard/semantics, UX-002 crawlable public routes, UX-003 metadata/not-found; state/action UX follow-through | Manual keyboard/screen-reader/mobile RTL plus automated checks, direct-link/status/metadata/social preview tests, owner-approved policies and routing migration |
+| 11 / codex/batch-11-ux-a11y-seo | UX-001 partial: keyboard/semantics/browser axe; UX-002 partial: client metadata/robots/routing ADR; UX-003 addressed: client recovery/cleanup | Browser keyboard/mobile RTL/metadata/deep-link checks implemented; assistive review, owner policies and domain/rendering/crawlable routing/sitemap/social rollout remain |
 | 12 / codex/batch-12-final-review | Reassess every open ID and cross-domain invariants; no new ID reuse | Repeat supported baseline and targeted production-engine/browser/security/recovery gates; record accepted residual risks, owners and evidence; main merge remains separately authorized |
 
 ## Dependency chains

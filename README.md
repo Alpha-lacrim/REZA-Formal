@@ -100,6 +100,11 @@ docker compose config --quiet
 
 `vercel.json` is intentionally frontend-only. It installs and builds `frontend/` and publishes `frontend/dist`. The application uses hash-based routing, so server-side SPA rewrites are unnecessary. Before a Vercel deployment, set `VITE_API_BASE` to the public HTTPS origin of the separately hosted Django API.
 
+The [routing decision](docs/adr/0001-storefront-routing.md) preserves existing hash
+deep links across container/static hosting. Batch 11 improves client metadata and
+adds robots guidance; crawlable product canonicals, an XML sitemap and server
+product/social metadata remain requirements of the future domain/rendering rollout.
+
 The Django application depends on SQL Server, native ODBC support, uploaded-media persistence, and startup migrations. Deploy it on a persistent container/application host rather than through the old Vercel Python configuration.
 
 Cookie auth includes an explicit CSRF bootstrap/header flow, but deployment still requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com`. A default `project.vercel.app` frontend plus an unrelated API host will not reliably receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; third-party-cookie deployments are intentionally unsupported. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login, OTP and TOTP enrollment/recovery are unavailable. See [security policies, verification and rollout](docs/SECURITY_HARDENING.md) for session rotation/revocation, trusted proxy settings and remaining deployment gates.

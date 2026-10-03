@@ -6,19 +6,41 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 10 source/runtime/recovery verified; production owner gates remain |
+| Program status | Batch 11 UX/browser/metadata verified; assistive and SEO/production rollout gates remain |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 10 - Production infrastructure and operations |
-| Batch status | Source and isolated operations scope verified; deployment/provisioning remains disabled and owner-controlled |
-| Batch branch | `codex/batch-10-production-ops` |
-| Batch start commit | `5e9e89dcca4f100b475bc93b7e33f65f33773757` (clean Batch 9 head) |
-| Final batch / integration merge | Final local head: `git rev-parse codex/batch-10-production-ops`; no integration merge/push |
-| Audit IDs handled | OPS-002/OPS-003/OPS-004 partial: implemented/tested infrastructure and recovery, qualified owner gates |
-| Verification performed | 166 SQL cases, 166 SQLite cases (12 SQL-only skips), 78 frontend cases, four Chrome journeys, locked image builds and runtime/proxy/recovery fixtures; exact results in Handoff |
+| Current batch | Batch 11 - UX, accessibility, RTL and SEO |
+| Batch status | Targeted source/browser scope verified; HashRouter retained through ADR 0001; no deployment |
+| Batch branch | `codex/batch-11-ux-a11y-seo` |
+| Batch start commit | `a2865f5` (clean Batch 10 follow-up head) |
+| Final batch / integration merge | Final local head: `git rev-parse codex/batch-11-ux-a11y-seo`; no integration merge/push |
+| Audit IDs handled | UX-001 partial (assistive review pending); UX-002 partial (domain/rendering/routing/sitemap rollout); UX-003 addressed in client |
+| Verification performed | 80 frontend cases, 16 Chrome/axe journeys, 166 isolated SQLite cases (12 SQL-only skips), lint/typecheck/build/Compose/npm gates; prior operations/SQL evidence retained |
 | Remaining risks | 63 unfixed backend HIGH/CRITICAL package findings across 23 advisory IDs, hosted CI, actual TLS/IP trust, SQL certificate/license/grants/capacity, legacy volume preparation, real backup objectives, expiring build advisory and historical secrets/financial/provider work |
-| Next batch | Batch 11 - UX/accessibility/SEO; not started |
+| Next batch | Batch 12 - final review; not started |
+
+## Batch 11 - UX, accessibility, RTL and SEO (2026-10-03)
+
+- Shared native dialogs, initial/return focus, skip navigation, visible focus,
+  persistent form labels/Persian validation, selected/disclosure state, live
+  feedback and explicit failed-read recovery improve the key customer/staff flows.
+- Responsive navbar/gallery/cart/checkout/table/dialog sizing and measured
+  contrast changes preserve the gold/black identity. Mixed-direction address,
+  email, product attributes and Persian pagination are verified in browser states.
+  Hero/detail priority and lazy decoding/containers reduce unnecessary waiting.
+- Metadata cleanup/defaults, absolute social/schema URLs, private/error noindex,
+  one product h1, breadcrumbs and route/policy/product recovery address UX-003.
+  [ADR 0001](adr/0001-storefront-routing.md) keeps supported hash deep links; product
+  canonicals/sitemap and server product/social/status rendering remain UX-002.
+- Pinned dev-only axe adds no production dependency. WCAG-tagged scans run without
+  disabled rules/exclusions, alongside keyboard/native-validation/viewport tests.
+  The long-copy/gallery and delivered return-read overrides are explicit UI stress
+  fixtures; actual COD/admin writes remain real Django. Manual NVDA/VoiceOver/user
+  review and broader browser/device/zoom coverage remain UX-001 evidence work.
+- Local commits only on the required branch; no merge/push, deployment, new
+  configuration, backend mutation code or migration. [Audit](audit/UX_A11Y_SEO_AUDIT.md)
+  and Handoff retain verification and prior unresolved launch obligations.
 
 ## Batch 10 - Production infrastructure and operations (2026-10-03)
 
@@ -244,7 +266,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 8 — Performance/database (measured remediation; explicit residuals)
 - [x] Batch 9 — Security (verified source scope; SEC-005 and production owner gates remain)
 - [x] Batch 10 — Production infrastructure (source/isolated operations scope; owner launch gates remain)
-- [ ] Batch 11 — UX/accessibility/SEO
+- [x] Batch 11 — scoped UX/accessibility/SEO work verified; assistive/SEO rollout residuals tracked
 - [ ] Batch 12 — Final architecture review
 
 ## Rules
