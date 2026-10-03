@@ -7,7 +7,7 @@ import { Product } from '../types';
 import { formatPrice, toPersianDigits } from '../utils';
 
 
-const ProductCard: React.FC<{ product: Product; className?: string }> = ({ product, className = '' }) => {
+const ProductCard: React.FC<{ product: Product; className?: string; headingLevel?: 'h2' | 'h3' }> = ({ product, className = '', headingLevel: Heading = 'h2' }) => {
     const { addToCart } = useActions();
     const defaultVariant = product.variants?.find(variant => variant.active && variant.stock > 0);
     const hasVariants = Boolean(product.variants?.length);
@@ -23,7 +23,7 @@ const ProductCard: React.FC<{ product: Product; className?: string }> = ({ produ
                 )}
             </Link>
             <div className="p-4">
-                <h3 className="font-serif text-lg text-lux-black dark:text-gray-100 mb-1">{product.name}</h3>
+                <Heading className="font-serif text-lg text-lux-black dark:text-gray-100 mb-1"><Link to={`/product/${encodeURIComponent(product.id)}`}><bdi>{product.name}</bdi></Link></Heading>
                 <p className="text-gray-500 dark:text-gray-400 text-sm mb-3 line-clamp-2">{product.short}</p>
                 {product.rating !== undefined && product.reviewCount !== undefined && product.reviewCount > 0 && (
                     <div className="flex items-center gap-1 text-xs text-gray-500 mb-3" aria-label={`امتیاز ${product.rating} از ۵`}>
@@ -32,7 +32,7 @@ const ProductCard: React.FC<{ product: Product; className?: string }> = ({ produ
                         <span>({toPersianDigits(product.reviewCount)} نظر)</span>
                     </div>
                 )}
-                <div className="flex items-center justify-between gap-3">
+                <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                         <strong className="text-lux-black dark:text-lux-gold">{formatPrice(displayedPrice)}</strong>
                         {product.compareAtPrice && product.compareAtPrice > displayedPrice && (
@@ -40,6 +40,7 @@ const ProductCard: React.FC<{ product: Product; className?: string }> = ({ produ
                         )}
                     </div>
                     <button
+                        aria-label={`${isOutOfStock ? 'ناموجود' : hasVariants ? 'افزودن گزینه موجود' : 'افزودن'} ${product.name}${defaultVariant && (defaultVariant.size || defaultVariant.color || defaultVariant.name) ? `؛ ${[defaultVariant.size, defaultVariant.color, defaultVariant.name].filter(Boolean).join('، ')}` : ''}`}
                         onClick={() => addToCart(product.id, 1, defaultVariant?.id, product)}
                         disabled={isOutOfStock}
                         className="px-4 py-2 rounded-lg bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-sm font-semibold hover:-translate-y-1 transition-transform disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:translate-y-0"

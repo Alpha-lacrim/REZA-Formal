@@ -102,7 +102,7 @@ const Footer: React.FC = () => {
                         </ul>
                     </div>
                 </div>
-                <div className="border-t border-gray-800 pt-6 text-xs text-gray-500 font-light">
+                <div className="border-t border-gray-800 pt-6 text-xs text-gray-400 font-light">
                     <p>&copy; ۲۰۲۶ REZA Formal. تمامی حقوق محفوظ است.</p>
                 </div>
             </div>

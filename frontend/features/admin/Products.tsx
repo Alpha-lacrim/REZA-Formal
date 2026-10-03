@@ -38,7 +38,7 @@ return <>
                             <h1 className="text-xl font-bold text-lux-black dark:text-white flex items-center gap-2">
                                 <Package className="text-lux-gold"/> مدیریت محصولات
                             </h1>
-                            <div className="flex gap-3 w-full md:w-auto">
+                            <div className="flex flex-wrap gap-3 w-full md:w-auto">
                                 <div className="relative flex-1 md:w-64 group">
                                     <input
                                         aria-label="جستجوی محصولات" type="search"
@@ -73,15 +73,15 @@ return <>
                         </div>
 
                         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-100 dark:border-zinc-800 overflow-hidden">
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-sm text-right">
+                            <div tabIndex={0} role="region" aria-label="جدول محصولات" className="overflow-x-auto">
+                                <table className="w-full min-w-[600px] text-sm text-right"><caption className="sr-only">محصولات فروشگاه و عملیات مدیریت</caption>
                                     <thead className="bg-gray-50/50 dark:bg-zinc-800/50 border-b border-gray-100 dark:border-zinc-800">
                                         <tr>
-                                            <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">محصول</th>
-                                            <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">دسته‌بندی</th>
-                                            <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">موجودی</th>
-                                            <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">قیمت</th>
-                                            <th className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400 text-left">عملیات</th>
+                                            <th scope="col" className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">محصول</th>
+                                            <th scope="col" className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">دسته‌بندی</th>
+                                            <th scope="col" className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">موجودی</th>
+                                            <th scope="col" className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400">قیمت</th>
+                                            <th scope="col" className="px-6 py-4 font-semibold text-gray-500 dark:text-gray-400 text-left">عملیات</th>
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-gray-100 dark:divide-zinc-800">

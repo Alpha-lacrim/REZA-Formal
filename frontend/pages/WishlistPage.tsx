@@ -1,7 +1,7 @@
 import { useAuth, useCatalog, useWishlist } from '../state/AppState';
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, HeartOff } from 'lucide-react';
+import { ArrowRight, HeartOff } from 'lucide-react';
 
 import SEO from '../components/SEO';
 import ProductCard from '../components/ProductCard';
@@ -35,7 +35,7 @@ const WishlistPage: React.FC = () => {
 
             <div className="bg-lux-black px-4 pb-4">
                 <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md hover:brightness-95 text-xs md:text-sm">
-                    <ArrowLeft size={14} />
+                    <ArrowRight size={14} />
                     <span>بازگشت</span>
                 </button>
             </div>

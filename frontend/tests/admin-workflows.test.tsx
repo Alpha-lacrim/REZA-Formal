@@ -183,11 +183,11 @@ test('commerce fetches only its selected section, pages it, and preserves a fail
   await waitFor(() => expect(api.adminGetCoupons).toHaveBeenCalledTimes(1));
   await user.click(screen.getByRole('button', { name: 'صفحه بعد' }));
   await waitFor(() => expect(vi.mocked(api.adminGetCoupons).mock.lastCall?.[0]).toMatchObject({ page: 2, page_size: 8 }));
-  await user.type(await screen.findByLabelText('WELCOME10'), 'RETRY');
+  await user.type(await screen.findByLabelText('کد تخفیف'), 'RETRY');
   await user.type(screen.getByLabelText('مقدار'), '10');
   await user.click(screen.getByRole('button', { name: 'ذخیره' }));
   await waitFor(() => expect(api.adminSaveCoupon).toHaveBeenCalledTimes(1));
-  expect(screen.getByLabelText('WELCOME10')).toHaveValue('RETRY');
+  expect(screen.getByLabelText('کد تخفیف')).toHaveValue('RETRY');
   await user.click(screen.getByRole('button', { name: 'ارسال' }));
   await waitFor(() => expect(vi.mocked(api.adminGetShippingMethods).mock.lastCall?.[0]).toMatchObject({ page: 1, page_size: 8 }));
   expect(api.adminGetPayments).not.toHaveBeenCalled();

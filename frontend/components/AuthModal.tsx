@@ -1,6 +1,8 @@
 import { useActions, useOverlays } from '../state/AppState';
 import { errorMessage, ApiError } from '../services/api';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Dialog } from './Dialog';
+import { TextField } from './FormField';
 import { X, LogIn, UserPlus, ArrowLeft, Loader2 } from 'lucide-react';
 
 
@@ -15,6 +17,8 @@ const AuthModal: React.FC = () => {
     
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
+    const errorRef = useRef<HTMLParagraphElement>(null);
+    useEffect(() => { if (error) errorRef.current?.focus(); }, [error]);
     
     useEffect(() => {
         if (!isAuthModalOpen) {
@@ -54,9 +58,9 @@ const AuthModal: React.FC = () => {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm" onClick={() => setAuthModalOpen(false)}>
-            <div className="bg-white dark:bg-zinc-800 rounded-lg w-full max-w-md p-6 shadow-2xl relative" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setAuthModalOpen(false)} className="absolute top-4 left-4 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+        <Dialog title={view === 'login' ? 'ورود به حساب' : 'ایجاد حساب کاربری'} size="compact" busy={loading} onClose={() => setAuthModalOpen(false)}>
+            <div className="bg-white dark:bg-zinc-800 p-6 relative">
+                <button disabled={loading} aria-label="بستن ورود" onClick={() => setAuthModalOpen(false)} className="icon-button absolute top-2 left-2 text-gray-500 hover:text-gray-600 dark:hover:text-gray-200">
                     <X size={20} />
                 </button>
                 
@@ -65,9 +69,9 @@ const AuthModal: React.FC = () => {
                     {view === 'register' && 'ایجاد حساب کاربری'}
                 </h2>
                 
-                <form onSubmit={handleSubmit} className="space-y-4">
+                <form onSubmit={handleSubmit} aria-busy={loading} className="space-y-4">
                     {view === 'register' && (
-                        <input 
+                        <TextField label="نام و نام خانوادگی" required autoComplete="name"
                             type="text" 
                             placeholder="نام و نام خانوادگی" 
                             value={name}
@@ -78,7 +82,7 @@ const AuthModal: React.FC = () => {
                     )}
                     
                         <>
-                            <input 
+                            <TextField label="ایمیل" required autoComplete="email" autoFocus
                                 type="email" 
                                 placeholder="ایمیل" 
                                 value={email}
@@ -87,7 +91,7 @@ const AuthModal: React.FC = () => {
                                 dir="ltr"
                                 disabled={loading}
                             />
-                            <input 
+                            <TextField label="رمز عبور" required autoComplete={view === 'login' ? 'current-password' : 'new-password'}
                                 type="password" 
                                 placeholder="رمز عبور" 
                                 value={password}
@@ -98,7 +102,7 @@ const AuthModal: React.FC = () => {
                             />
                         </>
 
-                    {error && <p className="text-red-500 text-sm animate-pulse">{error}</p>}
+                    {error && <p id="auth-error" ref={errorRef} tabIndex={-1} role="alert" className="text-red-700 dark:text-red-300 text-sm">{error}</p>}
 
                     <button 
                         type="submit" 
@@ -128,7 +132,7 @@ const AuthModal: React.FC = () => {
                         )}
                     </div>
             </div>
-        </div>
+        </Dialog>
     );
 };
 

@@ -66,14 +66,15 @@ const { capabilities, coupons, shippingMethods, payments, reviews, returns, besp
     };
 
 
-return <fieldset disabled={commerceAction !== null} className="min-w-0">
+return <fieldset aria-busy={commerceAction !== null} disabled={commerceAction !== null} className="min-w-0">
                     <div className="animate-in fade-in space-y-6 duration-500" dir="rtl">
                         <div className="flex flex-col gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:flex-row md:items-center md:justify-between">
                             <div><h1 className="flex items-center gap-2 text-xl font-bold text-lux-black dark:text-white"><Tags className="text-lux-gold" /> عملیات فروشگاه</h1><p className="mt-1 text-xs text-gray-500">مدیریت ارسال، تخفیف، پرداخت، بازخورد و خدمات مشتریان</p></div>
                             <button onClick={() => void loadCommerceData()} disabled={commerceLoading} className="flex items-center justify-center gap-2 rounded-xl border border-gray-200 px-4 py-2 text-sm font-bold text-gray-600 hover:border-lux-gold dark:border-zinc-700 dark:text-gray-300 disabled:opacity-50"><RefreshCw size={16} className={commerceLoading ? 'animate-spin' : ''} /> به‌روزرسانی</button>
                         </div>
 
-                        {commerceError && <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertCircle size={18} /> {commerceError}</div>}
+                        {commerceAction && <p role="status">در حال ذخیره تغییرات…</p>}
+                        {commerceError && <div role="alert" className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800"><AlertCircle size={18} /> {commerceError}</div>}
                         <div className="flex gap-2 overflow-x-auto rounded-2xl border border-gray-100 bg-white p-2 dark:border-zinc-800 dark:bg-zinc-900">
                             {([
                                 ['capabilities', 'آمادگی', ShieldCheck], ['coupons', 'تخفیف‌ها', Tags], ['shipping', 'ارسال', Truck],
@@ -82,7 +83,7 @@ return <fieldset disabled={commerceAction !== null} className="min-w-0">
                             ] as const).map(([id, label, Icon]) => <button key={id} onClick={() => { setCommerceSection(id); setCurrentPage(1); }} className={`flex shrink-0 items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold ${commerceSection === id ? 'bg-lux-black text-white dark:bg-lux-gold dark:text-black' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}><Icon size={16} /> {label}</button>)}
                         </div>
 
-                        {commerceLoading ? <div className="flex items-center justify-center gap-2 rounded-2xl bg-white py-20 text-gray-500 dark:bg-zinc-900"><Loader2 className="animate-spin text-lux-gold" /> در حال دریافت اطلاعات...</div> : (
+                        {commerceLoading ? <div role="status" className="flex items-center justify-center gap-2 rounded-2xl bg-white py-20 text-gray-500 dark:bg-zinc-900"><Loader2 className="animate-spin text-lux-gold" /> در حال دریافت اطلاعات...</div> : (
                             <>
                                 {commerceSection === 'capabilities' && (
                                     <section className="space-y-5">
@@ -104,7 +105,7 @@ return <fieldset disabled={commerceAction !== null} className="min-w-0">
                                     <div className="grid gap-6 lg:grid-cols-5">
                                         <form onSubmit={saveCoupon} className="space-y-3 rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-2">
                                             <h2 className="font-bold dark:text-white">{couponForm.id ? 'ویرایش کد تخفیف' : 'کد تخفیف جدید'}</h2>
-                                            <input className="admin-commerce-input uppercase" dir="ltr" aria-label="WELCOME10" placeholder="WELCOME10" value={couponForm.code || ''} onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} required />
+                                            <input className="admin-commerce-input uppercase" dir="ltr" aria-label="کد تخفیف" placeholder="WELCOME10" value={couponForm.code || ''} onChange={e => setCouponForm({ ...couponForm, code: e.target.value.toUpperCase() })} required />
                                             <div className="grid grid-cols-2 gap-2"><select aria-label="نوع تخفیف" className="admin-commerce-input" value={couponForm.type || 'percent'} onChange={e => setCouponForm({ ...couponForm, type: e.target.value as CouponSummary['type'] })}><option value="percent">درصدی</option><option value="fixed">مبلغ ثابت</option></select><input className="admin-commerce-input" type="number" min="0" aria-label="مقدار" placeholder="مقدار" value={couponForm.value || ''} onChange={e => setCouponForm({ ...couponForm, value: Number(e.target.value) })} required /></div>
                                             <input className="admin-commerce-input" type="number" min="0" aria-label="حداقل مبلغ سفارش" placeholder="حداقل مبلغ سفارش" value={couponForm.minimumOrderAmount || ''} onChange={e => setCouponForm({ ...couponForm, minimumOrderAmount: Number(e.target.value) || undefined })} />
                                             <input className="admin-commerce-input" type="number" min="0" aria-label="سقف دفعات استفاده" placeholder="سقف دفعات استفاده" value={couponForm.usageLimit || ''} onChange={e => setCouponForm({ ...couponForm, usageLimit: Number(e.target.value) || undefined })} />

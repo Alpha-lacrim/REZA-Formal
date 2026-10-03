@@ -9,6 +9,8 @@ import {
 import { useNavigate } from 'react-router-dom';
 import ImageLoader from '../components/ImageLoader';
 import SEO from '../components/SEO';
+import { Dialog } from '../components/Dialog';
+import { TextField, TextAreaField } from '../components/FormField';
 
 import api from '../services/api';
 import { Address, Order, ReturnRequest } from '../types';
@@ -52,6 +54,7 @@ const UserPanel: React.FC = () => {
     const [addresses, setAddresses] = useState<Address[]>([]);
     const [returns, setReturns] = useState<ReturnRequest[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadError, setLoadError] = useState('');
     const [actionLoading, setActionLoading] = useState<string | null>(null);
     const [expandedOrderId, setExpandedOrderId] = useState<string | null>(null);
     const [name, setName] = useState('');
@@ -62,10 +65,12 @@ const UserPanel: React.FC = () => {
     const [returnItems, setReturnItems] = useState<string[]>([]);
     const [returnReason, setReturnReason] = useState('');
     const [returnDetails, setReturnDetails] = useState('');
+    const [returnError, setReturnError] = useState('');
 
     const loadAccount = async (signal?: AbortSignal) => {
         const version = ++loadVersion.current;
         setLoading(true);
+        setLoadError('');
         try {
             if (activeTab === 'orders') {
                 const page = await api.myOrdersPage(orderPage, signal);
@@ -80,7 +85,7 @@ const UserPanel: React.FC = () => {
                 if (version === loadVersion.current && !signal?.aborted) setAddresses(saved);
             }
         } catch (error: unknown) {
-            if (version === loadVersion.current && !signal?.aborted) showToast(errorMessage(error, 'دریافت اطلاعات حساب کاربری ناموفق بود'));
+            if (version === loadVersion.current && !signal?.aborted) setLoadError(errorMessage(error, 'دریافت اطلاعات حساب کاربری ناموفق بود'));
         } finally {
             if (version === loadVersion.current && !signal?.aborted) setLoading(false);
         }
@@ -187,13 +192,13 @@ const UserPanel: React.FC = () => {
         setReturnOrder(order);
         setReturnItems(order.items.map(item => item.id).filter((id): id is string => Boolean(id)));
         setReturnReason('');
-        setReturnDetails('');
+        setReturnDetails(''); setReturnError('');
     };
 
     const submitReturn = async (event: React.FormEvent) => {
         event.preventDefault();
         if (!returnOrder || !returnReason.trim() || returnItems.length === 0) {
-            showToast('حداقل یک کالا و دلیل مرجوعی را انتخاب کنید');
+            setReturnError('حداقل یک کالا و دلیل مرجوعی را انتخاب کنید');
             return;
         }
         setActionLoading('return');
@@ -204,7 +209,7 @@ const UserPanel: React.FC = () => {
             setActiveTab('returns');
             showToast('درخواست مرجوعی ثبت شد');
         } catch (error: unknown) {
-            showToast(errorMessage(error, 'ثبت درخواست مرجوعی ناموفق بود'));
+            setReturnError(errorMessage(error, 'ثبت درخواست مرجوعی ناموفق بود'));
         } finally {
             setActionLoading(null);
         }
@@ -219,7 +224,7 @@ const UserPanel: React.FC = () => {
                 <div className="mb-6 flex flex-col justify-between gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm dark:border-zinc-800 dark:bg-zinc-900 md:flex-row md:items-center">
                     <div className="flex items-center gap-4">
                         <div className="flex h-14 w-14 items-center justify-center rounded-full bg-lux-black text-xl font-bold text-white dark:bg-lux-gold dark:text-black">{user?.name?.charAt(0)}</div>
-                        <div><h1 className="text-xl font-bold text-lux-black dark:text-white">{user?.name}</h1><p className="text-sm text-gray-500">{user?.email}</p></div>
+                        <div><h1 className="text-xl font-bold text-lux-black dark:text-white">{user?.name}</h1><p dir="ltr" className="text-sm text-gray-500">{user?.email}</p></div>
                     </div>
                     <button onClick={logout} className="flex items-center justify-center gap-2 rounded-xl border border-rose-200 px-4 py-2 text-sm font-bold text-rose-600 hover:bg-rose-50"><LogOut size={17} /> خروج از حساب</button>
                 </div>
@@ -229,24 +234,25 @@ const UserPanel: React.FC = () => {
                         ['orders', 'سفارش‌ها', Package], ['addresses', 'نشانی‌ها', MapPin],
                         ['returns', 'مرجوعی‌ها', RotateCcw], ['profile', 'مشخصات', UserIcon],
                     ] as const).map(([id, label, Icon]) => (
-                        <button key={id} onClick={() => setActiveTab(id)} className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold transition ${activeTab === id ? 'bg-lux-black text-white dark:bg-lux-gold dark:text-black' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}>
+                        <button key={id} aria-pressed={activeTab === id} onClick={() => setActiveTab(id)} className={`flex items-center justify-center gap-2 rounded-xl px-3 py-3 text-sm font-bold transition ${activeTab === id ? 'bg-lux-black text-white dark:bg-lux-gold dark:text-black' : 'text-gray-500 hover:bg-gray-50 dark:hover:bg-zinc-800'}`}>
                             <Icon size={18} /> {label}
                         </button>
                     ))}
                 </div>
 
-                {loading ? <div className="flex items-center justify-center gap-2 py-24 text-gray-500"><Loader2 className="animate-spin" /> در حال دریافت اطلاعات...</div> : null}
+                {loading ? <div role="status" className="flex items-center justify-center gap-2 py-24 text-gray-500"><Loader2 className="animate-spin" /> در حال دریافت اطلاعات...</div> : null}
+                {loadError && <p role="alert" className="mb-4 text-red-700 dark:text-red-300">{loadError} <button onClick={() => void loadAccount()} className="underline">تلاش دوباره</button></p>}
 
-                {!loading && activeTab === 'orders' && (
+                {!loading && !loadError && activeTab === 'orders' && (
                     <section className="space-y-4">
                         {orders.length === 0 ? <EmptyState icon={Package} text="هنوز سفارشی ثبت نکرده‌اید." /> : orders.map(order => (
                             <article key={order.id} className="overflow-hidden rounded-2xl border border-gray-100 bg-white shadow-sm dark:border-zinc-800 dark:bg-zinc-900">
-                                <button onClick={() => void toggleOrder(order)} className="flex w-full flex-wrap items-center justify-between gap-3 p-5 text-right">
+                                <button aria-expanded={expandedOrderId === order.id} aria-controls={`order-${order.id}`} onClick={() => void toggleOrder(order)} className="flex w-full flex-wrap items-center justify-between gap-3 p-5 text-right">
                                     <div><p className="font-bold text-lux-black dark:text-white">سفارش #{toPersianDigits(order.id)}</p><p className="mt-1 text-xs text-gray-500">{new Date(order.createdAt).toLocaleString('fa-IR')}</p></div>
                                     <div className="flex items-center gap-3"><span className={`rounded-full px-3 py-1 text-xs font-bold ${statusColors[order.status] || 'bg-gray-100 text-gray-700'}`}>{statusLabels[order.status] || order.status}</span><strong className="text-lux-gold">{formatPrice(order.total)}</strong>{expandedOrderId === order.id ? <ChevronUp /> : <ChevronDown />}</div>
                                 </button>
                                 {expandedOrderId === order.id && (
-                                    <div className="border-t border-gray-100 p-5 dark:border-zinc-800">
+                                    <div id={`order-${order.id}`} className="border-t border-gray-100 p-5 dark:border-zinc-800">
                                         {actionLoading === `order-${order.id}` ? <div className="flex justify-center py-6"><Loader2 className="animate-spin text-lux-gold" /></div> : (
                                             <div className="space-y-5">
                                                 <ul className="space-y-3">{order.items.map((item, index) => <li key={item.id || index} className="flex items-center justify-between gap-3 rounded-xl bg-gray-50 p-3 dark:bg-zinc-800"><div className="flex items-center gap-3"><ImageLoader src={item.image || ''} alt={item.name} className="h-12 w-12 rounded-lg object-cover" /><div><p className="text-sm font-bold dark:text-white">{item.name}</p><p className="text-xs text-gray-500">{[item.size, item.color].filter(Boolean).join(' · ')} × {toPersianDigits(item.qty)}</p></div></div><span className="text-sm font-bold dark:text-white">{formatPrice(item.total || item.price * item.qty)}</span></li>)}</ul>
@@ -275,20 +281,20 @@ const UserPanel: React.FC = () => {
                     <div className="grid gap-6 lg:grid-cols-5">
                         <form onSubmit={handleAddressSubmit} className="space-y-3 rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900 lg:col-span-2">
                             <h2 className="flex items-center gap-2 font-bold dark:text-white"><Plus size={18} /> {editingAddressId ? 'ویرایش نشانی' : 'نشانی جدید'}</h2>
-                            <input className={inputClass} placeholder="عنوان (خانه، محل کار...)" value={addressForm.label || ''} onChange={e => setAddressForm({ ...addressForm, label: e.target.value })} />
-                            <input className={inputClass} required placeholder="نام گیرنده" value={addressForm.recipientName} onChange={e => setAddressForm({ ...addressForm, recipientName: e.target.value })} />
-                            <input className={inputClass} required dir="ltr" placeholder="شماره تماس" value={addressForm.phone} onChange={e => setAddressForm({ ...addressForm, phone: e.target.value })} />
-                            <div className="grid grid-cols-2 gap-2"><input className={inputClass} placeholder="استان" value={addressForm.province} onChange={e => setAddressForm({ ...addressForm, province: e.target.value })} /><input className={inputClass} required placeholder="شهر" value={addressForm.city} onChange={e => setAddressForm({ ...addressForm, city: e.target.value })} /></div>
-                            <input className={inputClass} required dir="ltr" placeholder="کد پستی" value={addressForm.postalCode} onChange={e => setAddressForm({ ...addressForm, postalCode: e.target.value })} />
-                            <textarea className={inputClass} required rows={3} placeholder="نشانی کامل" value={addressForm.addressLine} onChange={e => setAddressForm({ ...addressForm, addressLine: e.target.value })} />
+                            <TextField label="عنوان نشانی (اختیاری)" className={inputClass} placeholder="عنوان (خانه، محل کار...)" value={addressForm.label || ''} onChange={e => setAddressForm({ ...addressForm, label: e.target.value })} />
+                            <TextField label="نام گیرنده" autoComplete="shipping name" className={inputClass} required placeholder="نام گیرنده" value={addressForm.recipientName} onChange={e => setAddressForm({ ...addressForm, recipientName: e.target.value })} />
+                            <TextField label="شماره تماس" type="tel" autoComplete="shipping tel" className={inputClass} required dir="ltr" placeholder="شماره تماس" value={addressForm.phone} onChange={e => setAddressForm({ ...addressForm, phone: e.target.value })} />
+                            <div className="grid grid-cols-2 gap-2"><TextField label="استان" autoComplete="shipping address-level1" className={inputClass} required placeholder="استان" value={addressForm.province} onChange={e => setAddressForm({ ...addressForm, province: e.target.value })} /><TextField label="شهر" autoComplete="shipping address-level2" className={inputClass} required placeholder="شهر" value={addressForm.city} onChange={e => setAddressForm({ ...addressForm, city: e.target.value })} /></div>
+                            <TextField label="کد پستی" inputMode="numeric" autoComplete="shipping postal-code" className={inputClass} required dir="ltr" placeholder="کد پستی" value={addressForm.postalCode} onChange={e => setAddressForm({ ...addressForm, postalCode: e.target.value })} />
+                            <TextAreaField label="نشانی کامل" autoComplete="shipping street-address" className={inputClass} required rows={3} placeholder="نشانی کامل" value={addressForm.addressLine} onChange={e => setAddressForm({ ...addressForm, addressLine: e.target.value })} />
                             <label className="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-300"><input type="checkbox" checked={Boolean(addressForm.isDefault)} onChange={e => setAddressForm({ ...addressForm, isDefault: e.target.checked })} /> نشانی پیش‌فرض</label>
                             <div className="flex gap-2"><button disabled={actionLoading === 'address'} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-lux-gold px-4 py-2.5 font-bold text-white disabled:opacity-50"><Save size={17} /> ذخیره</button>{editingAddressId && <button type="button" onClick={resetAddressForm} className="rounded-xl border px-4 dark:border-zinc-700 dark:text-white">انصراف</button>}</div>
                         </form>
-                        <div className="space-y-3 lg:col-span-3">{addresses.length === 0 ? <EmptyState icon={MapPin} text="نشانی ذخیره‌شده‌ای ندارید." /> : addresses.map(address => <div key={address.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="mb-2 flex items-center gap-2"><h3 className="font-bold dark:text-white">{address.label || 'نشانی'}</h3>{address.isDefault && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">پیش‌فرض</span>}</div><p className="text-sm leading-7 text-gray-600 dark:text-gray-300">{address.province}، {address.city}، {address.addressLine}</p><p className="text-xs text-gray-500">{address.recipientName} · {address.phone} · کدپستی {address.postalCode}</p><div className="mt-4 flex justify-end gap-2"><button onClick={() => editAddress(address)} className="rounded-lg border px-3 py-1.5 text-xs font-bold dark:border-zinc-700 dark:text-white">ویرایش</button><button disabled={actionLoading === `address-${address.id}`} onClick={() => void deleteAddress(address)} className="flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600"><Trash2 size={14} /> حذف</button></div></div>)}</div>
+                        <div className="space-y-3 lg:col-span-3">{addresses.length === 0 ? <EmptyState icon={MapPin} text="نشانی ذخیره‌شده‌ای ندارید." /> : addresses.map(address => <div key={address.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="mb-2 flex items-center gap-2"><h3 className="font-bold dark:text-white">{address.label || 'نشانی'}</h3>{address.isDefault && <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs text-emerald-700">پیش‌فرض</span>}</div><p className="text-sm leading-7 text-gray-600 dark:text-gray-300">{address.province}، {address.city}، {address.addressLine}</p><p className="text-xs text-gray-500"><bdi>{address.recipientName}</bdi> · <bdi dir="ltr">{address.phone}</bdi> · کدپستی <bdi dir="ltr">{address.postalCode}</bdi></p><div className="mt-4 flex justify-end gap-2"><button onClick={() => editAddress(address)} className="rounded-lg border px-3 py-1.5 text-xs font-bold dark:border-zinc-700 dark:text-white">ویرایش</button><button disabled={actionLoading === `address-${address.id}`} onClick={() => void deleteAddress(address)} className="flex items-center gap-1 rounded-lg border border-rose-200 px-3 py-1.5 text-xs font-bold text-rose-600"><Trash2 size={14} /> حذف</button></div></div>)}</div>
                     </div>
                 )}
 
-                {!loading && activeTab === 'returns' && (
+                {!loading && !loadError && activeTab === 'returns' && (
                     <section className="space-y-3">{returns.length === 0 ? <EmptyState icon={RotateCcw} text="درخواست مرجوعی ثبت نشده است." /> : returns.map(item => <article key={item.id} className="rounded-2xl border border-gray-100 bg-white p-5 dark:border-zinc-800 dark:bg-zinc-900"><div className="flex flex-wrap items-center justify-between gap-2"><div><h3 className="font-bold dark:text-white">مرجوعی سفارش #{toPersianDigits(item.orderId)}</h3><p className="mt-1 text-xs text-gray-500">{new Date(item.createdAt).toLocaleString('fa-IR')}</p></div><span className="rounded-full bg-gray-100 px-3 py-1 text-xs font-bold text-gray-700">{returnLabels[item.status] || item.status}</span></div><p className="mt-4 text-sm text-gray-700 dark:text-gray-200"><b>دلیل:</b> {item.reason}</p>{item.details && <p className="mt-1 text-sm text-gray-500">{item.details}</p>}{item.adminNote && <p className="mt-3 rounded-lg bg-amber-50 p-3 text-sm text-amber-800"><b>پاسخ فروشگاه:</b> {item.adminNote}</p>}{item.refundAmount !== undefined && <p className="mt-3 text-sm font-bold text-emerald-600">مبلغ بازپرداخت: {formatPrice(item.refundAmount)}</p>}</article>)}</section>
                 )}
 
@@ -298,7 +304,7 @@ const UserPanel: React.FC = () => {
                 )}
             </div>
 
-            {returnOrder && <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"><form onSubmit={submitReturn} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold dark:text-white">مرجوعی سفارش #{toPersianDigits(returnOrder.id)}</h2><button type="button" onClick={() => setReturnOrder(null)} className="text-gray-500"><XCircle /></button></div><p className="mb-3 text-sm text-gray-500">کالاهای موردنظر را انتخاب کنید:</p><div className="mb-4 space-y-2">{returnOrder.items.map((item, index) => { const id = item.id || ''; return <label key={id || index} className={`flex items-center gap-3 rounded-xl border p-3 dark:border-zinc-700 ${!id ? 'opacity-50' : ''}`}><input type="checkbox" disabled={!id} checked={Boolean(id && returnItems.includes(id))} onChange={e => setReturnItems(current => e.target.checked ? [...current, id] : current.filter(value => value !== id))} /><span className="text-sm font-bold dark:text-white">{item.name} × {toPersianDigits(item.qty)}</span></label>; })}</div><select className={inputClass} value={returnReason} onChange={e => setReturnReason(e.target.value)} required><option value="">دلیل مرجوعی</option><option value="size_issue">نامناسب بودن اندازه</option><option value="damaged">آسیب‌دیدگی کالا</option><option value="wrong_item">ارسال کالای اشتباه</option><option value="not_as_described">مغایرت با توضیحات</option><option value="other">سایر</option></select><textarea className={`${inputClass} mt-3`} rows={4} placeholder="توضیحات تکمیلی" value={returnDetails} onChange={e => setReturnDetails(e.target.value)} /><button disabled={actionLoading === 'return'} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lux-black py-3 font-bold text-white dark:bg-lux-gold dark:text-black disabled:opacity-50"><RotateCcw size={17} /> ثبت درخواست</button></form></div>}
+            {returnOrder && <Dialog title="درخواست مرجوعی" size="compact" busy={actionLoading === "return"} onClose={() => setReturnOrder(null)}><form onSubmit={submitReturn} className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl dark:bg-zinc-900"><div className="mb-5 flex items-center justify-between"><h2 className="text-lg font-bold dark:text-white">مرجوعی سفارش #{toPersianDigits(returnOrder.id)}</h2><button aria-label="بستن مرجوعی" disabled={actionLoading === "return"} type="button" onClick={() => setReturnOrder(null)} className="text-gray-500"><XCircle /></button></div><p className="mb-3 text-sm text-gray-500">کالاهای موردنظر را انتخاب کنید:</p>{returnError && <p role="alert" className="mb-3 text-red-700 dark:text-red-300">{returnError}</p>}<div className="mb-4 space-y-2">{returnOrder.items.map((item, index) => { const id = item.id || ''; return <label key={id || index} className={`flex items-center gap-3 rounded-xl border p-3 dark:border-zinc-700 ${!id ? 'opacity-50' : ''}`}><input type="checkbox" disabled={!id} checked={Boolean(id && returnItems.includes(id))} onChange={e => setReturnItems(current => e.target.checked ? [...current, id] : current.filter(value => value !== id))} /><span className="text-sm font-bold dark:text-white">{item.name} × {toPersianDigits(item.qty)}</span></label>; })}</div><label htmlFor="return-reason" className="block text-sm dark:text-white">دلیل مرجوعی</label><select id="return-reason" className={inputClass} value={returnReason} onChange={e => setReturnReason(e.target.value)} required><option value="">دلیل مرجوعی</option><option value="size_issue">نامناسب بودن اندازه</option><option value="damaged">آسیب‌دیدگی کالا</option><option value="wrong_item">ارسال کالای اشتباه</option><option value="not_as_described">مغایرت با توضیحات</option><option value="other">سایر</option></select><TextAreaField label="توضیحات تکمیلی" className={`${inputClass} mt-3`} rows={4} placeholder="توضیحات تکمیلی" value={returnDetails} onChange={e => setReturnDetails(e.target.value)} /><button disabled={actionLoading === 'return'} className="mt-4 flex w-full items-center justify-center gap-2 rounded-xl bg-lux-black py-3 font-bold text-white dark:bg-lux-gold dark:text-black disabled:opacity-50"><RotateCcw size={17} /> ثبت درخواست</button></form></Dialog>}
         </div>
     );
 };

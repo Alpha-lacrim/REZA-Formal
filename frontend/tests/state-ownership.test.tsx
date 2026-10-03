@@ -251,11 +251,23 @@ test('anonymous session invalidation resets quote ownership even when the role d
   checkoutMocks();
   vi.mocked(api.me).mockRejectedValue(new Error('Anonymous'));
   const quoteMock = vi.spyOn(api, 'quoteCheckout').mockResolvedValue(quote(100));
-  render(<MemoryRouter><AppStateProvider><Probe /><CartPage /></AppStateProvider></MemoryRouter>);
-  await waitFor(() => expect(screen.getByRole('button', { name: 'ثبت نهایی سفارش' })).toBeEnabled());
-  act(() => invalidateSession());
-  await waitFor(() => expect(quoteMock).toHaveBeenCalledTimes(2));
-  await waitFor(() => expect(screen.getByRole('button', { name: 'ثبت نهایی سفارش' })).toBeEnabled());
+  // Drive the deliberate quote debounce instead of racing a one-second wall clock
+  // while the full suite starts multiple jsdom workers.
+  vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
+  let view: ReturnType<typeof render> | undefined;
+  try {
+    await act(async () => { view = render(<MemoryRouter><AppStateProvider><Probe /><CartPage /></AppStateProvider></MemoryRouter>); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    const submit = () => screen.getByRole('button', { name: 'ثبت نهایی سفارش' });
+    expect(state.authState.status).toBe('anonymous');
+    expect(quoteMock).toHaveBeenCalledTimes(1);
+    expect(submit()).toBeEnabled();
+    await act(async () => invalidateSession());
+    expect(submit()).toBeDisabled();
+    await act(async () => { await vi.advanceTimersByTimeAsync(350); });
+    expect(quoteMock).toHaveBeenCalledTimes(2);
+    expect(submit()).toBeEnabled();
+  } finally { view?.unmount(); vi.useRealTimers(); }
 });
 
 test('logout during optional address save cannot submit checkout for the next account', async () => {
