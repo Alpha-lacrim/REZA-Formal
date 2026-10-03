@@ -146,7 +146,7 @@ FILE_UPLOAD_MAX_MEMORY_SIZE = 2 * 1024 * 1024
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': (
         'shop.auth.CookieJWTAuthentication',
-        'rest_framework_simplejwt.authentication.JWTAuthentication',
+        'shop.auth.SessionJWTAuthentication',
     ),
     'DEFAULT_PERMISSION_CLASSES': (
         'rest_framework.permissions.IsAuthenticated',
@@ -170,12 +170,9 @@ REST_FRAMEWORK = {
 }
 
 SIMPLE_JWT = {
-    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=60),
+    'ACCESS_TOKEN_LIFETIME': timedelta(minutes=15),
     'REFRESH_TOKEN_LIFETIME': timedelta(days=7),
 }
-
-GOOGLE_OAUTH_CLIENT_ID = env('GOOGLE_OAUTH_CLIENT_ID', default='').strip()
-
 
 def _same_site_setting(name, default):
     value = env(name, default=default).strip().capitalize()

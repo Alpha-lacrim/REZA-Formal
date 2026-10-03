@@ -14,6 +14,11 @@ User = get_user_model()
 
 
 class AccountReadSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+
+    def get_role(self, obj):
+        return 'admin' if obj.is_admin() else 'user'
+
     class Meta:
         model = User
         fields = [
@@ -48,9 +53,14 @@ class ProfileWriteSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    password = StrictCharField(max_length=1024, trim_whitespace=False)
+
+
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
-    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password = StrictCharField(write_only=True, trim_whitespace=False, max_length=1024)
     first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
 
     def validate(self, attrs):

@@ -1,18 +1,17 @@
 import { useActions, useOverlays } from '../state/AppState';
 import { errorMessage, ApiError } from '../services/api';
 import React, { useState, useEffect } from 'react';
-import { X, LogIn, UserPlus, ArrowLeft, Loader2, ShieldCheck } from 'lucide-react';
+import { X, LogIn, UserPlus, ArrowLeft, Loader2 } from 'lucide-react';
 
 
 const AuthModal: React.FC = () => {
     const { isAuthModalOpen } = useOverlays();
     const { setAuthModalOpen, login, register } = useActions();
-    const [view, setView] = useState<'login' | 'register' | '2fa'>('login');
+    const [view, setView] = useState<'login' | 'register'>('login');
     
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [name, setName] = useState('');
-    const [twoFactorCode, setTwoFactorCode] = useState('');
     
     const [error, setError] = useState('');
     const [loading, setLoading] = useState(false);
@@ -23,7 +22,6 @@ const AuthModal: React.FC = () => {
             setEmail('');
             setPassword('');
             setName('');
-            setTwoFactorCode('');
             setError('');
             setLoading(false);
         }
@@ -38,30 +36,18 @@ const AuthModal: React.FC = () => {
         setLoading(true);
         
         try {
-            if (view === '2fa') {
-                if (!twoFactorCode || twoFactorCode.length !== 6) {
-                    throw new ApiError(0, 'کد تایید باید ۶ رقم باشد', {}, 'validation_error');
-                }
-                await login(email, password, twoFactorCode);
-            } else {
-                if (!email || !password || (view === 'register' && !name)) {
-                    throw new ApiError(0, 'لطفاً تمام فیلدها را پر کنید', {}, 'validation_error');
-                }
+            if (!email || !password || (view === 'register' && !name)) {
+                throw new ApiError(0, 'لطفاً تمام فیلدها را پر کنید', {}, 'validation_error');
+            }
 
-                if (view === 'login') {
-                    await login(email, password);
-                } else {
-                    await register(name, email, password);
-                }
+            if (view === 'login') {
+                await login(email, password);
+            } else {
+                await register(name, email, password);
             }
             // If successful, modal closes via context state change triggered by login/register
         } catch (err: unknown) {
-            if (err instanceof ApiError && err.code === '2FA_REQUIRED') {
-                setView('2fa');
-                setError('');
-            } else {
-                setError(errorMessage(err, 'خطایی رخ داد'));
-            }
+            setError(errorMessage(err, 'خطایی رخ داد'));
         } finally {
             setLoading(false);
         }
@@ -77,12 +63,6 @@ const AuthModal: React.FC = () => {
                 <h2 className="text-xl font-bold mb-6 text-lux-black dark:text-white flex items-center gap-2">
                     {view === 'login' && 'ورود به حساب'}
                     {view === 'register' && 'ایجاد حساب کاربری'}
-                    {view === '2fa' && (
-                        <>
-                            <ShieldCheck className="text-lux-gold" />
-                            تایید دو مرحله‌ای
-                        </>
-                    )}
                 </h2>
                 
                 <form onSubmit={handleSubmit} className="space-y-4">
@@ -97,7 +77,6 @@ const AuthModal: React.FC = () => {
                         />
                     )}
                     
-                    {view !== '2fa' && (
                         <>
                             <input 
                                 type="email" 
@@ -118,35 +97,7 @@ const AuthModal: React.FC = () => {
                                 disabled={loading}
                             />
                         </>
-                    )}
 
-                    {view === '2fa' && (
-                        <div className="animate-in fade-in zoom-in duration-300 space-y-4">
-                            <div className="text-center mb-4">
-                                <div className="inline-flex items-center justify-center w-12 h-12 bg-blue-100 text-blue-600 rounded-full mb-2">
-                                    <ShieldCheck size={24} />
-                                </div>
-                                <p className="text-sm text-gray-500 dark:text-gray-400">کد ۶ رقمی برنامه احراز هویت خود را وارد کنید.</p>
-                            </div>
-                            
-                            <input 
-                                type="text" 
-                                placeholder="------" 
-                                value={twoFactorCode}
-                                onChange={e => {
-                                    const val = e.target.value.replace(/[^0-9]/g, '').slice(0, 6);
-                                    setTwoFactorCode(val);
-                                }}
-                                className="w-full p-3 border border-gray-300 bg-white text-lux-black rounded-lg dark:border-zinc-700 dark:bg-zinc-900 dark:text-white focus:border-lux-gold outline-none text-center text-2xl tracking-[0.5em] font-mono placeholder-gray-300"
-                                dir="ltr"
-                                disabled={loading}
-                                autoFocus
-                            />
-
-
-                        </div>
-                    )}
-                    
                     {error && <p className="text-red-500 text-sm animate-pulse">{error}</p>}
 
                     <button 
@@ -154,12 +105,11 @@ const AuthModal: React.FC = () => {
                         disabled={loading}
                         className="w-full py-3 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black rounded-lg font-bold hover:opacity-90 flex items-center justify-center gap-2 disabled:opacity-50"
                     >
-                        {loading ? <Loader2 size={18} className="animate-spin" /> : (view === 'login' ? <LogIn size={18} /> : (view === 'register' ? <UserPlus size={18} /> : <ShieldCheck size={18} />))}
-                        {loading ? 'لطفا صبر کنید...' : (view === 'login' ? 'ورود' : (view === 'register' ? 'ثبت نام' : 'تایید و ورود'))}
+                        {loading ? <Loader2 size={18} className="animate-spin" /> : (view === 'login' ? <LogIn size={18} /> : <UserPlus size={18} />)}
+                        {loading ? 'لطفا صبر کنید...' : (view === 'login' ? 'ورود' : 'ثبت نام')}
                     </button>
                 </form>
 
-                {view !== '2fa' && (
                     <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-700 flex justify-between items-center text-sm">
                         <button 
                             onClick={() => {
@@ -177,15 +127,6 @@ const AuthModal: React.FC = () => {
                             </button>
                         )}
                     </div>
-                )}
-                
-                {view === '2fa' && (
-                    <div className="mt-4 pt-4 border-t border-gray-100 dark:border-zinc-700 flex justify-center text-sm">
-                        <button onClick={() => setView('login')} className="flex items-center gap-1 text-gray-500 dark:text-gray-400 hover:text-lux-gold">
-                            <ArrowLeft size={14} /> بازگشت به ورود
-                        </button>
-                    </div>
-                )}
             </div>
         </div>
     );

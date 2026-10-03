@@ -29,6 +29,17 @@ class User(AbstractUser):
         super().save(*args, **kwargs)
 
 
+class AuthSession(models.Model):
+    """One browser session; never stores a bearer token or password."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='auth_sessions')
+    refresh_digest = models.CharField(max_length=64)
+    password_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField(db_index=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+
 # Ensure any Django superuser is treated as admin (keeps role/is_staff in sync).
 from django.db.models.signals import post_save
 from django.dispatch import receiver

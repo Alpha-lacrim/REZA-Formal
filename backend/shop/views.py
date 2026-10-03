@@ -21,18 +21,17 @@ from .serializers import (
     AdminProductWriteSerializer,
     ProductVariantInputSerializer,
     RegisterSerializer,
+    LoginSerializer,
     ProfileWriteSerializer,
     AccountReadSerializer,
     SiteSettingsSerializer,
 )
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
-import pyotp
 import uuid
+import base64
 from django.conf import settings
 from django.middleware.csrf import get_token
-from django.core.files.storage import default_storage
 from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
@@ -42,6 +41,7 @@ from django.db.models.functions import Cast, Coalesce
 from django.utils.dateparse import parse_date
 from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
 from .auth import enforce_csrf
+from .sessions import new_session, revoke_cookies, revoke_token, rotate_session
 from .commerce_services import CommerceError
 from .product_services import save_product
 from .selectors import product_reads, order_reads
@@ -49,42 +49,17 @@ from .pagination import page_response
 from .product_media import MAX_GALLERY_IMAGES, MAX_UPLOAD_BYTES
 import json
 import logging
+import time
 from decimal import Decimal
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class InvalidGoogleToken(Exception):
-    pass
 
-
-class GoogleTokenVerificationUnavailable(Exception):
-    pass
-
-
-def _verify_google_token(raw_id_token, client_id):
-    try:
-        from google.auth.exceptions import GoogleAuthError, TransportError
-        from google.auth.transport import requests as google_requests
-        from google.oauth2 import id_token as google_id_token
-    except ImportError as exc:
-        raise GoogleTokenVerificationUnavailable from exc
-
-    try:
-        return google_id_token.verify_oauth2_token(
-            raw_id_token,
-            google_requests.Request(),
-            client_id,
-        )
-    except TransportError as exc:
-        raise GoogleTokenVerificationUnavailable from exc
-    except (GoogleAuthError, ValueError) as exc:
-        raise InvalidGoogleToken from exc
 
 def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
-    return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+    return new_session(user)
 
 
 @api_view(['GET'])
@@ -102,26 +77,32 @@ def _set_auth_cookies(response, tokens):
     }
     response.set_cookie(
         'access',
-        tokens['access'],
+        str(tokens['access']),
+        max_age=max(0, tokens['access']['exp'] - int(time.time())),
         samesite=settings.AUTH_COOKIE_SAMESITE,
         **cookie_options,
     )
     response.set_cookie(
         'refresh',
-        tokens['refresh'],
+        str(tokens['refresh']),
+        max_age=max(0, tokens['refresh']['exp'] - int(time.time())),
         samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
         **cookie_options,
     )
 
 
 def _clear_auth_cookies(response):
-    response.delete_cookie(
+    response.set_cookie(
         'access',
+        '', max_age=0, expires='Thu, 01 Jan 1970 00:00:00 GMT',
+        httponly=True, secure=settings.AUTH_COOKIE_SECURE,
         path='/',
         samesite=settings.AUTH_COOKIE_SAMESITE,
     )
-    response.delete_cookie(
+    response.set_cookie(
         'refresh',
+        '', max_age=0, expires='Thu, 01 Jan 1970 00:00:00 GMT',
+        httponly=True, secure=settings.AUTH_COOKIE_SECURE,
         path='/',
         samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
     )
@@ -134,6 +115,8 @@ def _new_username(email):
 
 def serialize_user(user):
     return AccountReadSerializer(user).data
+
+
 
 
 def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentFile:
@@ -245,6 +228,7 @@ def register(request):
         if User.objects.filter(email__iexact=email).exists():
             return Response({'detail': 'Email already exists'}, status=400)
         return Response({'detail': 'Unable to create account; please retry'}, status=409)
+    revoke_cookies(request.COOKIES)
     tokens = get_tokens_for_user(user)
     response = Response(
         {'detail': 'registered', 'user': serialize_user(user)},
@@ -255,17 +239,20 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
-@throttle_classes([LoginRateThrottle])
+@throttle_classes([LoginRateThrottle, LoginAccountRateThrottle])
 def login(request):
     enforce_csrf(request)
-    email = str(request.data.get('email') or '').strip()
-    password = request.data.get('password') or ''
-    otp = request.data.get('otp')
-    if not email or not password:
+    if isinstance(request.data, Mapping) and (not request.data.get('email') or not request.data.get('password')):
         return Response({'detail': 'Email and password are required'}, status=400)
+    serializer = LoginSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+    email, password = serializer.validated_data['email'], serializer.validated_data['password']
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
+        # Match Django's unknown-user password hashing cost without logging input.
+        User().set_password(password)
         return Response({'detail':'Invalid credentials'}, status=400)
     except User.MultipleObjectsReturned:
         logger.error('Multiple users share the same normalized email')
@@ -274,11 +261,10 @@ def login(request):
     if not user_auth:
         return Response({'detail':'Invalid credentials'}, status=400)
     if user.two_factor_secret:
-        if not otp:
-            return Response({'detail':'2FA_REQUIRED'}, status=403)
-        totp = pyotp.TOTP(user.two_factor_secret)
-        if not totp.verify(otp):
-            return Response({'detail':'Invalid 2FA code'}, status=403)
+        # Enrollment, replay protection and recovery were never implemented.
+        # Fail closed for legacy MFA-marked accounts instead of bypassing MFA.
+        return Response({'detail': 'This sign-in method is unavailable.', 'code': 'feature_unavailable'}, status=503)
+    revoke_cookies(request.COOKIES)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': serialize_user(user)})
     _set_auth_cookies(resp, tokens)
@@ -295,6 +281,9 @@ def me(request):
 @permission_classes([permissions.AllowAny])
 def logout_view(request):
     enforce_csrf(request)
+    revoke_cookies(request.COOKIES)
+    if request.user.is_authenticated and request.auth:
+        revoke_token(request.auth)
     resp = Response({'detail': 'logged out'})
     _clear_auth_cookies(resp)
     return resp
@@ -306,25 +295,19 @@ def refresh_auth(request):
     enforce_csrf(request)
     raw_refresh = request.COOKIES.get('refresh')
     if not raw_refresh:
-        return Response({'detail': 'Refresh token required'}, status=401)
+        response = Response({'detail': 'Refresh token required'}, status=401)
+        _clear_auth_cookies(response)
+        return response
 
     try:
-        refresh = RefreshToken(raw_refresh)
-        access = str(refresh.access_token)
+        tokens = rotate_session(raw_refresh)
     except TokenError:
         response = Response({'detail': 'Invalid or expired refresh token'}, status=401)
         _clear_auth_cookies(response)
         return response
 
     response = Response({'detail': 'refreshed'})
-    response.set_cookie(
-        'access',
-        access,
-        httponly=True,
-        secure=settings.AUTH_COOKIE_SECURE,
-        samesite=settings.AUTH_COOKIE_SAMESITE,
-        path='/',
-    )
+    _set_auth_cookies(response, tokens)
     return response
 
 @api_view(['PUT'])
@@ -339,49 +322,8 @@ def update_profile(request):
 @permission_classes([permissions.AllowAny])
 def google_auth(request):
     enforce_csrf(request)
-    raw_id_token = request.data.get('id_token')
-    if not raw_id_token:
-        return Response({'detail': 'id_token required'}, status=400)
+    return Response({'detail': 'Google sign-in is unavailable.', 'code': 'feature_unavailable'}, status=501)
 
-    client_id = settings.GOOGLE_OAUTH_CLIENT_ID
-    if not client_id:
-        logger.error('Google authentication requested without GOOGLE_OAUTH_CLIENT_ID')
-        return Response({'detail': 'Google authentication is not configured'}, status=503)
-
-    try:
-        payload = _verify_google_token(raw_id_token, client_id)
-    except GoogleTokenVerificationUnavailable:
-        logger.warning('Google token verification service is unavailable')
-        return Response({'detail': 'Google authentication is temporarily unavailable'}, status=503)
-    except InvalidGoogleToken:
-        return Response({'detail': 'Invalid id_token'}, status=400)
-
-    email = str(payload.get('email') or '').strip().lower()
-    if not email or payload.get('email_verified') is not True or not payload.get('sub'):
-        return Response({'detail': 'Google account email is not verified'}, status=400)
-
-    user = User.objects.filter(email__iexact=email).first()
-    if user is None:
-        name = str(payload.get('name') or email.split('@', 1)[0])[:150]
-        try:
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    username=_new_username(email),
-                    email=email,
-                    password=None,
-                    first_name=name,
-                )
-        except IntegrityError:
-            user = User.objects.filter(email__iexact=email).first()
-            if user is None:
-                return Response({'detail': 'Unable to create account; please retry'}, status=409)
-    if not user.is_active:
-        return Response({'detail': 'Account is disabled'}, status=403)
-
-    tokens = get_tokens_for_user(user)
-    resp = Response({'user': serialize_user(user)})
-    _set_auth_cookies(resp, tokens)
-    return resp
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])

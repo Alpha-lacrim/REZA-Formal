@@ -37,7 +37,7 @@ urlpatterns = [
     path('admin/orders/<str:pk>/status/', views.admin_update_order_status),
     path('admin/users/', views.admin_users),
     path('admin/messages/', views.admin_messages),
-    path('admin/messages/<str:pk>/mark-read/', views.admin_mark_message_read),
+    path('admin/messages/<int:pk>/mark-read/', views.admin_mark_message_read),
     path('admin/products/', views.admin_products),
     path('admin/products/<str:pk>/', views.admin_product_detail),
     path('admin/coupons/', commerce_views.admin_coupons),

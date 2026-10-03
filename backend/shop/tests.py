@@ -173,46 +173,21 @@ class AuthenticationTests(TestCase):
         self.assertEqual(response.status_code, 400)
         self.assertEqual(response.data['detail'], 'Email and password are required')
 
-    @patch('shop.views._verify_google_token')
-    def test_google_auth_rejects_an_unverified_token(self, verifier):
-        from shop.views import InvalidGoogleToken
-
-        verifier.side_effect = InvalidGoogleToken
-        response = self.client.post(
-            '/api/auth/google/',
-            {'id_token': 'unsigned.claims.token'},
-            format='json',
-        )
-
-        self.assertEqual(response.status_code, 400)
+    def test_google_auth_is_disabled_even_with_configuration_and_claims(self):
+        response = self.client.post('/api/auth/google/', {'id_token': 'synthetic-token'}, format='json')
+        self.assertEqual(response.status_code, 501)
+        self.assertEqual(response.data['code'], 'feature_unavailable')
         self.assertFalse(User.objects.exists())
-        verifier.assert_called_once()
+        self.assertNotIn('access', response.cookies)
 
-    @patch('shop.views._verify_google_token')
-    def test_google_auth_accepts_only_verified_email_claims(self, verifier):
-        verifier.return_value = {
-            'sub': 'google-account-id',
-            'email': 'google.user@example.com',
-            'email_verified': False,
-            'name': 'Google User',
-        }
-        response = self.client.post(
-            '/api/auth/google/',
-            {'id_token': 'signed.claims.token'},
-            format='json',
-        )
-        self.assertEqual(response.status_code, 400)
-        self.assertFalse(User.objects.exists())
+    def test_legacy_mfa_account_fails_closed_without_disclosing_or_bypassing_secret(self):
+        User.objects.create_user('legacy-mfa', 'mfa@example.invalid', 'Test-only-493!', two_factor_secret='synthetic-mfa-marker')
+        for otp in (None, '000000'):
+            response = self.client.post('/api/auth/login/', {'email': 'mfa@example.invalid', 'password': 'Test-only-493!', 'otp': otp}, format='json')
+            self.assertEqual(response.status_code, 503)
+            self.assertNotIn('access', response.cookies)
+            self.assertNotIn('synthetic-mfa-marker', str(response.data))
 
-        verifier.return_value['email_verified'] = True
-        response = self.client.post(
-            '/api/auth/google/',
-            {'id_token': 'signed.claims.token'},
-            format='json',
-        )
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('access', response.cookies)
-        self.assertTrue(User.objects.filter(email='google.user@example.com').exists())
 
     def test_otp_endpoint_neither_discloses_a_code_nor_changes_a_user(self):
         user = User.objects.create_user(

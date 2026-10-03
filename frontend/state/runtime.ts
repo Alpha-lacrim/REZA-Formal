@@ -69,7 +69,10 @@ export function createRuntime() {
     async register(name: string, email: string, pass: string) {
       if (await auth.register(name, email, pass)) { ui.setAuthModalOpen(false); ui.showToast('حساب کاربری ایجاد شد'); }
     },
-    async logout() { await auth.logout(); ui.showToast('خروج با موفقیت انجام شد'); },
+    async logout() {
+      try { await auth.logout(); ui.showToast('خروج با موفقیت انجام شد'); }
+      catch { ui.showToast('خروج از سرور تأیید نشد. دوباره تلاش کنید.'); }
+    },
     updateUserProfile: (data: Partial<User>) => auth.updateUserProfile(data),
     refreshProducts,
     async cancelUserOrder(orderId: string) {
