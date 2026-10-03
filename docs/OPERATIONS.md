@@ -119,6 +119,14 @@ Git SHA, lockfiles, scan reports, migration plan and rollback image before relea
 Refresh digest/ODBC/OS inputs deliberately and rerun gates; a frozen vulnerable
 image is not an acceptable long-term update policy.
 
+The backend now uses Debian 13 with the same Python 3.11.17/ODBC 18.6.2.1 pins and
+Python hash lock. Same-release apt upgrades apply fixes newer than the pinned base;
+use `--pull --no-cache` for security refreshes. Runtime setuid/setgid executable bits
+are removed; application/maintenance jobs do not require them. The local scan removes
+all five reported CRITICAL findings but retains 44 HIGH package findings across eight
+IDs. These block release. See the [vendor matrix and required next steps](RUNTIME_VULNERABILITIES.md)
+before considering rollout; source-level scanner findings are not silently waived.
+
 The frontend removes unused dynamic Nginx modules and updates packages within the
 pinned base's Alpine release. Nginx itself uses the explicit maintained Alpine
 security package version in `NGINX_PACKAGE_VERSION` (currently 1.28.3-r7), preserving
@@ -367,6 +375,7 @@ docker build -t reza-b10-backend:local backend
 docker build -t reza-b10-frontend:local frontend
 node scripts/test-nginx-security.mjs
 node scripts/test-production-runtime.mjs
+node --test scripts/test-image-vulnerability-policy.mjs
 node scripts/scan-runtime-images.mjs
 ```
 
@@ -376,8 +385,8 @@ runs `scan-runtime-images.mjs --trivy <verified-binary>`. Local mode uses the
 digest-pinned scanner container and owned cache. The script attempts official Docker
 Hub, GHCR and public ECR database sources in order, requires a successful update,
 stores full-severity reports and verifies that scanned filesystems/timestamps match
-the selected images. Fixable HIGH/CRITICAL findings or scanner/download failures
-fail the gate; unfixed findings are recorded for review, never silently accepted.
+the selected images. Every HIGH/CRITICAL finding, including an unfixed one, or a
+scanner/download failure fails the gate. No advisory exception is implemented.
 Reports and source/worktree provenance live in ignored `.ops-reports/`; CI retains
 JSON artifacts for 14 days. The script performs no registry login, push or deployment.
 Checksum-verified actionlint validates workflow syntax/expressions locally and in CI.
@@ -389,8 +398,10 @@ rotation/history cleanup remain launch gates. Local fixtures cannot close them.
 The initial Batch 10 scans failed database downloads. The local follow-up completed
 through the official Docker Hub source and found fixable frontend OS/Nginx findings;
 the rebuilt runtime is re-scanned after patching. See Handoff for exact image IDs,
-severity counts and report locations. A fixable-finding gate pass is not a claim of
-zero advisories, deployed TLS assurance or observed GitHub-hosted execution.
+severity counts and report locations. The later Debian 13 remediation leaves zero
+CRITICAL and 44 HIGH backend findings; the strict gate fails as intended. Full scans
+also retain lower severities. Local evidence does not prove deployed TLS or observed
+GitHub-hosted execution.
 
 ## Primary references
 

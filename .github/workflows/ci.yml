@@ -94,6 +94,7 @@ jobs:
           node-version-file: frontend/.nvmrc
       - name: Build locked runtime images locally
         run: |
+          node --test scripts/test-image-vulnerability-policy.mjs
           docker build -t reza-b10-backend:local backend
           docker build -t reza-b10-frontend:local frontend
       - name: Proxy regression gate
@@ -107,7 +108,7 @@ jobs:
           curl --fail --location --retry 3 https://github.com/aquasecurity/trivy/releases/download/v0.75.0/trivy_0.75.0_Linux-64bit.tar.gz -o "$RUNNER_TEMP/trivy.tar.gz"
           echo 'c6e65abddb348e25f10549df887045629cf28cc72453cd1c63acb717316b3f3f  '"$RUNNER_TEMP/trivy.tar.gz" | sha256sum --check
           tar -xzf "$RUNNER_TEMP/trivy.tar.gz" -C "$RUNNER_TEMP" trivy
-      - name: Gate fixable high/critical runtime image vulnerabilities
+      - name: Gate all high/critical runtime image vulnerabilities
         run: |
           node scripts/scan-runtime-images.mjs --trivy "$RUNNER_TEMP/trivy"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

@@ -1,4 +1,5 @@
-FROM python:3.11-slim-bookworm@sha256:2333bd330d12de02514770b3585cad313644316047cdee24a7acfdece6de6efb AS base
+# Debian 13 carries security fixes unavailable in Debian 12. Keep Python/ODBC pins.
+FROM python:3.11.17-slim-trixie@sha256:bab1b7ef4b450c81002278d035eff85ebe394ae94df904f7a3ba14f7e16e487b AS base
 
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
@@ -19,11 +20,13 @@ FROM base AS runtime
 
 WORKDIR /app
 
-ADD --checksum=sha256:8434dcb8c346dc95fbd63dbece056c343704590b58b6a5c323d39acf52bf0b48 \
-    https://packages.microsoft.com/config/debian/12/packages-microsoft-prod.deb /tmp/packages-microsoft-prod.deb
+ADD --checksum=sha256:d0c2f69250c6ce0d4c6220b142f999d039a3c560af7f980b943687d106ca8e38 \
+    https://packages.microsoft.com/config/debian/13/packages-microsoft-prod.deb /tmp/packages-microsoft-prod.deb
 RUN dpkg -i /tmp/packages-microsoft-prod.deb \
     && rm /tmp/packages-microsoft-prod.deb \
     && apt-get update \
+    # Apply same-release security updates newer than the pinned base image.
+    && apt-get upgrade -y --no-install-recommends \
     && ACCEPT_EULA=Y apt-get install -y --no-install-recommends \
         ca-certificates libgssapi-krb5-2 unixodbc msodbcsql18=18.6.2.1-1 \
     && apt-get clean \
@@ -38,7 +41,9 @@ RUN /usr/local/bin/python -m pip uninstall --yes pip setuptools \
     && useradd --uid 10001 --gid app --no-create-home --shell /usr/sbin/nologin app \
     && mkdir -p /app/media /app/staticfiles \
     && chown app:app /app/media /app/staticfiles \
-    && chmod 755 /app/media /app/staticfiles /app/wait_for_db.sh /app/docker-entrypoint.sh
+    && chmod 755 /app/media /app/staticfiles /app/wait_for_db.sh /app/docker-entrypoint.sh \
+    # The application and maintenance jobs do not use setuid/setgid executables.
+    && find /usr /opt -xdev -type f -perm /6000 -exec chmod a-s {} +
 
 USER 10001:10001
 

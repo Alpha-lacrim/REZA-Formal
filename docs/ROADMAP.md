@@ -2,7 +2,7 @@
 
 Source/probe baseline established 2026-09-10 by Batch 1, with documentation completion review on 2026-09-13, on unchanged application commit `94d665881e3e929c41121d057385c28f822002fe`. Start with [AUDIT_INDEX](audit/AUDIT_INDEX.md), which owns the 43-finding register and all 18 hypothesis verdicts. This roadmap schedules work; it does not authorize starting another batch in this session or claim that any finding is fixed.
 
-## Batch 10 update - 2026-10-03
+## Batch 10 update - 2026-10-04
 
 Verified source/isolated operations scope on required `codex/batch-10-production-ops`
 from clean Batch 9 head `5e9e89d`. OPS-002/003/004 are partial with explicit evidence:
@@ -11,8 +11,11 @@ and shutdown, synthetic configuration, proxy/recreation and real SQL/media recov
 All 166 SQL cases, SQLite/frontend/Chrome, image builds, proxy/runtime and Compose
 gates pass. Initial image database downloads failed; the local follow-up now completes
 scans through an official source. Patched frontend reports zero advisories; backend
-has zero fixable HIGH/CRITICAL and 63 unfixed package findings across 23 advisory IDs.
-Full reports remain visible for release review. Backup-before-ownership maintenance,
+now uses supported Debian 13 security packages while retaining Python/ODBC/hash-lock
+versions. All five reported CRITICAL findings disappear; 44 unfixed HIGH package
+findings across eight IDs remain, and the strengthened severity gate blocks release.
+The [runtime advisory matrix](RUNTIME_VULNERABILITIES.md) records vendor fixes and
+next steps; full reports remain visible. Backup-before-ownership maintenance,
 legacy archive restore and disposable HTTPS/SQL certificate gates pass; actionlint
 validates workflows locally. Handoff records the exact evidence. [OPERATIONS](OPERATIONS.md)
 owns migration/backup/restore/ownership/health/log/rollback and TLS-ingress instructions.
