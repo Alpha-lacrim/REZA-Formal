@@ -41,15 +41,18 @@ modes, prepares non-root volume ownership and rejects symlinks. It uses a short-
 test CA to prove encrypted/certificate-validated SQL, wrong-host/unknown-CA rejection
 and HTTPS ingress with redirects/HSTS/Secure cookies. No host trust store is modified.
 
-CI also gates fixable high/critical image advisories with checksum-verified Trivy
+CI gates all high/critical image advisories, including unfixed ones, with checksum-verified Trivy
 0.75.0 through `scripts/scan-runtime-images.mjs`; local mode uses its pinned Docker
 image, CI passes the checksum-verified native binary. Official database fallback
 sources are tried without allowing unavailable or stale-scan evidence to pass.
 Full-severity reports and a summary are stored in ignored `.ops-reports/` and CI
-JSON artifacts; unfixed findings remain visible for review. The final local snapshot
-has zero frontend advisories and zero fixable HIGH/CRITICAL backend findings, with
-63 unfixed HIGH/CRITICAL package findings (23 advisory IDs). No risk acceptance or
-hosted execution is implied. Workflow syntax/expressions pass actionlint 1.7.12.
+JSON artifacts; unfixed findings fail the gate and remain visible for review.
+`node --test scripts/test-image-vulnerability-policy.mjs` verifies this severity policy.
+The Debian 13 local snapshot has zero frontend advisories and zero CRITICAL backend
+findings, with 44 unfixed HIGH package findings (eight advisory IDs); the scanner
+completes but returns exit 1 to block release. See the [advisory matrix](RUNTIME_VULNERABILITIES.md).
+No risk acceptance or hosted execution is implied. Workflow syntax/expressions pass
+actionlint 1.7.12.
 CI has no image push/deployment job. Full launch approval, TLS/backup targets,
 unfixed vulnerabilities and hosted execution remain owner gates. See
 [operations runbook](OPERATIONS.md). Runtime evidence is recorded in Handoff.

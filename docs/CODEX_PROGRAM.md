@@ -44,10 +44,18 @@ pre-codex-remediation-2026-09-10
 
 ## Batch 10 - Production infrastructure and operations (2026-10-03)
 
+- 2026-10-04 advisory remediation is isolated in the required Batch 10 worktree,
+  preserving completed Batch 11 in the primary checkout. Debian 13 security updates
+  remove all five reported CRITICAL and fifteen prior advisory IDs while retaining
+  Python/ODBC/hash-lock versions. Forty-four HIGH package findings across eight IDs
+  remain; every HIGH/CRITICAL now blocks release, including unfixed advisories.
+  No exceptions or unstable package mixing. Runtime privilege bits removed;
+  [vendor matrix and next steps](RUNTIME_VULNERABILITIES.md) track remaining work.
 - Local-only follow-up resolves scanner connectivity through official DB fallback:
   frontend fixes remove 67 fixable HIGH/CRITICAL findings and the patched snapshot
-  reports zero advisories; backend has no fixable HIGH/CRITICAL but retains the
-  unfixed findings above. Full reports/provenance retained; no silent exception.
+  reports zero advisories; the original backend retained 63 unfixed HIGH/CRITICAL
+  findings before the later remediation above. Full reports/provenance retained;
+  no silent exception.
   Backup-before-ownership maintenance, legacy restore/symlink rejection, disposable
   HTTPS/SQL certificate validation and local actionlint checks pass. Cleanup remains
   blocked by automatic review; real production and hosted workflow runs remain out
@@ -67,7 +75,7 @@ pre-codex-remediation-2026-09-10
   Real-SQL runtime fixture proves denied runtime DDL, restart persistence, graceful
   shutdown, dependency-failure health and SQL/media recovery to NEW disposable targets.
 - CI pins action commits and runtime patch versions, adds lock/secret-signature checks,
-  synthetic Compose validation, both builds, proxy/recovery and fixable high/critical
+  synthetic Compose validation, both builds, proxy/recovery and all high/critical
   image scan gates using checksum-verified Trivy. Actual deployment remains absent.
 - [OPERATIONS](OPERATIONS.md) owns operator runbooks and explicit limitations.
   Handoff records the public mirror build workaround, exact verification/scanner

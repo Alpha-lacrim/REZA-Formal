@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-04 (Batch 11 UX/RTL/metadata and browser/axe checks; prior Batch 10 operations evidence retained)
+Last verified: 2026-10-04 (Batch 12 candidate combines Batch 11 UX and Batch 10 Debian 13/runtime-security follow-up; final review in progress)
 
 ## Purpose and product
 
@@ -75,8 +75,13 @@ The local follow-up patches Alpine runtime packages and pins its maintained Ngin
 security package on the 1.28 branch; unused dynamic modules are removed. Image scans
 now download from official fallback registries and retain full reports/provenance in
 ignored `.ops-reports/` plus CI artifacts. Frontend has zero reported advisories in
-the observed snapshot; backend has zero fixable HIGH/CRITICAL and 63 unfixed package
-findings across 23 advisory IDs, requiring release review. This is not risk acceptance.
+the observed snapshot. Backend now uses Debian 13 with same-release security updates,
+keeping Python 3.11.17, ODBC 18.6.2.1 and the dependency hash lock. Its scan has zero
+CRITICAL and 44 unfixed HIGH package findings across eight advisory IDs, down from
+63 HIGH/CRITICAL across 23 IDs. All HIGH/CRITICAL findings block the release gate,
+including unfixed ones; no exception is accepted. Setuid/setgid executable bits are
+removed and verified in the runtime fixture. [Runtime advisory matrix and next steps](docs/RUNTIME_VULNERABILITIES.md)
+record vendor status and remaining work.
 The runtime fixture verifies a disposable TLS ingress/SQL CA with wrong-host/unknown-CA
 rejections; no host trust store or real certificates are changed. The explicit volume
 maintenance tool checks by default and verifies recovery archives before changing
@@ -99,6 +104,7 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `frontend/.nvmrc`, `frontend/nginx-main.conf` | CI Node patch baseline and unprivileged Nginx JSON logging/temp-path setup. |
 | `scripts/check-build-inputs.py`, `scripts/validate-production-config.py`, `scripts/test-production-runtime.mjs` | Read-only lock/secret-signature checks, synthetic configuration validation and isolated real-SQL/media recovery fixture. |
 | `scripts/prepare-volume-ownership.py`, `scripts/scan-runtime-images.mjs` | Explicit backup-before-ownership maintenance and full-report image scan gate with official DB source fallback. |
+| `scripts/image-vulnerability-policy.mjs`, `scripts/test-image-vulnerability-policy.mjs`, `docs/RUNTIME_VULNERABILITIES.md` | All-HIGH/CRITICAL gate including unfixed advisories, regression cases and vendor remediation/owner matrix. |
 | `scripts/Setup-DevelopmentEnv.ps1` | Creates ignored development env files, generates required secrets without displaying them, synchronizes the fresh database password, and removes obsolete Gemini variables. |
 | `.env.docker.example` | Names and safe examples for Docker configuration; never add real secrets. |
 | `frontend/package.json` | Frontend scripts and dependency contract. |

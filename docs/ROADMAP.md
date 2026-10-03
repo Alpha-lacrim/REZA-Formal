@@ -14,7 +14,7 @@ hosting pending origin/rendering/legacy-link decisions. Crawlable product canoni
 XML sitemap, true public HTTP statuses and initial product/social metadata remain
 an explicit future rollout, not a cosmetic URL migration. No deployment/merge/push.
 
-## Batch 10 update - 2026-10-03
+## Batch 10 update - 2026-10-04
 
 Verified source/isolated operations scope on required `codex/batch-10-production-ops`
 from clean Batch 9 head `5e9e89d`. OPS-002/003/004 are partial with explicit evidence:
@@ -23,8 +23,11 @@ and shutdown, synthetic configuration, proxy/recreation and real SQL/media recov
 All 166 SQL cases, SQLite/frontend/Chrome, image builds, proxy/runtime and Compose
 gates pass. Initial image database downloads failed; the local follow-up now completes
 scans through an official source. Patched frontend reports zero advisories; backend
-has zero fixable HIGH/CRITICAL and 63 unfixed package findings across 23 advisory IDs.
-Full reports remain visible for release review. Backup-before-ownership maintenance,
+now uses supported Debian 13 security packages while retaining Python/ODBC/hash-lock
+versions. All five reported CRITICAL findings disappear; 44 unfixed HIGH package
+findings across eight IDs remain, and the strengthened severity gate blocks release.
+The [runtime advisory matrix](RUNTIME_VULNERABILITIES.md) records vendor fixes and
+next steps; full reports remain visible. Backup-before-ownership maintenance,
 legacy archive restore and disposable HTTPS/SQL certificate gates pass; actionlint
 validates workflows locally. Handoff records the exact evidence. [OPERATIONS](OPERATIONS.md)
 owns migration/backup/restore/ownership/health/log/rollback and TLS-ingress instructions.

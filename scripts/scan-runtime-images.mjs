@@ -1,9 +1,10 @@
-// Full reports plus a fail-closed fixable HIGH/CRITICAL gate. No registry login/push.
+// Full reports plus a fail-closed HIGH/CRITICAL gate, including unfixed advisories.
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, unlinkSync } from 'node:fs';
 import { resolve, join } from 'node:path';
+import { assessImageVulnerabilities } from './image-vulnerability-policy.mjs';
 
 const args = process.argv.slice(2);
 const nativeIndex = args.indexOf('--trivy');
@@ -44,6 +45,9 @@ try {
     } catch { console.log('Scanner database source failed: ' + repository); }
   }
   assert.ok(downloaded, 'All official database sources failed; images are NOT verified');
+  summary.database_metadata = JSON.parse(scan(['version', '--format', 'json'])).VulnerabilityDB;
+  assert.ok(summary.database_metadata?.UpdatedAt && summary.database_metadata?.DownloadedAt,
+    'Scanner database provenance is missing; images are NOT verified');
   let blocked = false;
   for (const name of ['backend', 'frontend']) {
     const image = process.env['OPS_' + name.toUpperCase() + '_IMAGE'] || 'reza-b10-' + name + ':local';
@@ -62,22 +66,17 @@ try {
     assert.deepEqual(report.Metadata.ImageConfig.rootfs.diff_ids, inspected.RootFS.Layers, 'Scanned image filesystem differs from selected image');
     assert.equal(report.Metadata.ImageConfig.created, inspected.Created, 'Scanned image build timestamp differs');
     const findings = report.Results.flatMap(result => result.Vulnerabilities || []);
-    const important = findings.filter(item => ['HIGH', 'CRITICAL'].includes(item.Severity));
-    const fixable = important.filter(item => item.FixedVersion);
-    const counts = {};
-    for (const item of findings) counts[item.Severity] = (counts[item.Severity] || 0) + 1;
-    summary.images.push({ name, image_id: inspected.Id, severities: counts,
-      fixable_high_critical: fixable.length, unfixed_high_critical: important.length - fixable.length,
-      unfixed_ids: [...new Set(important.filter(item => !item.FixedVersion).map(item => item.VulnerabilityID))].sort() });
-    blocked ||= fixable.length > 0;
-    console.log(`${name}: fixable HIGH/CRITICAL=${fixable.length}; unfixed HIGH/CRITICAL=${important.length - fixable.length}`);
+    const assessment = assessImageVulnerabilities(findings);
+    summary.images.push({ name, image, image_id: inspected.Id, os: report.Metadata.OS, ...assessment });
+    blocked ||= assessment.release_blocked;
+    console.log(`${name}: fixable HIGH/CRITICAL=${assessment.fixable_high_critical}; unfixed HIGH/CRITICAL=${assessment.unfixed_high_critical}`);
   }
   summary.gate_passed = !blocked;
   summary.report_directory = output;
   writeFileSync(join(output, 'summary.json'), JSON.stringify(summary, null, 2));
   writeFileSync(resolve('.ops-reports', 'latest-summary.json'), JSON.stringify(summary, null, 2));
   console.log('Full scan reports: ' + output);
-  assert.ok(!blocked, 'Fixable HIGH/CRITICAL findings block release; see full reports');
+  assert.ok(!blocked, 'All HIGH/CRITICAL findings block release, including unfixed advisories; see full reports');
 } finally {
   if (createdCache) run('docker', ['volume', 'rm', cache]);
 }

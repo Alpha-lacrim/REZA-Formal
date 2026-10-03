@@ -86,6 +86,10 @@ function secureRequest(url, extra = {}) {
   });
 }
 try {
+  assert.equal(docker('run', '--rm', '--read-only', '--network', 'none', '--user', '0:0',
+    '--entrypoint', 'find', backendImage, '/usr', '/opt', '-xdev', '-type', 'f', '-perm', '/6000', '-print'), '',
+    'Backend runtime must not retain setuid/setgid executables');
+  console.log('Runtime fixture: no setuid/setgid executables in backend runtime');
   docker('network', 'create', network); createdNetwork = true;
   for (const name of volumes) { docker('volume', 'create', name); createdVolumes.push(name); }
   // Model a root-owned legacy volume, then make and verify a recovery archive
