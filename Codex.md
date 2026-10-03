@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-04 (Batch 12 architecture review; full frontend/browser/SQLite/SQL/proxy/runtime checks; completed image scan blocks release)
+Last verified: 2026-10-04 (Batch 12 review and container CI repair; verification in Handoff)
 
 ## Purpose and product
 
@@ -12,8 +12,9 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 
 The remediation program is partially complete. `codex/remediation-program` is the
 human-review candidate; automatic integration never updates main. Functional and
-disposable operations success does not clear the strict runtime-image release
-blocker or grant production approval. No new Batch 12 application migration exists.
+disposable operations success does not grant production approval. The image policy
+still blocks every HIGH/CRITICAL finding; tested Alpine artifacts clear that gate.
+No new Batch 12 application migration exists.
 
 ## Repository boundaries
 
@@ -80,18 +81,23 @@ The local follow-up patches Alpine runtime packages and pins its maintained Ngin
 security package on the 1.28 branch; unused dynamic modules are removed. Image scans
 now download from official fallback registries and retain full reports/provenance in
 ignored `.ops-reports/` plus CI artifacts. Frontend has zero reported advisories in
-the observed snapshot. Backend now uses Debian 13 with same-release security updates,
-keeping Python 3.11.17, ODBC 18.6.2.1 and the dependency hash lock. Its scan has zero
-CRITICAL and 44 unfixed HIGH package findings across eight advisory IDs, down from
-63 HIGH/CRITICAL across 23 IDs. All HIGH/CRITICAL findings block the release gate,
+the observed snapshot. Backend uses supported Alpine 3.23 with same-release security
+updates, Python 3.11.17, ODBC 18.7.1.1 and the unchanged 16-package hash lock.
+Microsoft's amd64/arm64 APK signatures were verified before checksum pinning;
+build-only downloads do not enter runtime layers. Both tested images report zero
+advisories. [ADR 0002](docs/adr/0002-backend-runtime-base.md) records musl/tooling
+compatibility and the untested arm64 deployment boundary. All HIGH/CRITICAL findings block the release gate,
 including unfixed ones; no exception is accepted. Setuid/setgid executable bits are
 removed and verified in the runtime fixture. [Runtime advisory matrix and next steps](docs/RUNTIME_VULNERABILITIES.md)
-record vendor status and remaining work.
+preserve the earlier Debian findings and current artifact evidence.
 The runtime fixture verifies a disposable TLS ingress/SQL CA with wrong-host/unknown-CA
 rejections; no host trust store or real certificates are changed. The explicit volume
 maintenance tool checks by default and verifies recovery archives before changing
 ownership. It runs only on owned synthetic volumes in tests; existing application
-volumes remain owner work. Hosted CI has local actionlint checks but no observed run.
+volumes remain owner work. Test recovery archives stay in a uniquely owned Docker
+volume, read through restricted maintenance containers; root-only manifest access
+is tested without relying on Windows host permissions. Hosted CI evidence is
+recorded separately in Handoff and FINAL_REVIEW.
 
 The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-13. This workstation uses ignored `MSSQL_PORT=11433` because Windows rejected host port `1433`; services still connect to `db:1433` inside Compose.
 

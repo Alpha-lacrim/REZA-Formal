@@ -2,8 +2,9 @@
 
 Batch 12 (2026-10-04): current npm production and resolved Python hash-lock scans
 report no known vulnerabilities; five exact build-only npm entries still expire
-2026-11-02. Completed runtime-image scanning is separate: backend 44 unfixed HIGHs
-across eight IDs blocks release under OPS-002; frontend reports zero findings.
+2026-11-02. The original Debian scan blocked 44 unfixed HIGH package findings;
+the later supported Alpine/ODBC container repair reports zero advisories on both
+final images under the unchanged strict policy. OPS-002 production gates remain.
 No VEX/exception is approved. [FINAL_REVIEW](FINAL_REVIEW.md) records current
 verification and retained historical credential/media/deployment obligations.
 

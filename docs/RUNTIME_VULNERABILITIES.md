@@ -1,9 +1,51 @@
 # Runtime image advisory remediation
 
-Reviewed locally on 2026-10-04. No production deployment, cloud/DNS/payment change,
-real database operation or hosted CI run is part of this work.
+Reviewed on 2026-10-04. No production deployment, cloud/DNS/payment change or real
+database operation is part of this work. Hosted follow-up evidence belongs in
+[FINAL_REVIEW](audit/FINAL_REVIEW.md) and Handoff.
 
-## Result and scope
+## Current supported-runtime follow-up
+
+The GitHub push/PR container jobs first failed in the recovery fixture: a Linux
+runner cannot read a root-owned mode-0600 manifest written to its bind-mounted
+temporary directory. The fixture now keeps recovery archives/manifests in its
+own uniquely named Docker backup volume. Read-only maintenance containers verify
+the manifest's original mode/owner and recovery bytes; UID 10001 is explicitly
+denied access. Media archive creation/restoration uses the same owned volume.
+Production backup permissions are not relaxed and no application volume is used.
+
+A fresh no-cache Debian rebuild reproduced all 44 HIGH findings below. The
+supported replacement is digest-pinned Python 3.11.17 on Alpine 3.23 with Microsoft
+ODBC 18.7.1.1, the unchanged 16-package hash lock and same UID/startup/storage
+contract. Microsoft supports this distribution/driver pair. Both architecture
+packages were detached-signature verified and are checksum-pinned; only the
+selected package is mounted into the build. See [ADR 0002](adr/0002-backend-runtime-base.md)
+for sources, the libc change, tooling and architecture-validation limits.
+
+Both final `--pull --no-cache` runtime builds pass. Fresh full Trivy 0.75.0 reports
+**zero advisories at every severity in both images**, and the unchanged gate exits
+0. Backend SQLite checks/drift/full suite and the final TLS/ownership/restart/
+shutdown/SQL+media recovery fixture pass. Full SQL/hosted outcomes are recorded
+separately as completed. No CVE ignore, VEX exception or essential-package purge
+clears this result.
+
+Final local reports: `.ops-reports/2026-10-03T23-01-55-283Z-d10fc3f8/` (UTC).
+Official Docker Hub vulnerability DB updated `2026-10-03T19:02:38Z`, downloaded
+`2026-10-03T23:02:37Z`. The summary records parent Git `77f1292` with a dirty worktree
+because it scanned the pending container fix; hosted checks validate the committed
+candidate separately. Images:
+
+| Selected image | Scanned Docker identity |
+| --- | --- |
+| `reza-b12-backend:ci-fix` | `sha256:904cbf6b37f248d83f321d9a9ad549305f955dcad938e46897af63b6d6ab98dd` |
+| `reza-b12-frontend:ci-fix` | `sha256:befe0f3002e6a47383bf5b349b05a15f3daf0ed356e09d2e131f1a3c9b8de83b` |
+
+Keep the strict all-HIGH/CRITICAL policy and full report retention. Archive and
+promote tested immutable images, repeat fresh scans on updates and require arm64
+runtime/SQL validation before deploying there. Production licensing, grants,
+ingress, capacity, backups and remaining audit work are still owner gates.
+
+## Historical Debian 13 result and scope
 
 The backend moves from Debian 12 to the supported Debian 13 Python image, with
 same-release security updates applied at build time. Python **3.11.17**, the
@@ -27,8 +69,8 @@ util-linux IDs each match nine packages instead of eight. No findings are ignore
 downgraded or given an exception. Exact images, database timestamps and full reports
 are recorded in the latest Handoff entry and ignored `.ops-reports/`.
 
-The release gate now fails on **every HIGH/CRITICAL finding**, including those with
-an empty fixed version. The current backend therefore **blocks release**. Scanner
+The release gate fails on **every HIGH/CRITICAL finding**, including those with
+an empty fixed version. This historical Debian backend therefore **blocks release**. Scanner
 or database errors also fail closed. CI retains full JSON reports even on failure;
 the regression tests cover the previously permitted unfixed-advisory case.
 
@@ -48,7 +90,7 @@ their upstream major/minor version stays the same.
 | OpenSSL `3.5.7-1~deb13u3` | [CVE-2026-84782](https://security-tracker.debian.org/tracker/CVE-2026-84782) |
 | zlib `1:1.3.dfsg+really1.3.1-1+b1` | [CVE-2023-45853](https://security-tracker.debian.org/tracker/CVE-2023-45853); the old source-level finding concerned MiniZip, which Debian also notes was not built into the old zlib binary |
 
-## Remaining findings and why they are unresolved
+## Historical Debian findings and vendor limits
 
 All 44 are HIGH. None has a fixed version in the scanner's Debian 13 report.
 Debian's tracker still lists the installed stable versions as vulnerable. A direct
@@ -79,7 +121,11 @@ force. These constrain local privilege-escalation paths; **they do not patch the
 packages or clear the scan findings**. Do not add a privileged container, host
 namespaces, SYS_ADMIN or host device mounts to bypass this boundary.
 
-## What the owner should do
+## Historical Debian remediation options
+
+These options describe the blocked Debian artifacts above. The supported Alpine
+follow-up supersedes waiting for Debian fixes for the current candidate; it does
+not accept the older images for release. Retain this vendor history for review.
 
 1. Keep rollout blocked while these HIGH findings remain unresolved. Review the
    full reports and this matrix with the security/release owner.

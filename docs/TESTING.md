@@ -3,8 +3,9 @@
 Run commands from the nested `REZA-Formal` Git root. Node 22 and Python 3.11 are the CI baselines. Install Python dependencies from `backend/requirements.txt` into a virtual environment. No command below uses the application SQL Server database.
 
 Latest executed evidence: [Batch 12 final review](audit/FINAL_REVIEW.md), 2026-10-04.
-All functional/browser/SQL/runtime gates pass; the completed image scan correctly
-blocks release on 44 backend HIGHs. Hosted CI execution is a separate evidence gate.
+The original review and subsequent container repair are recorded separately.
+Supported Alpine/ODBC images clear the unchanged image gate; hosted CI evidence is
+separate from local verification and production approval.
 
 ## Frontend accessibility checks (Batch 11)
 
@@ -41,7 +42,10 @@ SQL is unavailable. `OPS_BACKEND_IMAGE`/`OPS_FRONTEND_IMAGE` may select local te
 images. Cleanup touches only this fixture's names; no application env or volume is used.
 
 The expanded fixture also restores a root-owned legacy archive with original bytes/
-modes, prepares non-root volume ownership and rejects symlinks. It uses a short-lived
+modes, prepares non-root volume ownership and rejects symlinks. Recovery archives
+and manifests stay in an owned Docker volume, avoiding Linux runner/host UID
+assumptions. The manifest is verified as root-owned mode 0600 and denied to UID
+10001 before restoration through maintenance containers. It uses a short-lived
 test CA to prove encrypted/certificate-validated SQL, wrong-host/unknown-CA rejection
 and HTTPS ingress with redirects/HSTS/Secure cookies. No host trust store is modified.
 
@@ -52,13 +56,14 @@ sources are tried without allowing unavailable or stale-scan evidence to pass.
 Full-severity reports and a summary are stored in ignored `.ops-reports/` and CI
 JSON artifacts; unfixed findings fail the gate and remain visible for review.
 `node --test scripts/test-image-vulnerability-policy.mjs` verifies this severity policy.
-The Debian 13 local snapshot has zero frontend advisories and zero CRITICAL backend
-findings, with 44 unfixed HIGH package findings (eight advisory IDs); the scanner
-completes but returns exit 1 to block release. See the [advisory matrix](RUNTIME_VULNERABILITIES.md).
-No risk acceptance or hosted execution is implied. Workflow syntax/expressions pass
+The original Debian 13 snapshot completed with 44 unfixed backend HIGHs and correctly
+failed. The supported Alpine/ODBC follow-up reports zero advisories on both tested
+images and passes the same policy. See the [advisory record](RUNTIME_VULNERABILITIES.md)
+and [runtime ADR](adr/0002-backend-runtime-base.md). No risk acceptance or production
+approval is implied. Workflow syntax/expressions pass
 actionlint 1.7.12.
 CI has no image push/deployment job. Full launch approval, TLS/backup targets,
-unfixed vulnerabilities and hosted execution remain owner gates. See
+fresh artifact scanning and hosted execution remain release gates. See
 [operations runbook](OPERATIONS.md). Runtime evidence is recorded in Handoff.
 
 ## Security gates (Batch 9)

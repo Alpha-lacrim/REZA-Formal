@@ -85,7 +85,7 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
-The repository CI runs isolated checks plus frontend lint/tests/type/build, Compose and disposable container/recovery/security gates. Browser/SQL integration lanes are separately dispatched; see [TESTING](../docs/TESTING.md). External provider sandbox evidence remains pending provider selection. The strict image release gate currently blocks the backend; see [FINAL_REVIEW](../docs/audit/FINAL_REVIEW.md).
+The repository CI runs isolated checks plus frontend lint/tests/type/build, Compose and disposable container/recovery/security gates. Browser/SQL integration lanes are separately dispatched; see [TESTING](../docs/TESTING.md). External provider sandbox evidence remains pending provider selection. The supported Alpine/ODBC follow-up clears the strict image gate on tested artifacts; see [FINAL_REVIEW](../docs/audit/FINAL_REVIEW.md) for evidence and remaining production obligations.
 
 ## Docker
 

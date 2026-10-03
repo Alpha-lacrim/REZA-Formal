@@ -42,8 +42,9 @@ Remaining IDs: ARCH-003, BE-009, FE-006, DB-001/002/003, SEC-005, PERF-002,
 TEST-002/003, OPS-002/003/004 and UX-001/002. FE-006 includes the open price-change
 policy despite implemented race guards; disabled SEC-004 is contained, not a
 completed identity integration. Rollout/owner obligations on fixed records remain
-in [FINAL_REVIEW](FINAL_REVIEW.md). Fresh image scan completes with 44 unfixed
-backend HIGHs across eight IDs and blocks release under OPS-002; scanner severity
+in [FINAL_REVIEW](FINAL_REVIEW.md). The later supported Alpine/ODBC container repair
+clears the original 44-HIGH image blocker under the unchanged policy; OPS-002 still
+requires production owner evidence. Scanner severity
 does not renumber/reclassify original audit priorities. Program is partially complete.
 
 ## Supplied hypotheses: verdicts
