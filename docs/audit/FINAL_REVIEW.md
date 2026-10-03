@@ -236,7 +236,16 @@ runtime/TLS/ownership/SQL+media recovery fixture pass. Built-image Django check 
 drift pass; SQLite discovers 166 cases, with 154 pass/12 intentional SQL-only skips
 (18.061s). Fresh full Trivy reports **zero advisories at every severity for both
 images**, exit 0. The final built image also passes disposable SQL check/drift and
-**166/166 tests, zero skips (39.364s)**. Hosted results follow publication.
+**166/166 tests, zero skips (39.364s)**.
+
+Fix `7d8219a` merged into the candidate at `bc80739` and was normally pushed.
+Push CI `37160912651` and PR CI `37160916662` pass frontend/backend/Compose and
+dependency security; both container jobs confirm the backup/TLS/startup fix, then
+fail at reserving the old backend IP in the DNS drill, before image scanning.
+The follow-up uses Docker's automatically selected unused subnet with explicit
+IPAM and asserts a different replacement address. The complete local runtime rerun
+passes after that correction; hosted outcomes follow publication. No success is inferred from local
+Docker Desktop permissions or version behavior.
 
 Full scan JSON/provenance: `.ops-reports/2026-10-03T23-01-55-283Z-d10fc3f8/`;
 official Docker Hub DB updated `2026-10-03T19:02:38Z`, downloaded

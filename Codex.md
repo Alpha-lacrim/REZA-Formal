@@ -98,6 +98,9 @@ volumes remain owner work. Test recovery archives stay in a uniquely owned Docke
 volume, read through restricted maintenance containers; root-only manifest access
 is tested without relying on Windows host permissions. Hosted CI evidence is
 recorded separately in Handoff and FINAL_REVIEW.
+For the DNS recreation drill, Docker first selects an unused fixture subnet, then
+the empty owned network is recreated with explicit IPAM. This permits reserving
+the old backend address on Linux engines; the new address is explicitly checked.
 
 The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-13. This workstation uses ignored `MSSQL_PORT=11433` because Windows rejected host port `1433`; services still connect to `db:1433` inside Compose.
 

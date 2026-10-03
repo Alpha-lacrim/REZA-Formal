@@ -42,6 +42,11 @@ pre-codex-remediation-2026-09-10
 - Residual counts remain 15 (P0 0/P1 2/P2 13/P3 0). OPS-002 still requires actual
   production owners/artifact promotion/capacity/grants/volume evidence. Historical
   review and scan results below remain intact.
+- First fix `7d8219a`, integration merge `bc80739`, normal atomic push of both
+  branches. Hosted push/PR fast and security lanes pass; container jobs confirm the
+  backup fix but next fail reserving the old IP for DNS recovery. A scoped explicit
+  IPAM/different-address assertion follows, retaining all recovery and scan gates.
+  Final hosted outcomes remain pending this correction.
 
 ### Initial review
 

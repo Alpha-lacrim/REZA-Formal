@@ -40,6 +40,9 @@ static/media serving, correlation/redaction, graceful stop, recreation at a new 
 SQL checksum/new-database restore and media/new-volume restore, plus liveness when
 SQL is unavailable. `OPS_BACKEND_IMAGE`/`OPS_FRONTEND_IMAGE` may select local test
 images. Cleanup touches only this fixture's names; no application env or volume is used.
+The DNS drill configures Docker's automatically selected unused subnet explicitly
+before reserving the stopped backend's old address; it asserts the new backend has
+a different IP. No hardcoded host/application subnet is used.
 
 The expanded fixture also restores a root-owned legacy archive with original bytes/
 modes, prepares non-root volume ownership and rejects symlinks. Recovery archives
