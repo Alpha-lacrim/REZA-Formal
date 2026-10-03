@@ -244,8 +244,20 @@ dependency security; both container jobs confirm the backup/TLS/startup fix, the
 fail at reserving the old backend IP in the DNS drill, before image scanning.
 The follow-up uses Docker's automatically selected unused subnet with explicit
 IPAM and asserts a different replacement address. The complete local runtime rerun
-passes after that correction; hosted outcomes follow publication. No success is inferred from local
-Docker Desktop permissions or version behavior.
+passes after that correction. Fix `8712384` merged at `4225f9b`; normal atomic push
+updates both branches. [Push CI](https://github.com/Alpha-lacrim/REZA-Formal/actions/runs/37161305686)
+and [PR CI](https://github.com/Alpha-lacrim/REZA-Formal/actions/runs/37161309746)
+pass all four jobs, including full Linux runtime/DNS/recovery and strict image
+scanning. Both dependency-security workflows and Vercel checks pass; PR #2 remains
+open with CLEAN merge state. Hosted scanner logs report both images zero
+HIGH/CRITICAL. This is actual hosted execution, separate from Docker Desktop.
+
+Those green runs also reveal a report-retention gap: upload-artifact excludes
+hidden directories by default, so it warns and retains no `.ops-reports` artifact.
+The workflow now explicitly includes hidden files within that fixed JSON-only
+report path. No application env/config path is included; final upload evidence
+is recorded after hosted verification. Earlier success without artifacts remains
+visible rather than being rewritten as complete report-retention proof.
 
 Full scan JSON/provenance: `.ops-reports/2026-10-03T23-01-55-283Z-d10fc3f8/`;
 official Docker Hub DB updated `2026-10-03T19:02:38Z`, downloaded

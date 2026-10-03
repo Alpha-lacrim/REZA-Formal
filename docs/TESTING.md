@@ -58,6 +58,8 @@ image, CI passes the checksum-verified native binary. Official database fallback
 sources are tried without allowing unavailable or stale-scan evidence to pass.
 Full-severity reports and a summary are stored in ignored `.ops-reports/` and CI
 JSON artifacts; unfixed findings fail the gate and remain visible for review.
+The upload step explicitly includes hidden files only under `.ops-reports/**/*.json`
+so upload-artifact's hidden-directory default cannot silently omit reports.
 `node --test scripts/test-image-vulnerability-policy.mjs` verifies this severity policy.
 The original Debian 13 snapshot completed with 44 unfixed backend HIGHs and correctly
 failed. The supported Alpine/ODBC follow-up reports zero advisories on both tested

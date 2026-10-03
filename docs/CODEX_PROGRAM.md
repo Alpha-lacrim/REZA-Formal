@@ -46,7 +46,13 @@ pre-codex-remediation-2026-09-10
   branches. Hosted push/PR fast and security lanes pass; container jobs confirm the
   backup fix but next fail reserving the old IP for DNS recovery. A scoped explicit
   IPAM/different-address assertion follows, retaining all recovery and scan gates.
-  Final hosted outcomes remain pending this correction.
+  Fix `8712384` merged at `4225f9b` and was normally pushed on both branches.
+  Push CI `37161305686` and PR CI `37161309746` pass all jobs, including complete
+  runtime/DNS/recovery and the strict image scan. Both security workflows and
+  Vercel pass; PR #2 remains open/CLEAN, with main untouched.
+- Hosted artifact inspection finds that upload-artifact silently excludes hidden
+  `.ops-reports`. Enable hidden files only within the existing JSON report glob;
+  verify upload separately. No scanner/release policy changes.
 
 ### Initial review
 
