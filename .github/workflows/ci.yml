@@ -116,6 +116,7 @@ jobs:
         with:
           name: runtime-image-scans
           path: .ops-reports/**/*.json
+          include-hidden-files: true
           if-no-files-found: warn
           retention-days: 14
       # Deliberately no login, image push, remote environment or deployment job.
