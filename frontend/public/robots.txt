@@ -1,0 +1,5 @@
+User-agent: *
+Allow: /
+
+# Hash routes share one HTML document. A sitemap of public path URLs must
+# accompany the future domain/routing rollout; fragments cannot be listed.

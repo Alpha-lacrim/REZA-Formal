@@ -3,6 +3,8 @@ from rest_framework.exceptions import AuthenticationFailed
 from rest_framework.exceptions import PermissionDenied
 from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_simplejwt.exceptions import InvalidToken
+from rest_framework_simplejwt.exceptions import TokenError
+from .sessions import active_session
 
 
 def enforce_csrf(request):
@@ -14,7 +16,17 @@ def enforce_csrf(request):
         raise PermissionDenied(f'CSRF validation failed: {reason}')
 
 
-class CookieJWTAuthentication(JWTAuthentication):
+class SessionJWTAuthentication(JWTAuthentication):
+    def get_user(self, validated_token):
+        user = super().get_user(validated_token)
+        try:
+            active_session(validated_token, user)
+        except TokenError:
+            raise AuthenticationFailed('Session expired', code='session_expired') from None
+        return user
+
+
+class CookieJWTAuthentication(SessionJWTAuthentication):
     """Authenticate requests using the access token stored in an HttpOnly cookie named 'access'."""
     def authenticate(self, request):
         raw_token = request.COOKIES.get('access')

@@ -21,7 +21,7 @@ const ImageLoader: React.FC<Props> = ({ src, alt = '', className = '', dataUtili
 
   return (
     <div className={wrapperClass} style={{ minHeight: 8 }}>
-      {!isLoaded && (
+      {!isLoaded && !hasError && src && (
         <div aria-hidden className="image-skeleton absolute inset-0" />
       )}
       {!hasError && src ? (
@@ -30,13 +30,14 @@ const ImageLoader: React.FC<Props> = ({ src, alt = '', className = '', dataUtili
           src={src}
           alt={alt}
           loading={rest.loading || 'lazy'}
+          decoding={rest.decoding || 'async'}
           data-utility-image={dataUtility ? 'true' : undefined}
           onLoad={(e) => { setIsLoaded(true); if (typeof rest.onLoad === 'function') rest.onLoad(e); }}
           onError={(e) => { setHasError(true); if (typeof rest.onError === 'function') rest.onError(e); }}
           className={imgClass}
         />
       ) : (
-        <div className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-400"> 
+        <div role={alt ? 'img' : undefined} aria-label={alt ? `${alt}؛ تصویر موجود نیست` : undefined} className="w-full h-full bg-gray-100 flex items-center justify-center text-gray-600">
           <span>تصویر موجود نیست</span>
         </div>
       )}

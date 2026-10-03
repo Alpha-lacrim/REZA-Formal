@@ -1,11 +1,13 @@
+import { useActions } from '../state/AppState';
+import { errorMessage } from '../services/api';
 import React, { useState } from 'react';
 import { Instagram, Loader2, Mail, MapPin, Phone, Smartphone } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import api from '../services/api';
-import { useGlobal } from '../contexts/GlobalContext';
+
 
 const Footer: React.FC = () => {
-    const { showToast } = useGlobal();
+    const { showToast } = useActions();
     const [email, setEmail] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [subscribed, setSubscribed] = useState(false);
@@ -19,8 +21,8 @@ const Footer: React.FC = () => {
             setSubscribed(true);
             setEmail('');
             showToast('عضویت در خبرنامه با موفقیت ثبت شد');
-        } catch (error: any) {
-            showToast(error?.message || 'ثبت عضویت خبرنامه انجام نشد');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ثبت عضویت خبرنامه انجام نشد'));
         } finally {
             setSubmitting(false);
         }
@@ -100,7 +102,7 @@ const Footer: React.FC = () => {
                         </ul>
                     </div>
                 </div>
-                <div className="border-t border-gray-800 pt-6 text-xs text-gray-500 font-light">
+                <div className="border-t border-gray-800 pt-6 text-xs text-gray-400 font-light">
                     <p>&copy; ۲۰۲۶ REZA Formal. تمامی حقوق محفوظ است.</p>
                 </div>
             </div>

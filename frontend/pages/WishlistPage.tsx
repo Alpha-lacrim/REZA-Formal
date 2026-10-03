@@ -1,12 +1,16 @@
+import { useAuth, useCatalog, useWishlist } from '../state/AppState';
 import React, { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeft, HeartOff } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+import { ArrowRight, HeartOff } from 'lucide-react';
+
 import SEO from '../components/SEO';
 import ProductCard from '../components/ProductCard';
+import SyncNotice from '../components/SyncNotice';
 
 const WishlistPage: React.FC = () => {
-    const { wishlist, products, user } = useGlobal();
+    const { wishlist, syncStatus } = useWishlist();
+    const { products } = useCatalog();
+    const { user } = useAuth();
     const navigate = useNavigate();
 
     useEffect(() => window.scrollTo(0, 0), []);
@@ -31,12 +35,13 @@ const WishlistPage: React.FC = () => {
 
             <div className="bg-lux-black px-4 pb-4">
                 <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md hover:brightness-95 text-xs md:text-sm">
-                    <ArrowLeft size={14} />
+                    <ArrowRight size={14} />
                     <span>بازگشت</span>
                 </button>
             </div>
 
             <main className="container max-w-7xl mx-auto px-4 py-12">
+                <SyncNotice status={syncStatus} />
                 {wishlistItems.length === 0 ? (
                     <div className="text-center py-20">
                         <HeartOff size={64} className="mx-auto text-gray-300 mb-6" />

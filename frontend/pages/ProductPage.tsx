@@ -1,13 +1,16 @@
+import { useActions, useAuth, useCatalog, useWishlist } from '../state/AppState';
+import { ApiError, errorMessage } from '../services/api';
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, CheckCircle, Heart, Info, Loader2, Minus, Plus, ShoppingBag, Star, X } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { ArrowRight, CheckCircle, Heart, Info, Loader2, Minus, Plus, ShoppingBag, Star, X } from 'lucide-react';
+
 import api from '../services/api';
 import { Product, ProductReview } from '../types';
 import { formatPrice, toPersianDigits } from '../utils';
 import ImageLoader from '../components/ImageLoader';
 import ProductCard from '../components/ProductCard';
-import SEO from '../components/SEO';
+import SEO, { absoluteUrl, publicPageUrl } from '../components/SEO';
+import CollectionPager from '../components/CollectionPager';
 
 const Stars: React.FC<{ rating: number; size?: number }> = ({ rating, size = 16 }) => (
     <span className="inline-flex text-yellow-400" aria-label={`امتیاز ${rating} از ۵`}>
@@ -20,38 +23,57 @@ const Stars: React.FC<{ rating: number; size?: number }> = ({ rating, size = 16 
 const ProductPage: React.FC = () => {
     const { id } = useParams<{ id: string }>();
     const navigate = useNavigate();
-    const { addToCart, toggleWishlist, isInWishlist, products, user, setAuthModalOpen, showToast } = useGlobal();
+    const { addToCart, toggleWishlist, setAuthModalOpen, showToast } = useActions();
+    const { isInWishlist } = useWishlist();
+    const { products } = useCatalog();
+    const { user } = useAuth();
     const contextProduct = products.find(item => item.id === id);
     const [detail, setDetail] = useState<Product | null>(null);
+    const [reviewPaging, setReviewPaging] = useState<{ id?: string; page: number }>({ id, page: 1 });
+    const reviewPage = reviewPaging.id === id ? reviewPaging.page : 1;
+    const [reviewPages, setReviewPages] = useState(1);
     const [loadingProduct, setLoadingProduct] = useState(true);
+    const [detailError, setDetailError] = useState('');
+    const [notFound, setNotFound] = useState(false);
+    const [detailAttempt, setDetailAttempt] = useState(0);
     const [activeTab, setActiveTab] = useState<'desc' | 'reviews'>('desc');
     const [quantity, setQuantity] = useState(1);
     const [selectedImage, setSelectedImage] = useState('');
     const [selectedVariantId, setSelectedVariantId] = useState('');
     const [reviews, setReviews] = useState<ProductReview[]>([]);
     const [reviewsLoading, setReviewsLoading] = useState(false);
+    const [reviewsError, setReviewsError] = useState('');
     const [reviewSubmitting, setReviewSubmitting] = useState(false);
     const [reviewForm, setReviewForm] = useState({ rating: 5, title: '', body: '' });
 
-    const product = detail || contextProduct;
+    const product = notFound ? null : detail?.id === id ? detail : contextProduct;
 
     useEffect(() => {
+        const controller = new AbortController();
         window.scrollTo(0, 0);
         setDetail(contextProduct || null);
         setLoadingProduct(true);
+        setDetailError(''); setNotFound(false);
         setActiveTab('desc');
         setQuantity(1);
         void (async () => {
             if (!id) return;
             try {
-                setDetail(await api.getProduct(id));
-            } catch {
-                // The already-loaded catalog item remains a valid read-only fallback.
+                // Let an immediately disposed effect cancel before dispatching HTTP.
+                await Promise.resolve();
+                if (controller.signal.aborted) return;
+                const loaded = await api.getProduct(id, controller.signal);
+                if (!controller.signal.aborted) setDetail(loaded);
+            } catch (error: unknown) {
+                if (controller.signal.aborted) return;
+                if (error instanceof ApiError && error.status === 404) setNotFound(true);
+                else setDetailError(errorMessage(error, 'دریافت جزئیات محصول انجام نشد'));
             } finally {
-                setLoadingProduct(false);
+                if (!controller.signal.aborted) setLoadingProduct(false);
             }
         })();
-    }, [id, contextProduct?.id]);
+        return () => controller.abort();
+    }, [id, detailAttempt]);
 
     useEffect(() => {
         if (!product) return;
@@ -62,22 +84,28 @@ const ProductPage: React.FC = () => {
         setQuantity(1);
     }, [product?.id, product?.variants]);
 
-    const loadReviews = async () => {
+    const loadReviews = async (signal?: AbortSignal) => {
         if (!id) return;
         setReviewsLoading(true);
+        setReviewsError('');
         try {
-            const page = await api.getProductReviews(id);
-            setReviews(page.results);
-        } catch (error: any) {
-            showToast(error?.message || 'دریافت نظرها انجام نشد');
+            await Promise.resolve();
+            if (signal?.aborted) return;
+            const page = await api.getProductReviews(id, { page: reviewPage, page_size: 8 }, signal);
+            if (!signal?.aborted) { setReviews(page.results); setReviewPages(page.totalPages || 1); }
+        } catch (error: unknown) {
+            if (!signal?.aborted) setReviewsError(errorMessage(error, 'دریافت نظرها انجام نشد'));
         } finally {
-            setReviewsLoading(false);
+            if (!signal?.aborted) setReviewsLoading(false);
         }
     };
 
     useEffect(() => {
-        if (id) void loadReviews();
-    }, [id]);
+        const controller = new AbortController();
+        setReviews([]);
+        if (id) void loadReviews(controller.signal);
+        return () => controller.abort();
+    }, [id, reviewPage]);
 
     const selectedVariant = product?.variants?.find(variant => variant.id === selectedVariantId);
     const images = useMemo(() => {
@@ -90,16 +118,21 @@ const ProductPage: React.FC = () => {
     }, [product, selectedVariant?.image]);
 
     if (loadingProduct && !product) {
-        return <div className="min-h-screen pt-36 flex justify-center dark:bg-zinc-900"><Loader2 className="animate-spin text-lux-gold" size={32} /></div>;
+        return <main className="min-h-screen pt-36 flex justify-center gap-2 dark:bg-zinc-900 dark:text-white"><SEO title="در حال دریافت محصول" noIndex /><p role="status">در حال دریافت محصول…</p><Loader2 aria-hidden="true" className="animate-spin text-lux-gold" size={32} /></main>;
     }
+
+    if (!product && detailError) return <main className="min-h-screen pt-32 px-4 text-center dark:bg-zinc-900 dark:text-white">
+        <SEO title="دریافت محصول انجام نشد" noIndex /><h1 className="text-2xl mb-4">دریافت محصول انجام نشد</h1>
+        <p role="alert">{detailError}</p><button className="my-4 underline" onClick={() => setDetailAttempt(value => value + 1)}>تلاش دوباره</button>
+    </main>;
 
     if (!product) {
         return (
-            <div className="min-h-screen pt-32 text-center dark:bg-zinc-900 dark:text-white">
-                <SEO title="محصول یافت نشد" />
-                <h2 className="text-2xl font-bold mb-4">محصول یافت نشد</h2>
+            <main className="min-h-screen pt-32 text-center dark:bg-zinc-900 dark:text-white">
+                <SEO title="محصول یافت نشد" noIndex />
+                <h1 className="text-2xl font-bold mb-4">محصول یافت نشد</h1>
                 <button onClick={() => navigate('/catalog')} className="text-lux-gold underline">بازگشت به فروشگاه</button>
-            </div>
+            </main>
         );
     }
 
@@ -124,19 +157,21 @@ const ProductPage: React.FC = () => {
         '@context': 'https://schema.org/',
         '@type': 'Product',
         name: product.name,
-        image: images,
+        image: images.map(absoluteUrl),
         description: product.description,
         sku: selectedVariant?.sku || product.id,
         brand: { '@type': 'Brand', name: 'REZA Formal' },
         offers: {
             '@type': 'Offer',
-            url: window.location.href,
+            url: publicPageUrl(`/product/${encodeURIComponent(product.id)}`),
             priceCurrency: 'IRR',
             price: displayedPrice * 10,
             availability: stockStatus === 'out_of_stock' ? 'https://schema.org/OutOfStock' : 'https://schema.org/InStock',
             itemCondition: 'https://schema.org/NewCondition',
         },
     };
+    // Do not assert an IRR offer if legacy data uses an unsupported currency.
+    if (product.currency !== 'Toman') delete schema.offers;
     if (product.rating !== undefined && product.reviewCount && product.reviewCount > 0) {
         schema.aggregateRating = {
             '@type': 'AggregateRating',
@@ -163,8 +198,8 @@ const ProductPage: React.FC = () => {
             setReviewForm({ rating: 5, title: '', body: '' });
             showToast('نظر شما ثبت شد و پس از بررسی نمایش داده می‌شود');
             await loadReviews();
-        } catch (error: any) {
-            showToast(error?.message || 'ثبت نظر انجام نشد');
+        } catch (error: unknown) {
+            showToast(errorMessage(error, 'ثبت نظر انجام نشد'));
         } finally {
             setReviewSubmitting(false);
         }
@@ -174,26 +209,28 @@ const ProductPage: React.FC = () => {
         <div className="min-h-screen bg-lux-body dark:bg-zinc-900 pt-20">
             <SEO title={product.name} description={product.short} image={product.image} schema={schema} type="product" />
             <header className="relative text-center bg-lux-black text-white py-8 overflow-hidden">
-                <div className="relative mx-auto max-w-4xl px-4 z-10"><h1 className="font-serif text-3xl md:text-5xl">جزئیات محصول</h1></div>
+                <div className="relative mx-auto max-w-4xl px-4 z-10"><p className="font-serif text-3xl md:text-5xl">جزئیات محصول</p></div>
                 <div className="absolute inset-x-0 top-1/2 h-32 bg-lux-gold/20 blur-3xl" />
             </header>
             <div className="bg-lux-black px-4 pb-4">
-                <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md text-sm"><ArrowLeft size={14} /> بازگشت</button>
+                <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md text-sm"><ArrowRight size={14} /> بازگشت</button>
             </div>
 
             <main className="container max-w-6xl mx-auto px-4 py-12">
+                <nav aria-label="مسیر صفحه" className="mb-6 text-sm dark:text-white"><ol className="flex flex-wrap gap-2"><li><Link to="/">خانه</Link></li><li aria-hidden="true">/</li><li><Link to="/catalog">فروشگاه</Link></li><li aria-hidden="true">/</li><li aria-current="page"><bdi>{product.name}</bdi></li></ol></nav>
+                {detailError && <p role="alert" className="mb-4">{detailError}. <button className="underline" onClick={() => setDetailAttempt(value => value + 1)}>تلاش دوباره</button></p>}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-10 lg:gap-16 mb-20">
                     <div className="flex flex-col gap-4">
                         <div className="relative rounded-lg overflow-hidden h-[400px] md:h-[500px] bg-gray-100 dark:bg-zinc-800">
-                            <ImageLoader src={selectedImage || product.image} alt={product.name} className="w-full h-full" loading="eager" />
-                            <button onClick={() => toggleWishlist(product.id)} className="absolute top-4 left-4 bg-white/85 dark:bg-black/60 p-3 rounded-full" aria-label="تغییر علاقه‌مندی">
+                            <ImageLoader src={selectedImage || product.image} alt={product.name} className="w-full h-full" loading="eager" fetchPriority="high" />
+                            <button aria-pressed={isInWishlist(product.id)} onClick={() => toggleWishlist(product.id)} className="absolute top-4 left-4 bg-white/85 dark:bg-black/60 p-3 rounded-full" aria-label="تغییر علاقه‌مندی">
                                 <Heart size={24} className={isInWishlist(product.id) ? 'fill-red-500 text-red-500' : 'text-gray-600 dark:text-white'} />
                             </button>
                         </div>
                         {images.length > 1 && (
                             <div className="flex gap-3 overflow-x-auto pb-2">
-                                {images.map(image => (
-                                    <button key={image} onClick={() => setSelectedImage(image)} className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${selectedImage === image ? 'border-lux-gold' : 'border-transparent'}`}>
+                                {images.map((image, index) => (
+                                    <button key={image} aria-label={`نمایش تصویر ${toPersianDigits(index + 1)} از ${product.name}`} aria-pressed={selectedImage === image} onClick={() => setSelectedImage(image)} className={`shrink-0 w-20 h-20 rounded-lg overflow-hidden border-2 ${selectedImage === image ? 'border-lux-gold' : 'border-transparent'}`}>
                                         <ImageLoader src={image} alt="" className="w-full h-full" />
                                     </button>
                                 ))}
@@ -226,6 +263,7 @@ const ProductPage: React.FC = () => {
                                     {selectableVariants.map(variant => (
                                         <button
                                             key={variant.id}
+                                            aria-pressed={selectedVariantId === variant.id}
                                             onClick={() => {
                                                 setSelectedVariantId(variant.id);
                                                 if (variant.image) setSelectedImage(variant.image);
@@ -245,7 +283,7 @@ const ProductPage: React.FC = () => {
                         {realAttributes.length > 0 && (
                             <dl className="grid grid-cols-2 gap-2 border-y border-gray-100 dark:border-zinc-700 py-5 mb-6 text-sm">
                                 {realAttributes.map(([label, value]) => (
-                                    <div key={`${label}-${value}`} className="flex gap-1 text-gray-600 dark:text-gray-300"><dt className="font-bold">{label}:</dt><dd>{value}</dd></div>
+                                    <div key={`${label}-${value}`} className="flex flex-wrap gap-1 min-w-0 text-gray-600 dark:text-gray-300"><dt className="font-bold">{label}:</dt><dd><bdi>{value}</bdi></dd></div>
                                 ))}
                             </dl>
                         )}
@@ -254,29 +292,29 @@ const ProductPage: React.FC = () => {
                             <div className="flex items-center gap-4 mb-6">
                                 <span className="text-sm font-bold dark:text-white">تعداد:</span>
                                 <div className="flex items-center border border-gray-300 dark:border-zinc-600 rounded-lg overflow-hidden">
-                                    <button onClick={() => setQuantity(value => Math.max(1, value - 1))} disabled={quantity <= 1} className="p-3 bg-gray-50 dark:bg-zinc-800 disabled:opacity-40"><Minus size={16} className="dark:text-white" /></button>
+                                    <button aria-label="کاهش تعداد" onClick={() => setQuantity(value => Math.max(1, value - 1))} disabled={quantity <= 1} className="p-3 bg-gray-50 dark:bg-zinc-800 disabled:opacity-40"><Minus size={16} className="dark:text-white" /></button>
                                     <span className="px-4 font-bold dark:text-white">{toPersianDigits(quantity)}</span>
-                                    <button onClick={() => setQuantity(value => Math.min(maxStock, value + 1))} disabled={quantity >= maxStock} className="p-3 bg-gray-50 dark:bg-zinc-800 disabled:opacity-40"><Plus size={16} className="dark:text-white" /></button>
+                                    <button aria-label="افزایش تعداد" onClick={() => setQuantity(value => Math.min(maxStock, value + 1))} disabled={quantity >= maxStock} className="p-3 bg-gray-50 dark:bg-zinc-800 disabled:opacity-40"><Plus size={16} className="dark:text-white" /></button>
                                 </div>
                             </div>
                         )}
-                        <button onClick={() => addToCart(product.id, quantity, selectedVariant?.id)} disabled={stockStatus === 'out_of_stock' || (hasVariants && !selectedVariant)} className="w-full md:w-auto px-8 py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg flex items-center justify-center gap-3 disabled:opacity-50">
+                        <button onClick={() => addToCart(product.id, quantity, selectedVariant?.id, product)} disabled={stockStatus === 'out_of_stock' || (hasVariants && !selectedVariant)} className="w-full md:w-auto px-8 py-4 bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black text-lg font-bold rounded-lg flex items-center justify-center gap-3 disabled:opacity-50">
                             <ShoppingBag size={20} /> {stockStatus === 'out_of_stock' ? 'ناموجود' : 'افزودن به سبد خرید'}
                         </button>
                     </div>
                 </div>
 
                 <section className="mb-20">
-                    <div className="flex border-b border-gray-200 dark:border-zinc-700 mb-6">
-                        <button onClick={() => setActiveTab('desc')} className={`pb-4 px-6 text-lg border-b-2 ${activeTab === 'desc' ? 'border-lux-gold text-lux-gold' : 'border-transparent text-gray-500'}`}>توضیحات</button>
-                        <button onClick={() => setActiveTab('reviews')} className={`pb-4 px-6 text-lg border-b-2 ${activeTab === 'reviews' ? 'border-lux-gold text-lux-gold' : 'border-transparent text-gray-500'}`}>نظرهای کاربران {product.reviewCount ? `(${toPersianDigits(product.reviewCount)})` : ''}</button>
+                    <div className="flex flex-wrap border-b border-gray-200 dark:border-zinc-700 mb-6">
+                        <button aria-pressed={activeTab === 'desc'} onClick={() => setActiveTab('desc')} className={`pb-4 px-6 text-lg border-b-2 ${activeTab === 'desc' ? 'border-lux-gold text-lux-gold' : 'border-transparent text-gray-500'}`}>توضیحات</button>
+                        <button aria-pressed={activeTab === 'reviews'} onClick={() => setActiveTab('reviews')} className={`pb-4 px-6 text-lg border-b-2 ${activeTab === 'reviews' ? 'border-lux-gold text-lux-gold' : 'border-transparent text-gray-500'}`}>نظرهای کاربران {product.reviewCount ? `(${toPersianDigits(product.reviewCount)})` : ''}</button>
                     </div>
                     {activeTab === 'desc' ? (
                         <div className="prose dark:prose-invert max-w-none text-justify text-gray-700 dark:text-gray-300 leading-8 whitespace-pre-line">{product.description || 'توضیح بیشتری برای این محصول ثبت نشده است.'}</div>
                     ) : (
                         <div className="grid lg:grid-cols-[1fr_340px] gap-8">
                             <div className="space-y-4">
-                                {reviewsLoading ? <Loader2 className="animate-spin text-lux-gold" /> : reviews.length === 0 ? (
+                                {reviewsLoading ? <p role="status">در حال دریافت نظرها…</p> : reviewsError ? <p role="alert">{reviewsError} <button onClick={() => void loadReviews()} className="underline">تلاش دوباره</button></p> : reviews.length === 0 ? (
                                     <p className="p-6 bg-white dark:bg-zinc-800 rounded-lg text-gray-500">هنوز نظر تأییدشده‌ای برای این محصول ثبت نشده است.</p>
                                 ) : reviews.map(review => (
                                     <article key={review.id} className="bg-white dark:bg-zinc-800 p-5 rounded-lg border border-gray-100 dark:border-zinc-700">
@@ -290,7 +328,7 @@ const ProductPage: React.FC = () => {
                                     </article>
                                 ))}
                             </div>
-                            <form onSubmit={submitReview} className="bg-white dark:bg-zinc-800 p-5 rounded-lg border border-gray-100 dark:border-zinc-700 h-fit space-y-4">
+                            <form onSubmit={submitReview} aria-busy={reviewSubmitting} className="bg-white dark:bg-zinc-800 p-5 rounded-lg border border-gray-100 dark:border-zinc-700 h-fit space-y-4">
                                 <h3 className="font-bold text-lg dark:text-white">نظر شما</h3>
                                 {!user && <p className="text-sm text-gray-500">برای ثبت نظر باید وارد حساب کاربری شوید.</p>}
                                 <label className="block text-sm dark:text-gray-300">امتیاز
@@ -302,6 +340,7 @@ const ProductPage: React.FC = () => {
                                 <label className="block text-sm dark:text-gray-300">متن نظر<textarea required rows={4} value={reviewForm.body} onChange={event => setReviewForm({ ...reviewForm, body: event.target.value })} className="mt-2 w-full p-2 border rounded dark:bg-zinc-700 dark:border-zinc-600" /></label>
                                 <button type="submit" disabled={reviewSubmitting} className="w-full py-3 bg-lux-gold text-white rounded font-bold disabled:opacity-60">{reviewSubmitting ? 'در حال ثبت...' : user ? 'ثبت نظر' : 'ورود و ثبت نظر'}</button>
                             </form>
+                            <CollectionPager page={reviewPage} totalPages={reviewPages} busy={reviewsLoading} onPage={page => setReviewPaging({ id, page })} />
                         </div>
                     )}
                 </section>
@@ -309,7 +348,7 @@ const ProductPage: React.FC = () => {
                 {relatedProducts.length > 0 && (
                     <section className="border-t border-gray-200 dark:border-zinc-700 pt-12">
                         <h2 className="text-2xl font-serif font-bold text-lux-black dark:text-white mb-8">محصولات مشابه</h2>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{relatedProducts.map(item => <ProductCard key={item.id} product={item} />)}</div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">{relatedProducts.map(item => <ProductCard headingLevel="h3" key={item.id} product={item} />)}</div>
                     </section>
                 )}
             </main>
