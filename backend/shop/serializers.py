@@ -14,6 +14,11 @@ User = get_user_model()
 
 
 class AccountReadSerializer(serializers.ModelSerializer):
+    role = serializers.SerializerMethodField()
+
+    def get_role(self, obj):
+        return 'admin' if obj.is_admin() else 'user'
+
     class Meta:
         model = User
         fields = [
@@ -48,9 +53,14 @@ class ProfileWriteSerializer(serializers.ModelSerializer):
         return super().to_internal_value(data)
 
 
+class LoginSerializer(serializers.Serializer):
+    email = serializers.EmailField(max_length=254)
+    password = StrictCharField(max_length=1024, trim_whitespace=False)
+
+
 class RegisterSerializer(serializers.Serializer):
     email = serializers.EmailField(max_length=254)
-    password = serializers.CharField(write_only=True, trim_whitespace=False)
+    password = StrictCharField(write_only=True, trim_whitespace=False, max_length=1024)
     first_name = serializers.CharField(required=False, allow_blank=True, max_length=150)
 
     def validate(self, attrs):
@@ -195,6 +205,20 @@ class ContactMessageSerializer(serializers.ModelSerializer):
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
+    about_image = ProductImageField(required=False, allow_null=True)
+    hero_image = ProductImageField(required=False, allow_null=True)
+    suits_section_image = ProductImageField(required=False, allow_null=True)
+    shirts_section_image = ProductImageField(required=False, allow_null=True)
+    blazers_section_image = ProductImageField(required=False, allow_null=True)
+    accessories_section_image = ProductImageField(required=False, allow_null=True)
+    bespoke_section_image = ProductImageField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        from .product_media import MAX_UPLOAD_BYTES
+        if sum(value.size for value in attrs.values() if hasattr(value, 'size')) > MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError({'images': 'Combined image uploads must be at most 40 MiB.'})
+        return attrs
+
     class Meta:
         model = SiteSettings
         fields = [

@@ -1,4 +1,5 @@
 .env
+.env.*
 .venv
 __pycache__
 *.pyc
@@ -12,3 +13,10 @@ media
 staticfiles
 *.log
 README.md
+*.pem
+*.key
+*.pfx
+*.p12
+*.bak
+*.trn
+backups

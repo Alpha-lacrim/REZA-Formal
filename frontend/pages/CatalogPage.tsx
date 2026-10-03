@@ -1,7 +1,8 @@
 import { useCatalogPage, useProductFacets } from '../state/AppState';
 import React, { useState, useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
+import { toPersianDigits } from '../utils';
 import ProductCard from '../components/ProductCard';
 
 import SEO from '../components/SEO';
@@ -54,7 +55,7 @@ const CatalogPage: React.FC = () => {
             
             <div className="bg-lux-black px-4 pb-4 shadow-md -mt-1 pt-1 z-20 relative">
                  <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 bg-lux-gold text-white px-4 py-2 rounded-lg shadow hover:bg-lux-gold-dark transition-colors text-sm font-medium">
-                    <ArrowLeft size={16} />
+                    <ArrowRight size={16} />
                     <span>بازگشت</span>
                  </button>
             </div>
@@ -67,8 +68,9 @@ const CatalogPage: React.FC = () => {
                         </select>
                     </label>
                     <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-lux-black dark:text-gray-300">جنس پارچه:</label>
+                        <label htmlFor="fabric-filter" className="text-xs font-bold uppercase tracking-wider text-lux-black dark:text-gray-300">جنس پارچه:</label>
                         <select 
+                            id="fabric-filter"
                             value={fabricFilter} 
                             onChange={e => setFabricFilter(e.target.value)}
                             className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white text-lux-black focus:outline-none focus:border-lux-gold focus:ring-1 focus:ring-lux-gold dark:bg-zinc-700 dark:border-zinc-600 dark:text-white transition-shadow w-full sm:w-auto"
@@ -78,8 +80,9 @@ const CatalogPage: React.FC = () => {
                         </select>
                     </div>
                      <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-                        <label className="text-xs font-bold uppercase tracking-wider text-lux-black dark:text-gray-300">قیمت:</label>
+                        <label htmlFor="price-filter" className="text-xs font-bold uppercase tracking-wider text-lux-black dark:text-gray-300">قیمت:</label>
                         <select 
+                            id="price-filter"
                             value={priceFilter} 
                             onChange={e => setPriceFilter(e.target.value)}
                             className="px-4 py-2 border border-gray-300 rounded-lg text-sm bg-white text-lux-black focus:outline-none focus:border-lux-gold focus:ring-1 focus:ring-lux-gold dark:bg-zinc-700 dark:border-zinc-600 dark:text-white transition-shadow w-full sm:w-auto"
@@ -92,7 +95,7 @@ const CatalogPage: React.FC = () => {
                     </div>
                 </div>
 
-                {catalog.isFetching ? <p role="status">در حال دریافت محصولات…</p> : catalog.isError ? <button onClick={() => void catalog.refetch()}>دریافت محصولات ناموفق بود؛ تلاش دوباره</button> : filteredProducts.length > 0 ? (
+                {catalog.isFetching ? <p role="status">در حال دریافت محصولات…</p> : catalog.isError ? <p role="alert">دریافت محصولات ناموفق بود؛ <button onClick={() => void catalog.refetch()} className="underline">تلاش دوباره</button></p> : filteredProducts.length > 0 ? (
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
                         {filteredProducts.map(p => <ProductCard key={p.id} product={p} />)}
                     </div>
@@ -106,7 +109,7 @@ const CatalogPage: React.FC = () => {
                 )}
                 <nav aria-label="صفحه‌بندی محصولات" className="flex justify-center items-center gap-4 mt-8">
                     <button disabled={page <= 1 || catalog.isFetching} onClick={() => setPage(value => value - 1)}>قبلی</button>
-                    <span>{page} / {catalog.data?.totalPages || 1} ({catalog.data?.count || 0})</span>
+                    <span aria-live="polite"><bdi>{toPersianDigits(page)} / {toPersianDigits(catalog.data?.totalPages || 1)} ({toPersianDigits(catalog.data?.count || 0)})</bdi></span>
                     <button disabled={!catalog.data?.next || catalog.isFetching} onClick={() => setPage(value => value + 1)}>بعدی</button>
                 </nav>
             </main>

@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import AxeBuilder from '@axe-core/playwright';
 
 test.beforeEach(async ({ page }) => {
   // External fonts/assets are irrelevant to commerce smoke checks. No remote API
@@ -56,6 +57,8 @@ test('customer authenticates, adds product, checks out with COD and sees order h
   await page.getByRole('button').filter({ hasText: persianId }).click();
   await expect(page.getByText('E2E Suit', { exact: true }).first()).toBeVisible();
   expect(orderDetailReads).toBe(0);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
 });
 
 test('administrator authenticates and persists a product edit', async ({ page }) => {
@@ -135,4 +138,47 @@ test('administrator creates managed gallery images, edits them after reload and 
   await page.screenshot({ path: testInfo.outputPath('product-editor-mobile.png') });
   await expect(dialog).toBeVisible();
   await page.keyboard.press('Escape');
+});
+
+test('customer return dialog supports labels, validation, Escape and focus restoration', async ({ page }) => {
+  await login(page, 'buyer');
+  // Only this UI audit overrides the existing synthetic order's read state.
+  // No delivery transition or return write is simulated as successful.
+  await page.route('**/api/orders/my/**', async route => {
+    const response = await route.fetch();
+    const body = await response.json();
+    await route.fulfill({ response, json: { ...body, results: body.results.map((order: object) => ({ ...order, status: 'delivered' })) } });
+  });
+  await page.goto('/#/profile');
+  await page.getByRole('button').filter({ hasText: 'سفارش #' }).first().click();
+  const open = page.getByRole('button', { name: 'درخواست مرجوعی', exact: true }).first();
+  await open.click();
+  const dialog = page.getByRole('dialog', { name: 'درخواست مرجوعی' });
+  await expect(dialog.getByLabel('دلیل مرجوعی', { exact: true })).toBeVisible();
+  expect((await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze()).violations).toEqual([]);
+  let returnWrites = 0;
+  page.on('request', request => { if (request.method() === 'POST' && request.url().endsWith('/api/returns/')) returnWrites++; });
+  await dialog.getByRole('button', { name: 'ثبت درخواست', exact: true }).click();
+  await expect(dialog.getByLabel('دلیل مرجوعی', { exact: true })).toBeFocused();
+  expect(returnWrites).toBe(0);
+  await dialog.getByLabel('توضیحات تکمیلی', { exact: true }).focus();
+  await page.keyboard.press('Escape'); await expect(open).toBeFocused();
+});
+
+test('admin invoice table scrolls within its dialog on mobile', async ({ page }, info) => {
+  await login(page, 'admin');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/#/admin');
+  await page.getByRole('button', { name: 'باز کردن منوی مدیریت' }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'سفارشات', exact: true }).click();
+  await page.getByRole('button', { name: 'جزئیات کامل', exact: true }).first().click();
+  const dialog = page.getByRole('dialog', { name: 'جزئیات سفارش' });
+  const table = dialog.getByRole('region', { name: 'کالاهای سفارش' });
+  await expect(table).toBeVisible();
+  await table.focus(); await expect(table).toBeFocused();
+  expect(await dialog.evaluate(element => element.scrollWidth <= element.clientWidth + 1)).toBe(true);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  const result = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa']).analyze();
+  expect(result.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => n.failureSummary) }))).toEqual([]);
+  await page.screenshot({ path: info.outputPath('invoice-mobile.png') });
 });

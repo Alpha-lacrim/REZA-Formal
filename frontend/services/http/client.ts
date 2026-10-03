@@ -12,6 +12,16 @@ let sessionChanges = 0;
 const expiryListeners = new Set<() => void>();
 const accountWrites = new Set<Promise<unknown>>();
 const SESSION_EPOCH_KEY = 'reza_session_epoch_v1';
+const REFRESH_EPOCH_KEY = 'reza_refresh_epoch_v1';
+const readRefreshEpoch = () => {
+  try { return localStorage.getItem(REFRESH_EPOCH_KEY); } catch { return null; }
+};
+
+// Web Locks coordinate cookie mutation across same-origin tabs. In browsers
+// without them the per-tab single-flight remains; a rotation race fails closed.
+export async function withSessionLock<T>(operation: () => Promise<T>): Promise<T> {
+  return navigator.locks ? navigator.locks.request('reza_auth_cookies', operation) : operation();
+}
 const readSessionEpoch = () => {
   try { return localStorage.getItem(SESSION_EPOCH_KEY); } catch { return null; }
 };
@@ -125,21 +135,25 @@ function waitForRefresh(pending: Promise<void>, signal?: AbortSignal | null): Pr
   });
 }
 
-function refresh(version: number): Promise<void> {
+function refresh(version: number, observedRefresh: string | null): Promise<void> {
   if (!refreshRequest) {
-    const pending = (async () => {
+    const pending = withSessionLock(async () => {
       try {
+        synchronizeSessionEpoch();
+        if (version !== sessionVersion) throw sessionChanged();
+        if (readRefreshEpoch() !== observedRefresh) { refreshVersion++; return; }
         // Direct send: the refresh endpoint can never recursively refresh itself.
         const response = await send('/api/auth/refresh/', { method: 'POST' }, version);
         if (!response.ok) throw sessionChanged();
         if (version !== sessionVersion) throw sessionChanged();
         csrfRequest = null;
         refreshVersion++;
+        try { localStorage.setItem(REFRESH_EPOCH_KEY, crypto.randomUUID()); } catch { /* Cookies remain authoritative. */ }
       } catch {
         if (version === sessionVersion) invalidateSession();
         throw sessionChanged();
       }
-    })();
+    });
     refreshRequest = pending;
     void pending.finally(() => { if (refreshRequest === pending) refreshRequest = null; }).catch(() => undefined);
   }
@@ -158,6 +172,7 @@ export function request(path: string, opts: RequestInit = {}, policy: { sessionB
 async function performRequest(path: string, opts: RequestInit = {}, policy: { sessionBound?: boolean } = {}): Promise<unknown> {
   const identity = sessionVersion;
   const generation = refreshVersion;
+  const observedRefresh = readRefreshEpoch();
   const endpoint = path.split('?')[0];
   const eligible = !AUTH_PATHS.has(endpoint);
   const sessionBound = eligible && policy.sessionBound !== false;
@@ -168,7 +183,7 @@ async function performRequest(path: string, opts: RequestInit = {}, policy: { se
       // A new public/catalog read during logout must not race its cookie deletion.
       if (identity !== sessionVersion || sessionChanges > 0) throw sessionChanged();
       // Late 401s from the old token reuse the completed refresh as well.
-      if (generation === refreshVersion) await waitForRefresh(refresh(identity), opts.signal);
+      if (generation === refreshVersion) await waitForRefresh(refresh(identity, observedRefresh), opts.signal);
       opts.signal?.throwIfAborted();
       if (identity !== sessionVersion) throw sessionChanged();
       response = await send(path, opts, identity);

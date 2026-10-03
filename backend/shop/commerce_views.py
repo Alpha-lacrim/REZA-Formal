@@ -64,7 +64,7 @@ from .models import (
     ShippingMethod,
     WishlistItem,
 )
-from .throttles import CheckoutQuoteRateThrottle, CheckoutRateThrottle, NewsletterRateThrottle
+from .throttles import CheckoutQuoteRateThrottle, CheckoutRateThrottle, NewsletterRateThrottle, ReviewRateThrottle, BespokeRateThrottle, ReturnRateThrottle
 from .subscription_services import subscribe
 from .pagination import page_response
 from .selectors import order_reads, return_reads
@@ -292,6 +292,7 @@ def wishlist_item(request, product_id):
 
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([ReviewRateThrottle])
 def product_reviews(request, product_id):
     product = get_object_or_404(Product, pk=product_id, is_active=True)
     if request.method == 'GET':
@@ -329,6 +330,7 @@ def product_reviews(request, product_id):
 
 @api_view(['GET', 'POST'])
 @permission_classes([permissions.IsAuthenticated])
+@throttle_classes([ReturnRateThrottle])
 def returns(request):
     if request.method == 'GET':
         queryset = return_reads().filter(user=request.user)
@@ -396,6 +398,7 @@ def returns(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([BespokeRateThrottle])
 def bespoke_requests(request):
     enforce_csrf(request)
     serializer = BespokeRequestSerializer(data=request.data)

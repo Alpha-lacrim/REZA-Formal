@@ -2,7 +2,7 @@ import { useSettings } from '../state/AppState';
 import React, { useEffect } from 'react';
 import ImageLoader from '../components/ImageLoader';
 
-import { ArrowLeft } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SEO from '../components/SEO';
 
@@ -33,7 +33,7 @@ const AboutPage: React.FC = () => {
             
             <div className="bg-lux-black px-4 pb-4">
                  <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md hover:brightness-95 text-xs md:text-sm">
-                    <ArrowLeft size={14} />
+                    <ArrowRight size={14} />
                     <span>بازگشت</span>
                  </button>
             </div>

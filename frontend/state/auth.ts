@@ -39,7 +39,7 @@ export function createAuth(onChange: (state: AuthState) => void) {
     },
     login: (email: string, pass: string, code?: string) => authenticate(() => api.login(email, pass, code)),
     register: (name: string, email: string, pass: string) => authenticate(() => api.register(name, email, pass)),
-    async logout() { expire(); try { await api.logout(); } catch { /* Local session is already cleared. */ } },
+    async logout() { expire(); await api.logout(); },
     async updateUserProfile(data: Partial<User>) {
       if (!('user' in store.getSnapshot())) return;
       const attempt = generation;

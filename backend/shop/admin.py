@@ -28,6 +28,15 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
+    def has_add_permission(self, request):
+        return request.user.is_superuser and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser and super().has_delete_permission(request, obj)
+
     list_display = ('username', 'email', 'phone', 'role', 'is_active', 'is_staff')
     list_filter = ('role', 'is_active', 'is_staff', 'is_superuser')
     search_fields = ('username', 'email', 'phone', 'first_name', 'last_name')
@@ -305,5 +314,5 @@ class MessageAdmin(admin.ModelAdmin):
 
 
 @admin.register(SiteSettings)
-class SettingsAdmin(admin.ModelAdmin):
+class SettingsAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('id',)

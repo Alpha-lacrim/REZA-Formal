@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react';
-import { ArrowLeft } from 'lucide-react';
-import { Link, Navigate, useNavigate, useParams } from 'react-router-dom';
+import { ArrowRight } from 'lucide-react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 import SEO from '../components/SEO';
+import NotFoundPage from './NotFoundPage';
 
 type PolicyKey = 'privacy' | 'terms' | 'shipping' | 'returns' | 'payment';
 
@@ -215,7 +216,7 @@ const PolicyPage: React.FC = () => {
     }, [policyId]);
 
     if (!policy) {
-        return <Navigate to="/policies/terms" replace />;
+        return <NotFoundPage />;
     }
 
     return (
@@ -236,7 +237,7 @@ const PolicyPage: React.FC = () => {
                     onClick={() => navigate(-1)}
                     className="inline-flex items-center gap-1 rounded bg-lux-gold px-3 py-1 text-xs text-white shadow-md hover:brightness-95 md:text-sm"
                 >
-                    <ArrowLeft size={14} />
+                    <ArrowRight size={14} />
                     <span>بازگشت</span>
                 </button>
             </div>

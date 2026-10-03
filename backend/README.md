@@ -15,7 +15,8 @@ Use the project-tested Python 3.11/3.12 baseline. The Docker image uses 3.11 and
 ```powershell
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
+python -m pip check
 ```
 
 4. Ensure SQL Server is running, the target database exists, and the configured login can access it.
@@ -39,10 +40,15 @@ Use an available Python 3.11/3.12 executable, then:
 ```bash
 python3.12 -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 ```
 
 The Microsoft ODBC driver still must be installed through the operating system.
+
+`requirements.in` holds compatible inputs; `requirements.txt` is the complete
+version/hash lock. Docker and CI enforce hashes and binary wheels. See
+[operations](../docs/OPERATIONS.md) for lock updates, restricted runtime/migration
+logins, JSON logging, UID 10001 volume ownership and recovery procedures.
 
 ## Configuration
 
@@ -53,18 +59,20 @@ Important `backend/.env` values:
 - `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, and `DB_PORT`
 - `DB_DRIVER`, `DB_ENCRYPT`, `DB_TRUST_SERVER_CERTIFICATE`, and `DB_CONNECTION_TIMEOUT`
 - optional `DJANGO_SUPERUSER_EMAIL`, `DJANGO_SUPERUSER_PASSWORD`, and `DJANGO_SUPERUSER_USERNAME`
-- optional `GOOGLE_OAUTH_CLIENT_ID` (Google login is disabled when blank)
+- `TRUSTED_PROXY_CIDRS` (only verified immediate proxy networks; blank ignores forwarded IPs)
 - `AUTH_COOKIE_*`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, and the HTTPS controls documented in `.env.example`
 
 `backend/.env` is ignored and must never be committed.
 
-Google ID tokens are verified server-side against the configured web client ID. Browser mutations use the `/api/auth/csrf/` bootstrap and `X-CSRFToken`; authentication cookies intentionally accept only `SameSite=Lax` or `Strict`. For HTTPS production, enable secure cookies, trusted proxy forwarding, redirect, and HSTS only after confirming the deployment topology.
+Google/OTP endpoints return 501; legacy MFA-marked accounts fail closed rather than bypassing their marker. Access sessions last 15 minutes with rotating refresh under a fixed seven-day family expiry. Logout revokes the family immediately. Apply migrations 0009/0010 with coordinated frontend rollout and require sign-in again. Schedule `python manage.py prune_security_state` daily. See [Batch 9 security record](../docs/SECURITY_HARDENING.md). Browser mutations use the `/api/auth/csrf/` bootstrap and `X-CSRFToken`; authentication cookies intentionally accept only `SameSite=Lax` or `Strict`. For HTTPS production, enable secure cookies, trusted proxy forwarding, redirect, and HSTS only after confirming the deployment topology.
 
 ## Checks
 
 Run the hermetic backend tests without connecting to the configured SQL Server:
 
 ```powershell
+python manage.py check --settings=reza_backend.test_settings
+python manage.py makemigrations --check --dry-run --settings=reza_backend.test_settings
 python manage.py test --settings=reza_backend.test_settings
 ```
 
@@ -77,7 +85,7 @@ python manage.py check
 python manage.py makemigrations --check --dry-run
 ```
 
-The repository CI runs these checks plus frontend type/build checks and Compose validation. Provider sandbox/browser automation still belongs in the deployment pipeline once providers are selected.
+The repository CI runs isolated checks plus frontend lint/tests/type/build, Compose and disposable container/recovery/security gates. Browser/SQL integration lanes are separately dispatched; see [TESTING](../docs/TESTING.md). External provider sandbox evidence remains pending provider selection. The strict image release gate currently blocks the backend; see [FINAL_REVIEW](../docs/audit/FINAL_REVIEW.md).
 
 ## Docker
 

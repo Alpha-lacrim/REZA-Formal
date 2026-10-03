@@ -2,6 +2,12 @@
 
 REZA Formal is a full-stack Persian/RTL commerce site for formal menswear. It combines a React/Vite storefront with a Django REST API, Microsoft SQL Server persistence, CSRF-protected cookie JWT authentication, and a health-checked Docker stack.
 
+The remediation candidate is `codex/remediation-program`, for human review into
+main. [Final architecture review](docs/audit/FINAL_REVIEW.md) records the current
+system and verification; [remaining roadmap](docs/ROADMAP.md) owns follow-up work.
+The program is partially complete and production release remains blocked by the
+runtime-image advisory gate and owner deployment obligations.
+
 The provider-free store is functional with product variants and inventory history, saved carts and wishlists, structured addresses, server-priced quotes, coupons and shipping methods, idempotent COD/manual checkout, payment and fulfillment state, immutable order snapshots, verified-purchase reviews, returns/refunds, bespoke leads, newsletters, policy pages, and customer/staff dashboards. Real online payments, carrier labels, and transactional email/SMS remain explicit provider integrations; the site never simulates those services as successful.
 
 ## Stack
@@ -55,7 +61,7 @@ Copy-Item .env.example .env
 # Edit .env with the local SQL Server connection and Django secret.
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install --require-hashes --only-binary=:all: -r requirements.txt
 python manage.py migrate
 python manage.py seed_data
 python manage.py runserver
@@ -100,9 +106,14 @@ docker compose config --quiet
 
 `vercel.json` is intentionally frontend-only. It installs and builds `frontend/` and publishes `frontend/dist`. The application uses hash-based routing, so server-side SPA rewrites are unnecessary. Before a Vercel deployment, set `VITE_API_BASE` to the public HTTPS origin of the separately hosted Django API.
 
+The [routing decision](docs/adr/0001-storefront-routing.md) preserves existing hash
+deep links across container/static hosting. Batch 11 improves client metadata and
+adds robots guidance; crawlable product canonicals, an XML sitemap and server
+product/social metadata remain requirements of the future domain/rendering rollout.
+
 The Django application depends on SQL Server, native ODBC support, uploaded-media persistence, and startup migrations. Deploy it on a persistent container/application host rather than through the old Vercel Python configuration.
 
-Cookie auth includes an explicit CSRF bootstrap/header flow, but deployment still requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com`. A default `project.vercel.app` frontend plus an unrelated API host will not reliably receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; third-party-cookie deployments are intentionally unsupported. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login additionally requires a configured backend `GOOGLE_OAUTH_CLIENT_ID` and a frontend Google Identity flow that supplies a verified ID token.
+Cookie auth includes an explicit CSRF bootstrap/header flow, but deployment still requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com`. A default `project.vercel.app` frontend plus an unrelated API host will not reliably receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; third-party-cookie deployments are intentionally unsupported. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login, OTP and TOTP enrollment/recovery are unavailable. See [security policies, verification and rollout](docs/SECURITY_HARDENING.md) for session rotation/revocation, trusted proxy settings and remaining deployment gates.
 
 ## Project structure
 
@@ -118,6 +129,11 @@ REZA-Formal/
 ```
 
 ## Configuration and hygiene
+
+Production preparation and recovery: [operations runbook](docs/OPERATIONS.md).
+The reviewed production Compose override is a template; it requires owner-provisioned
+SQL credentials/certificates, TLS ingress and prepared volume ownership. CI builds
+and tests disposable infrastructure only; no production deployment is enabled.
 
 - Root `.env` is read by Docker Compose; `backend/.env` is read by manual Django runs. Both are ignored.
 - Uploaded media, local databases, virtual environments, Python caches, cookie jars, archives, dependencies, and build output are ignored.

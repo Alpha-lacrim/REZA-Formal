@@ -1,6 +1,6 @@
 # Frontend audit
 
-The descriptive analysis below preserves Batch 1 observations. Dated Batch 2 results in FE-001/FE-002 supersede their original behavior; broader frontend work remains open.
+The descriptive analysis below preserves Batch 1 observations. Dated revalidation rows supersede their original behavior. Batch 9 (2026-10-03) adds rotating/revocable server sessions, cross-tab cookie coordination, explicit failed logout and effective staff DTO alignment (FE-008); unsupported MFA UI is removed. See [current security policies](../SECURITY_HARDENING.md) for exact evidence and residuals.
 
 The frontend has React 19, TypeScript 5.8 and Vite 6, with locally compiled Tailwind/PostCSS and lazy route chunks. [Baseline typecheck/build](TESTING_CI_AUDIT.md) pass. Those checks do not exercise effects, concurrent requests, accessibility or wire-data validation.
 
@@ -195,10 +195,11 @@ No browser session, visual comparison, assistive technology run or frontend test
 | ID | FE-008 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed defect |
+| Status | Fixed - Batch 9 effective backend capability |
+| Batch 9 revalidation | 2026-10-03: AccountReadSerializer returns admin when backend is_admin grants staff capability, without writing role/staff flags. Anonymous/customer/admin and native-superuser mutation tests pass; React consumes the same validated role contract. |
 | Evidence | Construct is_staff=True, role=user, non-superuser: is_admin returns true; returned role remains user and ProtectedRoute redirects. Superuser sync does not cover ordinary staff. |
 | File/function references | backend/shop/models.py:User.is_admin; backend/shop/views.py:125; frontend/App.tsx:ProtectedRoute; frontend/contexts/GlobalContext.tsx:149 |
-| Current behaviour | API permits is_staff users even when role=user. serialize_user returns raw role; React requires role=admin. |
+| Batch 1 behaviour | API permits is_staff users even when role=user. serialize_user returns raw role; React requires role=admin. |
 | Impact | Legitimate Django staff without the custom role can use staff APIs but are denied the React admin interface; capability ownership is inconsistent. |
 | Reproduction/proof | Construct is_staff=True, role=user, non-superuser: is_admin returns true; returned role remains user and ProtectedRoute redirects. Superuser sync does not cover ordinary staff. |
 | Root cause | Authorization capability is duplicated as raw role checks. |

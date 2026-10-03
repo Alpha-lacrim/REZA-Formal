@@ -14,6 +14,7 @@ class SqlIndexTests(TransactionTestCase):
     def test_sku_index_migration_forward_reverse_keeps_uniqueness(self):
         before = [('shop', '0007_commerce_payment_refund_states')]
         after = [('shop', '0008_remove_redundant_sku_index')]
+        latest = MigrationExecutor(connection).loader.graph.leaf_nodes()
         def constraints():
             with connection.cursor() as cursor:
                 return connection.introspection.get_constraints(cursor, 'shop_productvariant')
@@ -27,7 +28,7 @@ class SqlIndexTests(TransactionTestCase):
             MigrationExecutor(connection).migrate(before)
             self.assertIn('variant_sku_idx', constraints())
         finally:
-            MigrationExecutor(connection).migrate(after)
+            MigrationExecutor(connection).migrate(latest)
 
     def test_sku_index_shapes_and_lookup_plan(self):
         product = Product.objects.create(id='index-product', name='Synthetic', price=10)

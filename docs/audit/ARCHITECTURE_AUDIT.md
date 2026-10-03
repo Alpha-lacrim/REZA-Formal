@@ -1,5 +1,9 @@
 # Architecture audit
 
+Current system/consistency review: [FINAL_REVIEW](FINAL_REVIEW.md), 2026-10-04.
+The map/traces below preserve the original audit baseline; current status and dated
+resolution evidence supersede historical behavior descriptions.
+
 Audited application tree: `94d665881e3e929c41121d057385c28f822002fe`, 2026-09-10. See [the index](AUDIT_INDEX.md) for severity/status definitions, all hypotheses, and limits. Architecture observations below are maintenance debt, not proof that module size itself is a defect.
 
 ## System map

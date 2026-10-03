@@ -17,6 +17,7 @@ If several agents work in parallel, the primary agent owns `Codex.md`, `AGENTS.m
 - `Codex.md` is the durable project map: architecture, important files, data flows, configuration names, commands, and stable implementation constraints. Update it whenever those facts change. It is not a chronological changelog.
 - `Handoff.md` is the chronological session record. Every session must state what changed, what was verified, what remains incomplete, and what the repository owner must do. Keep the newest entry first and never silently drop an unresolved item.
 - `AGENTS.md` is this operating contract. Update it if the maintenance workflow, required checks, or responsibilities of the other two files change.
+- `docs/CODEX_PROGRAM.md` owns remediation status and Git provenance; `docs/audit/` preserves findings and historical evidence; `docs/adr/` records consequential decisions; `docs/ROADMAP.md` owns remaining future work. Keep these roles distinct when reconciling documentation.
 
 ## Working rules
 
@@ -27,6 +28,7 @@ If several agents work in parallel, the primary agent owns `Codex.md`, `AGENTS.m
 - Prices and stock must remain server-authoritative. Order writes and stock restoration must be transactional.
 - Do not expose development credentials in UI or documentation. Production secrets belong only in ignored environment files or the deployment platform's secret store.
 - Do not rewrite Git history, delete persistent data, remove volumes, or rotate external credentials without explicit owner approval. Redact a tracked secret from the current tree and report the required rotation/history cleanup instead.
+- Remediation integration belongs on `codex/remediation-program` as a candidate for human review into main. Preserve main during automatic integration. Record failing release gates and unobserved hosted CI separately from successful local functional checks; never label a partially remediated program production-ready.
 - Use `apply_patch` for hand-edited files, keep changes scoped, and avoid committing generated output, local environments, uploaded media, cookie jars, or ad-hoc debug artifacts.
 
 ## Expected verification
@@ -52,7 +54,23 @@ cd ..
 docker compose config --quiet
 ```
 
+For authentication, authorization, uploads, proxy or dependency changes, also run the relevant fixtures/gates in `docs/TESTING.md`: resolved Python advisory scan, production npm audit, full `audit:security` policy, disposable SQL security schedules and Nginx probes as applicable. Never treat the expiring build-only advisory exception as a zero-advisory full report or claim local checks prove deployed TLS/headers.
+
 If a command is unavailable or requires an external service, record that fact in `Handoff.md`; do not claim it passed.
+
+For container/startup/production operations changes, also run `scripts/check-build-inputs.py`
+and `scripts/validate-production-config.py`, build both runtime images, run the proxy
+gate and `node scripts/test-production-runtime.mjs` using only its owned disposable
+fixtures. Follow `docs/OPERATIONS.md` for hash-lock updates, volume ownership and
+recovery gates. Keep production deployment disabled; real ingress/DB/backup/capacity
+changes need explicit owner scope. Record image scanner/database failures separately
+from a successful vulnerability scan; hosted CI is separate from local evidence.
+Run `node --test scripts/test-image-vulnerability-policy.mjs` and
+`node scripts/scan-runtime-images.mjs` after image changes and preserve full
+reports, including unfixed findings. All HIGH/CRITICAL findings block release;
+an empty fixed version is not risk acceptance. See `docs/RUNTIME_VULNERABILITIES.md`.
+Volume maintenance must use an explicit operator window and verified backup; test
+`prepare-volume-ownership.py` only on the runtime fixture's uniquely owned volumes.
 
 ## Mandatory session close
 

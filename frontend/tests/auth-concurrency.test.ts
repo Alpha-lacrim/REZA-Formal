@@ -9,6 +9,37 @@ let client: typeof import('../services/http/client');
 beforeEach(async () => { vi.resetModules(); client = await import('../services/http/client'); });
 afterEach(() => vi.unstubAllGlobals());
 
+test('same-origin tabs serialize rotating refresh and reuse the completed cookie update', async () => {
+  let tail = Promise.resolve<unknown>(undefined);
+  vi.stubGlobal('navigator', { locks: { request: (_name: string, operation: () => Promise<unknown>) => {
+    const result = tail.then(operation); tail = result.catch(() => undefined); return result;
+  } } });
+  const tabOne = client;
+  vi.resetModules();
+  const tabTwo = await import('../services/http/client');
+  let refreshes = 0;
+  let authenticated = false;
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    if (path.endsWith('/csrf/')) return Response.json({ csrfToken: 'synthetic-csrf' });
+    if (path.endsWith('/refresh/')) { refreshes++; authenticated = true; return Response.json({}); }
+    return Response.json({ ok: authenticated }, { status: authenticated ? 200 : 401 });
+  }));
+  await expect(Promise.all([tabOne.request('/api/auth/me/'), tabTwo.request('/api/auth/me/')])).resolves.toHaveLength(2);
+  expect(refreshes).toBe(1);
+});
+
+test('failed server logout clears local identity and reports failure to its caller', async () => {
+  const { createAuth } = await import('../state/auth');
+  const changes = vi.fn();
+  const auth = createAuth(changes);
+  vi.stubGlobal('fetch', vi.fn(async (path: string) => {
+    if (path.endsWith('/csrf/')) return Response.json({ csrfToken: 'synthetic-csrf' });
+    throw new TypeError('synthetic network failure');
+  }));
+  await expect(auth.logout()).rejects.toMatchObject({ code: 'network_error' });
+  expect(auth.store.getSnapshot()).toEqual({ status: 'anonymous' });
+});
+
 test('concurrent 401s share one refresh, including a late old-token response', async () => {
   const release = deferred<Response>();
   const late = deferred<Response>();

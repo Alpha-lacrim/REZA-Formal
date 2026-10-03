@@ -1,6 +1,28 @@
 # Security audit
 
-Historical analysis below describes Batch 1. SEC-001 includes the dated Batch 2 product-upload fix; other security findings and production media-serving verification remain open.
+Batch 12 (2026-10-04): current npm production and resolved Python hash-lock scans
+report no known vulnerabilities; five exact build-only npm entries still expire
+2026-11-02. Completed runtime-image scanning is separate: backend 44 unfixed HIGHs
+across eight IDs blocks release under OPS-002; frontend reports zero findings.
+No VEX/exception is approved. [FINAL_REVIEW](FINAL_REVIEW.md) records current
+verification and retained historical credential/media/deployment obligations.
+
+## Batch 9 revalidation - 2026-10-03
+
+SEC-002/SEC-003 and FE-008 are fixed in the application; SEC-004 exposed identity
+paths are disabled/fail closed. SEC-001 protection now covers site images and a
+verified disposable proxy. SEC-005 is partial: runtime npm/resolved Python reports
+are clear, while five development-only affected npm entries remain until a
+Tailwind compatibility migration. The exact exception expires 2026-11-02 00:00 UTC.
+See [security policies, fixtures and rollout](../SECURITY_HARDENING.md).
+
+Full SQL Server: 161/161, zero skips; frontend: 9 Node + 69 Vitest; four Chrome
+journeys; ten Nginx status/header/media checks plus two spoofed-XFF probes pass.
+Production TLS/proxy CIDRs, HSTS, image/OS scanning, historical media and credential
+rotation/history cleanup remain owner/deployment obligations.
+
+The records below preserve the Batch 1 evidence and original behavior. Dated
+revalidation/status rows supersede their historical remediation recommendations.
 
 Audit scope is current tracked application/configuration plus isolated fixtures. No credential values were read from ignored environment files or recorded. No exploit against a deployed system was attempted. A current-tree signature scan for private keys, token formats and credential-bearing URLs produced no matches; that is not proof that all secrets or Git history are clean.
 
@@ -46,11 +68,12 @@ Handoff records a previously committed SQL password and obsolete Gemini key expo
 | ID | SEC-001 |
 | Severity | P1 |
 | Confidence | High |
-| Status | Fixed - Batch 2 upload containment; existing-media deployment review remains |
+| Status | Fixed - product/site validation and disposable proxy verified; historical/deployment review open |
+| Batch 9 revalidation | 2026-10-03: seven site fields share decoder/budgets/random names/staged rollback; native site writes are read-only; Nginx blocks active extensions and symlinks. Ten status/header/media fixtures and two forwarding probes pass. Existing media retained. |
 | Batch 2 revalidation/fix | 2026-09-14: API tests reproduced HTML/SVG acceptance, rejected-write orphans and appended active content. Product primary/gallery files now share decoded/re-encoded still-image validation (PNG/JPEG/WebP/GIF; 10 MiB per file, 8000 px per side, 20 million pixels, 12 gallery entries), MIME/extension checks, URL/shape validation and transaction-owned storage cleanup. Newly written files are removed on validation/DB/storage failure; existing referenced files are retained. Both REST mutation surfaces are covered and native catalog writes are read-only. Nginx media adds restrictive CSP sandbox for legacy active content; live Nginx serving remains unverified because Docker is unavailable. Eight media tests pass; combined media/inventory/variant suite: 15. No historical media was deleted or quarantined. |
 | Evidence | P04: harmless .html upload accepted with 201 and saved. P05: invalid negative-price request returns 400 but leaves a .txt file. Nginx serves media by extension without attachment/sandbox policy. |
 | File/function references | backend/shop/views.py:139,182,214; backend/reza_backend/settings.py:DATA_UPLOAD_MAX_MEMORY_SIZE; frontend/nginx.conf:30 |
-| Current behaviour | Gallery files keep the submitted extension and are read/stored directly without image decoding, type allowlist, dimension/file-count/explicit byte checks. Files save before product validation/transaction. JSON gallery URLs are also unrestricted. |
+| Batch 1 behaviour | Gallery files keep the submitted extension and are read/stored directly without image decoding, type allowlist, dimension/file-count/explicit byte checks. Files save before product validation/transaction. JSON gallery URLs are also unrestricted. |
 | Impact | Staff-uploaded active content is served on the application's media origin; stored-script execution is an exposure risk. Rejected writes leave orphans and large inputs consume memory/storage. No browser exploit was run. |
 | Reproduction/proof | P04: harmless .html upload accepted with 201 and saved. P05: invalid negative-price request returns 400 but leaves a .txt file. Nginx serves media by extension without attachment/sandbox policy. |
 | Root cause | Gallery helper bypasses ImageField and storage writes are outside domain success/cleanup ownership. |
@@ -69,10 +92,11 @@ Handoff records a previously committed SQL password and obsolete Gemini key expo
 | ID | SEC-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - confirmed lifecycle gap |
+| Status | Fixed - Batch 9 session rotation/revocation |
+| Batch 9 revalidation | 2026-10-03: AuthSession family, JTI/password digests, 15-minute access, absolute seven-day rotating refresh, immediate cookie/header logout revocation and failed-refresh clearing. Access/reuse/disabled/password/expiry/CSRF and separate SQL refresh/logout schedules pass; migration 0009 requires re-login. |
 | Evidence | P16: restore an in-memory synthetic refresh after CSRF-protected logout: refresh=200 and me=200. Disable user: refresh=200, me=401. No token values were emitted. |
 | File/function references | backend/shop/views.py:448,459; backend/reza_backend/settings.py:SIMPLE_JWT,INSTALLED_APPS; frontend/contexts/GlobalContext.tsx:354 |
-| Current behaviour | Logout deletes browser cookies only. Refresh validates signed token and issues access without rotation/revocation or checking current user activity; access use still checks the user. |
+| Batch 1 behaviour | Logout deletes browser cookies only. Refresh validates signed token and issues access without rotation/revocation or checking current user activity; access use still checks the user. |
 | Impact | A copied refresh token remains replayable after logout until expiry. Disabled-user refresh reports success but its access token is rejected. Network-failed logout can leave browser cookies active. |
 | Reproduction/proof | P16: restore an in-memory synthetic refresh after CSRF-protected logout: refresh=200 and me=200. Disable user: refresh=200, me=401. No token values were emitted. |
 | Root cause | Stateless token lifetime is the only revocation boundary; client success messaging ignores server logout failure. |
@@ -91,10 +115,11 @@ Handoff records a previously committed SQL password and obsolete Gemini key expo
 | ID | SEC-003 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - configuration risk |
+| Status | Fixed - shared atomic counters and explicit proxy trust; deployment CIDRs pending |
+| Batch 9 revalidation | 2026-10-03: ThrottleBucket atomic conditional increments share workers; HMAC keys contain no raw IP/email; normalized account and IP REST/native-admin login limits; bounded contact/register/refresh/quote/checkout/review/bespoke/return/newsletter writes. Untrusted XFF ignored; Nginx overwrites it. Separate SQL counter creation/update and real proxy spoofing fixtures pass. Migration 0010; daily prune and verified deployment CIDRs required. |
 | Evidence | Static configuration and installed DRF get_ident implementation; no trusted-proxy sanitization or shared cache configured. Existing throttle test exercises one in-process instance. |
 | File/function references | backend/shop/throttles.py:ScopedIPRateThrottle; backend/reza_backend/settings.py:REST_FRAMEWORK; backend/Dockerfile:CMD; frontend/nginx.conf:25 |
-| Current behaviour | Django default local-memory cache is used by three Gunicorn workers. NUM_PROXIES is unset; Nginx appends incoming X-Forwarded-For. DRF then uses the supplied chain for IP identity. |
+| Batch 1 behaviour | Django default local-memory cache is used by three Gunicorn workers. NUM_PROXIES is unset; Nginx appends incoming X-Forwarded-For. DRF then uses the supplied chain for IP identity. |
 | Impact | Limits are per worker and forwarded-header variation can change login/register/contact identity; exact abuse limits are not guaranteed. |
 | Reproduction/proof | Static configuration and installed DRF get_ident implementation; no trusted-proxy sanitization or shared cache configured. Existing throttle test exercises one in-process instance. |
 | Root cause | Development throttle/cache defaults are used without an explicit edge trust model. |
@@ -113,10 +138,11 @@ Handoff records a previously committed SQL password and obsolete Gemini key expo
 | ID | SEC-004 |
 | Severity | P2 |
 | Confidence | Medium |
-| Status | Open - conditional security risk |
+| Status | Disabled - Batch 9 dormant paths fail closed |
+| Batch 9 revalidation | 2026-10-03: Google and OTP return 501; legacy MFA-marked accounts return 503 without clearing markers/bypassing MFA; frontend incomplete TOTP challenge removed; unused provider dependencies/configuration removed. Recovery/provider enrollment is not implemented. |
 | Evidence | Static branch comparison; GOOGLE_OAUTH_CLIENT_ID is a gate, Google frontend absent, and migration 0005 clears historical secrets. |
 | File/function references | backend/shop/views.py:430,504,545,552; backend/shop/models.py:User.two_factor_secret; frontend/components/AuthModal.tsx |
-| Current behaviour | Password login checks two_factor_secret. Google login links by verified email and issues tokens without checking that field. OTP enrollment/delivery/recovery are absent. |
+| Batch 1 behaviour | Password login checks two_factor_secret. Google login links by verified email and issues tokens without checking that field. OTP enrollment/delivery/recovery are absent. |
 | Impact | If Google is configured and a user has a populated second-factor secret, login methods have different assurance. This is not evidence that such accounts/configuration exist. |
 | Reproduction/proof | Static branch comparison; GOOGLE_OAUTH_CLIENT_ID is a gate, Google frontend absent, and migration 0005 clears historical secrets. |
 | Root cause | Partially retired MFA fields coexist with an independently implemented social login path. |
@@ -135,10 +161,11 @@ Handoff records a previously committed SQL password and obsolete Gemini key expo
 | ID | SEC-005 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - dependency assurance gap |
+| Status | Partial - runtime checks clear; five build-only npm entries remain |
+| Batch 9 revalidation | 2026-10-03: supported Python lines and frontend dependencies updated; npm ci/lint/type/build/78 tests/Chrome pass. npm production audit and pip-audit requirements resolution report zero known vulnerabilities. GHSA-vfj7-8cjw-p6xm affects five dev-only build entries; exact scoped gate expires 2026-11-02. Tailwind major requires compatibility work. Scheduled security/proxy workflow added; hosted execution and OS/image scan remain unverified. |
 | Evidence | Exact npm result/version table above and TESTING_CI_AUDIT commands. RSC advisory is not reached by the current SPA architecture; Python advisory status unknown. |
 | File/function references | frontend/package-lock.json; frontend/package.json; backend/requirements.txt; .github/workflows/ci.yml; Dockerfiles |
-| Current behaviour | npm audit reports six affected entries. CI has no advisory/OS scans; Python requirements resolve ranges; pip-audit is unavailable locally. |
+| Batch 1 behaviour | npm audit reports six affected entries. CI has no advisory/OS scans; Python requirements resolve ranges; pip-audit is unavailable locally. |
 | Impact | Known package risks and future resolution drift are not automatically triaged; applicability must be distinguished from raw severity. |
 | Reproduction/proof | Exact npm result/version table above and TESTING_CI_AUDIT commands. RSC advisory is not reached by the current SPA architecture; Python advisory status unknown. |
 | Root cause | Security verification is manual/historical and build dependencies/images are not fully pinned. |

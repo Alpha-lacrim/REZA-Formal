@@ -2,7 +2,7 @@ import { useActions, useAuth, useSettings } from '../state/AppState';
 import { errorMessage } from '../services/api';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
+import { ArrowRight, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
 
 import api from '../services/api';
 import ImageLoader from '../components/ImageLoader';
@@ -81,7 +81,7 @@ const BespokePage: React.FC = () => {
             </header>
             <div className="bg-lux-black px-4 pb-4">
                 <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md text-sm">
-                    <ArrowLeft size={14} /> بازگشت
+                    <ArrowRight size={14} /> بازگشت
                 </button>
             </div>
 

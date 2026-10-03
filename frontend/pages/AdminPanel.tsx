@@ -26,7 +26,7 @@ const { stats, adminError, loadData } = useAdminData('shell');
     return (
         <div dir="rtl" className="min-h-screen bg-lux-body dark:bg-zinc-950 pt-20 flex flex-col md:flex-row transition-colors duration-300">
             <style>{`.admin-commerce-input{width:100%;border:1px solid #e5e7eb;border-radius:.75rem;background:#fff;padding:.625rem .75rem;font-size:.875rem;outline:none}.admin-commerce-input:focus{border-color:#c5a059}.dark .admin-commerce-input{border-color:#3f3f46;background:#27272a;color:#fff}`}</style>
-            <SEO title="Admin panel" />
+            <SEO title="پنل مدیریت" noIndex />
             
             {/* Sidebar (hidden on small screens; mobile drawer used instead) */}
             <aside className="hidden md:flex md:w-72 bg-white dark:bg-zinc-900 border-b md:border-b-0 md:border-l border-gray-200 dark:border-zinc-800 p-6 shrink-0 print:hidden flex-col h-auto md:h-[calc(100vh-5rem)] sticky top-20 shadow-sm z-30">
@@ -37,7 +37,7 @@ const { stats, adminError, loadData } = useAdminData('shell');
                         <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">نسخه ۲.۴.۰</p>
                     </div>
                 </div>
-                <nav className="space-y-2 flex-1">
+                <nav aria-label="بخش‌های مدیریت" className="space-y-2 flex-1">
                     {[
                         { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard },
                         { id: 'products', label: 'محصولات', icon: Package },
@@ -47,7 +47,7 @@ const { stats, adminError, loadData } = useAdminData('shell');
                     ].map(item => (
                         <button 
                             key={item.id}
-                            onClick={() => setActiveTab(item.id as AdminTab)}
+                            aria-pressed={activeTab === item.id} onClick={() => setActiveTab(item.id as AdminTab)}
                             className={`w-full flex items-center gap-3 px-4 py-3.5 rounded-xl text-sm font-bold transition-all duration-200 group relative overflow-hidden ${
                                 activeTab === item.id 
                                 ? 'bg-lux-black dark:bg-white text-white dark:text-lux-black shadow-md' 
@@ -97,7 +97,7 @@ const { stats, adminError, loadData } = useAdminData('shell');
                             </div>
                             <button aria-label="بستن منوی مدیریت" onClick={() => setMobileSidebarOpen(false)} className="p-2 rounded-md hover:bg-gray-100 dark:hover:bg-zinc-800"><X size={18} /></button>
                         </div>
-                        <nav className="space-y-2">
+                        <nav aria-label="بخش‌های مدیریت" className="space-y-2">
                             {[
                                 { id: 'dashboard', label: 'داشبورد', icon: LayoutDashboard },
                                 { id: 'products', label: 'محصولات', icon: Package },
@@ -121,7 +121,7 @@ const { stats, adminError, loadData } = useAdminData('shell');
             )}
 
             {/* Main Content */}
-            <main className="flex-1 p-4 md:p-8 overflow-y-auto h-full" role="main">
+            <main className="flex-1 min-w-0 p-4 md:p-8 overflow-y-auto h-full">
                 {adminError && <div role="alert" className="mb-4 rounded-lg border border-red-300 p-3 text-red-700">
                     دریافت اطلاعات مدیریت انجام نشد. <button onClick={() => void loadData()} className="underline">تلاش دوباره</button>
                 </div>}

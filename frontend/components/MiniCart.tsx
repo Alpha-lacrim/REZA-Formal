@@ -1,6 +1,7 @@
 import { useActions, useCart, useCatalog, useOverlays } from '../state/AppState';
 import { cartLineKey } from '../state/persistence';
-import React, { useEffect, useRef } from 'react';
+import React from 'react';
+import { Dialog } from './Dialog';
 import { Link } from 'react-router-dom';
 import { Minus, Plus, Trash2, X } from 'lucide-react';
 import ImageLoader from './ImageLoader';
@@ -12,19 +13,6 @@ const MiniCart: React.FC = () => {
     const { toggleCart, updateQty, removeFromCart } = useActions();
     const { cartLines } = useCart();
     const { products } = useCatalog();
-    const cartRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (!isCartOpen) return;
-        const handleClickOutside = (event: MouseEvent) => {
-            if (cartRef.current && !cartRef.current.contains(event.target as Node)) toggleCart(false);
-        };
-        const timer = window.setTimeout(() => document.addEventListener('mousedown', handleClickOutside), 50);
-        return () => {
-            window.clearTimeout(timer);
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, [isCartOpen, toggleCart]);
 
     if (!isCartOpen) return null;
 
@@ -37,10 +25,11 @@ const MiniCart: React.FC = () => {
     const total = items.reduce((sum, item) => sum + item.price * item.line.quantity, 0);
 
     return (
-        <div ref={cartRef} dir="rtl" className="fixed bottom-4 right-4 z-[9999] w-[90vw] max-w-sm bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 rounded-lg shadow-2xl flex flex-col overflow-hidden max-h-[80vh] animate-in slide-in-from-bottom-5 fade-in duration-300">
+        <Dialog title="سبد خرید" size="compact" onClose={() => toggleCart(false)}>
+        <div className="flex flex-col max-h-[calc(100dvh-2rem)]">
             <div className="flex justify-between items-center p-3 border-b border-gray-100 dark:border-zinc-800 bg-gray-50 dark:bg-zinc-900">
                 <strong className="text-lux-black dark:text-white">سبد خرید</strong>
-                <button onClick={() => toggleCart(false)} className="p-1 hover:bg-gray-200 dark:hover:bg-zinc-800 rounded" aria-label="بستن سبد خرید">
+                <button onClick={() => toggleCart(false)} className="icon-button hover:bg-gray-200 dark:hover:bg-zinc-800 rounded" aria-label="بستن سبد خرید">
                     <X size={18} className="dark:text-white" />
                 </button>
             </div>
@@ -64,9 +53,9 @@ const MiniCart: React.FC = () => {
                                     )}
                                     <div className="text-xs text-lux-gold my-2">{formatPrice(price)}</div>
                                     <div className="flex items-center gap-2">
-                                        <button onClick={() => updateQty(key, -1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white" aria-label="کاهش تعداد"><Minus size={12} /></button>
+                                        <button disabled={line.quantity <= 1} onClick={() => updateQty(key, -1)} className="icon-button border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white disabled:opacity-40" aria-label={`کاهش تعداد ${product.name}`}><Minus size={12} /></button>
                                         <span className="text-sm w-6 text-center dark:text-white">{toPersianDigits(line.quantity)}</span>
-                                        <button onClick={() => updateQty(key, 1)} className="p-1 border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white" aria-label="افزایش تعداد"><Plus size={12} /></button>
+                                        <button onClick={() => updateQty(key, 1)} className="icon-button border rounded hover:bg-gray-50 dark:border-zinc-700 dark:text-white" aria-label={`افزایش تعداد ${product.name}`}><Plus size={12} /></button>
                                     </div>
                                 </div>
                                 <button onClick={() => removeFromCart(key)} className="text-gray-400 hover:text-red-500 self-start" aria-label="حذف از سبد">
@@ -88,6 +77,7 @@ const MiniCart: React.FC = () => {
                 </Link>
             </div>
         </div>
+        </Dialog>
     );
 };
 

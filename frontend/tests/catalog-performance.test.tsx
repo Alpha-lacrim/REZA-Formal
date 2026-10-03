@@ -37,7 +37,7 @@ test('catalog pages/search filters remain bounded and a product beyond the previ
   await screen.findByRole('heading', { name: 'Suit 0' });
   await user.click(screen.getByRole('button', { name: 'بعدی' }));
   await screen.findByRole('heading', { name: 'Suit 102' });
-  await user.click(screen.getByRole('button', { name: 'افزودن گزینه موجود' }));
+  await user.click(screen.getByRole('button', { name: 'افزودن گزینه موجود Suit 102' }));
   await waitFor(() => expect(screen.getByRole('status')).toHaveTextContent('Suit 102'));
   expect(api.getProducts).toHaveBeenCalledTimes(1);
   expect(pageApi.mock.calls.filter(([params]) => !params?.ids).every(([params]) => params?.page_size === 24)).toBe(true);

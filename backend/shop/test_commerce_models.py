@@ -264,6 +264,8 @@ class CommerceMigrationTests(TransactionTestCase):
 
     def test_legacy_catalog_orders_and_addresses_are_safely_backfilled(self):
         executor = MigrationExecutor(connection)
+        latest = executor.loader.graph.leaf_nodes()
+        self.addCleanup(lambda: MigrationExecutor(connection).migrate(latest))
         executor.migrate([self.migrate_from])
         old_apps = executor.loader.project_state([self.migrate_from]).apps
 

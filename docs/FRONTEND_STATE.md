@@ -2,6 +2,10 @@
 
 Decision date: 2026-10-01. Findings: ARCH-001, FE-004, FE-006, FE-007.
 
+Reconciled through Batch 12 on 2026-10-04. The ownership decision remains;
+later pagination/cache/staff changes are reflected below. Exact original session
+evidence remains in Handoff and [final review](audit/FINAL_REVIEW.md).
+
 ## Classification before changing ownership
 
 | Class | Existing examples | Owner after this batch |
@@ -24,10 +28,10 @@ The implementation uses shared keyed reads, in-flight deduplication, freshness, 
 
 - Keys: `['catalog', identity]`, `['settings']`, `['admin', identity, collection]`. Catalog/admin data waits for resolved auth. No previous-identity placeholder data is used.
 - Freshness: 30 seconds for catalog/admin; 60 seconds for public settings. Focus refetch is disabled; reconnect/default mount freshness checks remain. Reads and mutations have `retry: false` so failures are visible and writes are never silently repeated.
-- The bounded set of keys stays in memory for the application session (`gcTime: Infinity`). Identity changes cancel/remove every identity-bound query; provider teardown clears the client. Nothing in Query is persisted to browser storage.
+- Base catalog/settings keys stay in memory for the application session (`gcTime: Infinity`). Paged catalog/facet, nonempty selected-ID and admin keys expire five minutes after becoming inactive. Identity changes cancel/remove every identity-bound query; provider teardown clears the client. Nothing in Query is persisted to browser storage.
 - Successful product writes, checkout and cancellation invalidate catalog and admin stats. Admin order/commerce/message actions invalidate admin collections as appropriate. Settings use the authoritative write response. Failed admin reads keep any same-session snapshot with an error/retry affordance; a failed staff catalog never substitutes public/fallback data.
 - Public catalog failure retains the explicitly labelled emergency fallback. Checkout requires `catalogSource === 'server'`; the server still revalidates stock and prices.
-- Admin pagination transport behavior is unchanged. Migrating customer screen collections or redesigning admin feature/pagination UI is separate work, not a prerequisite to these ownership boundaries.
+- Admin features use server pages and load only the selected commerce section. Customer order/return/review page controls and server-filtered public catalog are implemented in later batches without changing these ownership boundaries.
 
 References considered: [TanStack Query overview](https://tanstack.com/query/latest/docs/framework/react/overview), [defaults](https://tanstack.com/query/latest/docs/framework/react/guides/important-defaults), [cancellation](https://tanstack.com/query/latest/docs/framework/react/guides/query-cancellation), and [invalidation](https://tanstack.com/query/latest/docs/framework/react/guides/query-invalidation). Defaults above are deliberately set for this application.
 
@@ -59,6 +63,7 @@ Audited all active `frontend` sources and repository references using `rg` for `
 | `reza_wishlist_v1` | Legacy migration reader only; string IDs validated/deduplicated. Kept, not deleted or overwritten. |
 | `reza_session_v1` | Before this batch, only GlobalContext wrote/deleted the user copy; there was **no auth reader**. Cookie `/me` owns auth. The new migration checks its presence only to quarantine ambiguous legacy commerce rather than importing a former user's data into a guest/new account. The obsolete copy is removed only after writing the guest migration/quarantine bucket successfully. No new session snapshot is stored. |
 | `reza_session_epoch_v1` | New non-secret change notification written before explicit cookie-session mutations; storage events and pre-dispatch reads invalidate other app runtimes. Contains no user identity or credential and cannot authorize any request. If storage is blocked, this cross-tab notification is unavailable; in-memory session guards still apply. |
+| `reza_refresh_epoch_v1` | Batch 9 non-secret random completion marker for refresh, checked under the same-origin Web Lock. A waiting tab retries with current cookies rather than rotating again. Contains no identity/token; blocked storage falls back to per-tab coordination and concurrent refresh can require sign-in. |
 | `reza_theme_pref` | Active `ui.ts` reader/writer. Only `dark` and `light` are accepted. |
 | `reza_db_products_v1` | Active read-only fallback cache in `services/db.ts`; retained. Storage exceptions return bundled seed data. |
 | `reza_db_users_v1`, `reza_db_orders_v1`, `reza_db_messages_v1`, `reza_db_settings_v1` | Existing retired-key cleanup in `services/db.ts`; repository search found no active readers/writers outside that cleanup. Existing deletion policy is retained (old user data could include plaintext passwords). No additional fallback key is deleted. |
@@ -69,4 +74,4 @@ Old unowned cart/wishlist data cannot be reliably attributed retrospectively. Wh
 
 `tests/state-ownership.test.tsx`, existing Node startup probes, commerce MSW tests and HTTP concurrency tests cover anonymous/customer/admin bootstrap, guest transfer, logout/account isolation, persistence/migration/corruption/storage failure, failed GET/write/retry, removal tombstones, hydration edits, serialized cart clear, stock limits, late response rejection, catalog/settings/admin invalidation, quote cancellation, checkout session changes, StrictMode and subscription boundaries. Existing Chrome smoke journeys exercise real-Django catalog, customer COD checkout/history, and admin product persistence against a disposable SQLite fixture.
 
-See the Batch 6 entry in `Handoff.md` for exact final check results. Price-change confirmation policy, effective staff capabilities, multi-device conflict resolution, broader screen decomposition and prior production/security obligations remain separately documented follow-ups.
+See `Handoff.md` and FINAL_REVIEW for exact checks. Batch 9's user DTO reflects the backend's effective staff capability; admin feature decomposition and customer paging are implemented. Price-change confirmation policy, multi-device conflict resolution and prior production/security obligations remain separately documented follow-ups.

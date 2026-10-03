@@ -17,6 +17,8 @@ Batch 1 established documentation and evidence only. Its original source/probe o
 | [Testing/CI/operations](TESTING_CI_AUDIT.md) | Exact baseline commands/results, test inventory, reproducible probes and infrastructure gaps |
 | [UX/accessibility/SEO](UX_A11Y_SEO_AUDIT.md) | Static markup/RTL/routing/metadata review and limits |
 | [Dead code/debt](DEAD_CODE_DEBT.md) | Routed versus retained compatibility implementations and removal preconditions |
+| [Final review](FINAL_REVIEW.md) | Current system, all residual priorities/owners, verification and production blockers as of 2026-10-04 |
+| [Historical roadmap](PROGRAM_ROADMAP_HISTORY.md) | Original batch sequencing and dated updates preserved at closeout |
 | [Roadmap](../ROADMAP.md) | Priority, dependencies, acceptance gates and owner decisions |
 | [Program](../CODEX_PROGRAM.md) | Batch/Git tracking |
 | [Handoff](../../Handoff.md) | Chronological session record |
@@ -33,6 +35,16 @@ File/function line references describe the unchanged application baseline. A fin
 Severity is remediation priority, **not confidence or a vulnerability scanner's severity**. Confidence is High (direct code/probe evidence for stated behavior) or Medium (credible conditional mechanism requiring target-environment verification). All records were Open at Batch 1; current status is in the register. Architectural size/coupling is not classified as a confirmed application defect.
 
 **43 findings: P0 0; P1 8; P2 33; P3 2.** P1 entries include DB-002 (unverified SQL concurrency risk) and TEST-003 (coverage gap); do not report all P1 entries as reproduced bugs. No production incident or successful deployed exploit was demonstrated.
+
+**Batch 12 final review (2026-10-04): 15 remaining open/partial records: P0 0,
+P1 2, P2 13, P3 0; 28 addressed/contained at their recorded source scope.**
+Remaining IDs: ARCH-003, BE-009, FE-006, DB-001/002/003, SEC-005, PERF-002,
+TEST-002/003, OPS-002/003/004 and UX-001/002. FE-006 includes the open price-change
+policy despite implemented race guards; disabled SEC-004 is contained, not a
+completed identity integration. Rollout/owner obligations on fixed records remain
+in [FINAL_REVIEW](FINAL_REVIEW.md). Fresh image scan completes with 44 unfixed
+backend HIGHs across eight IDs and blocks release under OPS-002; scanner severity
+does not renumber/reclassify original audit priorities. Program is partially complete.
 
 ## Supplied hypotheses: verdicts
 
@@ -83,16 +95,16 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | FE-005 | P2 | High | Addressed - Batch 8 public/customer/review and Batch 7 staff pages | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5/7/8 |
 | FE-006 | P2 | High | Implemented guards; price-confirmation policy open | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
 | FE-007 | P2 | High | Fixed - Batch 6 | [Legacy cart migration returns before reading legacy entries](FRONTEND_AUDIT.md#fe-007) | 6 |
-| FE-008 | P2 | High | Open - confirmed defect | [Frontend staff access disagrees with backend role rules](FRONTEND_AUDIT.md#fe-008) | 5 |
+| FE-008 | P2 | High | Fixed - Batch 9 effective capability DTO | [Frontend staff access disagrees with backend role rules](FRONTEND_AUDIT.md#fe-008) | 5/9 |
 | DB-001 | P2 | High | Partial - ownership/reconciliation verified; wider invariants remain | [Several cross-record invariants rely on cooperative application writers](DATABASE_AUDIT.md#db-001) | 8 |
 | DB-002 | P1 | Medium | Open - unverified concurrency risk | [Lock acquisition order differs between mutation paths](DATABASE_AUDIT.md#db-002) | 2 (SQL verification in 3) |
 | DB-003 | P2 | High | Open - confirmed compatibility gap | [Legacy migration does not establish payment history](DATABASE_AUDIT.md#db-003) | 4 |
 | DB-004 | P3 | High | Fixed - Batch 8 SQL index/plan/migration evidence | [SKU has an explicit index alongside a uniqueness index](DATABASE_AUDIT.md#db-004) | 8 |
-| SEC-001 | P1 | High | Fixed - Batch 2; deployment review open | [Gallery upload bypasses image validation and persists before validation](SECURITY_AUDIT.md#sec-001) | 2 (deployment in 9/10) |
-| SEC-002 | P2 | High | Open - confirmed lifecycle gap | [Logout cannot revoke a copied refresh token](SECURITY_AUDIT.md#sec-002) | 9 (coordinate API work in 5) |
-| SEC-003 | P2 | High | Open - configuration risk | [Throttle identity and cache are weak across proxies/workers](SECURITY_AUDIT.md#sec-003) | 9 |
-| SEC-004 | P2 | Medium | Open - conditional security risk | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |
-| SEC-005 | P2 | High | Open - dependency assurance gap | [Known dependency advisories and incomplete repeatable scanning](SECURITY_AUDIT.md#sec-005) | 9 (scanning foundation in 3) |
+| SEC-001 | P1 | High | Fixed - product/site/proxy source; historical deployment review open | [Gallery upload bypasses image validation and persists before validation](SECURITY_AUDIT.md#sec-001) | 2 (deployment in 9/10) |
+| SEC-002 | P2 | High | Fixed - Batch 9 rotating revocable sessions | [Logout cannot revoke a copied refresh token](SECURITY_AUDIT.md#sec-002) | 9 (coordinate API work in 5) |
+| SEC-003 | P2 | High | Fixed - shared counters/trusted forwarding; deployment CIDRs pending | [Throttle identity and cache are weak across proxies/workers](SECURITY_AUDIT.md#sec-003) | 9 |
+| SEC-004 | P2 | Medium | Disabled - Batch 9 dormant identity fails closed | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |
+| SEC-005 | P2 | High | Partial - runtime clear; five build-only entries expire 2026-11-02 | [Known dependency advisories and incomplete repeatable scanning](SECURITY_AUDIT.md#sec-005) | 9 (scanning foundation in 3) |
 | PERF-001 | P2 | High | Fixed - Batch 4; constant product read query budget | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
 | PERF-002 | P2 | High | Partial - paged collections/SQL stats fixed; saved snapshots/legacy media remain | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 |
 | PERF-003 | P2 | High | Fixed - Batch 8 two-query compact cart graph | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
@@ -100,12 +112,12 @@ No hypothesis was accepted merely because it was supplied. Several claims requir
 | TEST-002 | P2 | High | Partial - lint and auth/catalog DTO gates added; remaining strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3/5 |
 | TEST-003 | P1 | High | Partial - SQL baseline passes; broader races remain | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
 | OPS-001 | P2 | High | Fixed - Batch 3 branch filters; hosted run unverified | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
-| OPS-002 | P2 | High | Open - deployment hardening gap | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |
-| OPS-003 | P2 | High | Open - conditional deployment risk | [TLS forwarding and security header inheritance need an explicit ingress design](TESTING_CI_AUDIT.md#ops-003) | 10 |
-| OPS-004 | P2 | High | Open - operational evidence gap | [Recovery and provider-dependent workflows lack launch evidence](TESTING_CI_AUDIT.md#ops-004) | 10 (provider work requires explicit scoped batch) |
-| UX-001 | P2 | High | Open - accessibility gap | [Dialogs and controls lack consistent keyboard and naming semantics](UX_A11Y_SEO_AUDIT.md#ux-001) | 11 |
-| UX-002 | P2 | High | Open - SEO limitation | [Hash routes and client-only metadata limit storefront discoverability](UX_A11Y_SEO_AUDIT.md#ux-002) | 11 |
-| UX-003 | P2 | High | Open - confirmed navigation/metadata gap | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
+| OPS-002 | P2 | High | Partial - runtimes/locks/production template verified; owner provisioning/capacity gates | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |
+| OPS-003 | P2 | High | Partial - proxy headers/ingress contract verified; real TLS/IP trust remains | [TLS forwarding and security header inheritance need an explicit ingress design](TESTING_CI_AUDIT.md#ops-003) | 10 |
+| OPS-004 | P2 | High | Partial - isolated SQL/media recovery verified; real objectives/providers remain | [Recovery and provider-dependent workflows lack launch evidence](TESTING_CI_AUDIT.md#ops-004) | 10 (provider work requires explicit scoped batch) |
+| UX-001 | P2 | High | Partial - keyboard/semantics verified; assistive review pending | [Dialogs and controls lack consistent keyboard and naming semantics](UX_A11Y_SEO_AUDIT.md#ux-001) | 11 |
+| UX-002 | P2 | High | Partial - metadata/robots improved; routing deferred | [Hash routes and client-only metadata limit storefront discoverability](UX_A11Y_SEO_AUDIT.md#ux-002) | 11 |
+| UX-003 | P2 | High | Addressed - client fallback/metadata verified | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
 
 ## Batch 4 update - 2026-09-30
 

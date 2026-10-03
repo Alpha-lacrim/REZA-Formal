@@ -213,9 +213,9 @@ return <>
                 {viewingOrder && (
                     <Dialog title="جزئیات سفارش" size="order" onClose={() => setViewingOrder(null)}>
                          <div className="bg-white dark:bg-zinc-900 w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[95vh] print:shadow-none print:max-w-none print:h-auto print:dark:bg-white print:rounded-none animate-in slide-in-from-bottom-10 duration-300">
-                            <div className="p-6 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center print:hidden bg-gray-50 dark:bg-zinc-900">
+                            <div className="p-4 sm:p-6 border-b border-gray-100 dark:border-zinc-800 flex flex-wrap gap-3 justify-between items-center print:hidden bg-gray-50 dark:bg-zinc-900">
                                 <h3 className="font-bold text-xl text-lux-black dark:text-white flex items-center gap-2">
-                                    <ShoppingBag className="text-lux-gold"/> جزئیات سفارش <span className="font-mono text-gray-400">#{viewingOrder.id.slice(-6)}</span>
+                                    <ShoppingBag className="text-lux-gold"/> جزئیات سفارش <bdi dir="ltr" className="font-mono text-gray-400">#{viewingOrder.id.slice(-6)}</bdi>
                                 </h3>
                                 <div className="flex gap-3">
                                     <button onClick={handlePrintOrder} className="p-2.5 text-gray-600 dark:text-gray-300 hover:bg-white dark:hover:bg-zinc-800 hover:shadow-md rounded-xl transition-all" title="چاپ">
@@ -227,7 +227,7 @@ return <>
                                 </div>
                             </div>
 
-                            <div className="p-8 overflow-y-auto print:overflow-visible text-lux-black dark:text-white print:text-black">
+                            <div className="p-4 sm:p-8 overflow-y-auto print:overflow-visible text-lux-black dark:text-white print:text-black">
                                 {/* Print Header */}
                                 <div className="hidden print:flex justify-between items-end mb-8 border-b-2 border-black pb-4">
                                     <div>
@@ -286,14 +286,14 @@ return <>
                                 </div>
 
                                 {/* Items Table */}
-                                <div className="border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-hidden print:border-black">
-                                    <table className="w-full text-sm">
+                                <div tabIndex={0} role="region" aria-label="کالاهای سفارش" className="border border-gray-100 dark:border-zinc-800 rounded-2xl overflow-x-auto print:border-black">
+                                    <table className="w-full min-w-[560px] text-sm"><caption className="sr-only">کالاها و قیمت‌های سفارش</caption>
                                         <thead className="bg-gray-50 dark:bg-zinc-800 print:bg-gray-200">
                                             <tr>
-                                                <th className="px-6 py-4 text-right font-bold text-gray-600 dark:text-gray-300">شرح محصول</th>
-                                                <th className="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-300 w-24">تعداد</th>
-                                                <th className="px-6 py-4 text-left font-bold text-gray-600 dark:text-gray-300 w-40">قیمت واحد</th>
-                                                <th className="px-6 py-4 text-left font-bold text-gray-600 dark:text-gray-300 w-40">قیمت کل</th>
+                                                <th scope="col" className="px-6 py-4 text-right font-bold text-gray-600 dark:text-gray-300">شرح محصول</th>
+                                                <th scope="col" className="px-6 py-4 text-center font-bold text-gray-600 dark:text-gray-300 w-24">تعداد</th>
+                                                <th scope="col" className="px-6 py-4 text-left font-bold text-gray-600 dark:text-gray-300 w-40">قیمت واحد</th>
+                                                <th scope="col" className="px-6 py-4 text-left font-bold text-gray-600 dark:text-gray-300 w-40">قیمت کل</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-100 dark:divide-zinc-800 print:divide-black">

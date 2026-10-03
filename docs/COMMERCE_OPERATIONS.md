@@ -4,6 +4,11 @@ This document defines the honest operating boundary for REZA Formal. It is an
 operational checklist, not a legal guarantee. Customer-facing promises and
 business policies must be reviewed by the owner before launch.
 
+[FINAL_REVIEW](audit/FINAL_REVIEW.md) records the latest source/disposable-runtime
+evidence and production blockers; [OPERATIONS](OPERATIONS.md) owns executable
+environment/migration/backup/restore/ownership/rollback runbooks. A completed
+synthetic drill does not approve the actual production setup or customer policies.
+
 ## Provider-free order flow
 
 Until external providers are configured, the supported checkout methods are:
@@ -35,7 +40,8 @@ testing. A simulated success response must never be shown as a real service.
   tracking events, failed-delivery rules, and carrier account credentials.
 - **Tax/accounting:** owner-approved pricing unit, tax rules, invoice fields, and
   financial export or accounting integration.
-- **Production media/monitoring:** durable object storage, error monitoring,
+- **Production media/monitoring:** durable, backed-up managed media storage (the
+  existing volume model is supported), error monitoring,
   uptime checks, alert delivery, and access-controlled operational logs.
 
 ## Order and payment responsibilities

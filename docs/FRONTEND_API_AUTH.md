@@ -41,9 +41,11 @@ aborts catalog/account reads and cancels queued cart synchronization. Old reques
 commit or retry under the new identity, including a response whose body arrives late.
 Login/register/logout operations serialize and wait for pending refresh cookie writes;
 new 401s cannot initiate refresh during these mutations. Logout invalidates local state
-immediately and then asks the server to clear cookies.
-HttpOnly cookie deletion/revocation still belongs to the backend; offline expiry cannot
-guarantee server-side revocation. Session version coordination is per browser tab.
+immediately and then asks the server to revoke its family and clear cookies. Failed logout
+rejects and displays an unconfirmed-server-logout message. Offline expiry cannot guarantee
+server-side revocation. Same-origin Web Locks serialize cookie mutations across tabs, and
+`reza_refresh_epoch_v1` lets waiting tabs reuse a completed refresh. The epoch contains no
+credentials or identity. Without Locks/storage, only per-tab coordination is available.
 
 `GlobalContext.authState` distinguishes loading, anonymous, customer and admin.
 `user` and `isAuthLoading` are derived compatibility fields. Catalog selection waits for
@@ -72,7 +74,9 @@ exclusions, multipart/CSRF renewal, abort isolation, logout during refresh, body
 identity changes, malformed DTOs/errors, bootstrap roles and stale account/product reads.
 The existing real-Django Chrome smoke suite covers customer checkout and staff editing.
 
-Retained follow-ups: remaining domain DTO typing, broader quote races, complete cart write
-ordering and guest/account merge policy, pagination UI, effective Django staff capability
-mapping, cross-tab session coordination and server token-revocation policy. Batch 5 does
-not close FE-004/FE-005/FE-006/FE-008 or redesign these policies.
+Batches 6-9 subsequently addressed commerce ordering/guest isolation, request races,
+pagination, effective staff capability mapping and cross-tab cookie-session lifecycle.
+Backend access requires an active family; 15-minute access and rotating refresh use a
+fixed seven-day expiry. See [security policies and rollout](SECURITY_HARDENING.md).
+Remaining work includes other domain DTO typing, independent-device commerce conflicts,
+actual TLS/proxy configuration and unsupported provider activation.

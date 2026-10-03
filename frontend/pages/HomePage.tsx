@@ -1,10 +1,11 @@
-import { useCatalogPage, useSettings } from '../state/AppState';
-import React, { useRef, useEffect } from 'react';
+import { useActions, useCatalogPage, useSettings } from '../state/AppState';
+import React, { useRef, useEffect, useState } from 'react';
 import ImageLoader from '../components/ImageLoader';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { Ruler, Globe, Truck, ChevronLeft, ChevronRight, ArrowLeft } from 'lucide-react';
 import ProductCard from '../components/ProductCard';
-import SEO from '../components/SEO';
+import SEO, { absoluteUrl } from '../components/SEO';
+import api, { errorMessage } from '../services/api';
 
 
 const Hero = () => {
@@ -23,14 +24,15 @@ const Hero = () => {
             <div className="absolute inset-0 z-0">
                  <ImageLoader 
                     src={siteSettings?.heroImage || "/images/utilities/hero.jpg"}
-                    alt="Luxury Suit Man" 
+                    alt="پوشاک رسمی رضا فرمال"
+                    loading="eager" fetchPriority="high"
                     className="w-full h-full object-cover opacity-40" 
                     dataUtility 
                 />
             </div>
             <div className="relative z-10 text-center px-4 max-w-4xl mx-auto animate-in fade-in duration-1000">
                 <p className="text-lux-gold text-sm md:text-base tracking-[0.3em] uppercase mb-4">از ۱۹۸۴ تا امروز • تهران</p>
-                <h1 className="font-serif text-5xl md:text-7xl lg:text-8xl text-white mb-8 leading-tight">
+                <h1 lang="en" dir="ltr" className="font-serif text-5xl md:text-7xl lg:text-8xl text-white mb-8 leading-tight">
                     Refining the <br/><span className='italic text-lux-gold'>Gentleman</span>
                 </h1>
                 <p className="text-gray-300 text-lg md:text-xl mb-10 max-w-2xl mx-auto font-light">
@@ -61,17 +63,17 @@ const FeatureBar = () => (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
                 <div className="p-6 border-b-2 md:border-b-0 md:border-l-2 border-lux-gold/40 flex flex-col items-center">
                     <Ruler className="text-lux-gold mb-4" size={32} />
-                    <h3 className="font-serif text-xl mb-2 text-lux-black dark:text-white">دوخت دقیق و استادانه</h3>
+                    <h2 className="font-serif text-xl mb-2 text-lux-black dark:text-white">دوخت دقیق و استادانه</h2>
                     <p className="text-gray-500 dark:text-gray-400 font-light text-sm leading-relaxed">دوخت و فرم‌دهی دقیق با روش‌های اصیل برای تناسب کامل بدن.</p>
                 </div>
                 <div className="p-6 border-b-2 md:border-b-0 md:border-l-2 border-lux-gold/40 flex flex-col items-center">
                     <Globe className="text-lux-gold mb-4" size={32} />
-                    <h3 className="font-serif text-xl mb-2 text-lux-black dark:text-white">پارچه‌های ایتالیایی و ترکی</h3>
+                    <h2 className="font-serif text-xl mb-2 text-lux-black dark:text-white">پارچه‌های ایتالیایی و ترکی</h2>
                     <p className="text-gray-500 dark:text-gray-400 font-light text-sm leading-relaxed">تهیه‌شده از بهترین کارخانجات پارچه‌بافی</p>
                 </div>
                 <div className="p-6 border-b-2 md:border-b-0 border-lux-gold/40 flex flex-col items-center">
                     <Truck className="text-lux-gold mb-4" size={32} />
-                    <h3 className="font-serif text-xl mb-2 text-lux-black dark:text-white">ارسال به سراسر کشور</h3>
+                    <h2 className="font-serif text-xl mb-2 text-lux-black dark:text-white">ارسال به سراسر کشور</h2>
                     <p className="text-gray-500 dark:text-gray-400 font-light text-sm leading-relaxed">ارسال رایگان و سریع برای همه سفارش‌های خصوصی</p>
                 </div>
             </div>
@@ -101,7 +103,7 @@ const IntroSection: React.FC<IntroSectionProps> = ({ id, image, subtitle, title,
             </div>
             <div className="w-full md:w-7/12 bg-lux-black text-white flex items-center justify-center p-12 lg:p-24 relative">
                  <div className="max-w-md text-center z-10">
-                    <h4 className="text-lux-gold uppercase tracking-[0.2em] text-sm mb-4 font-bold">{subtitle}</h4>
+                    <p className="text-lux-gold uppercase tracking-[0.2em] text-sm mb-4 font-bold">{subtitle}</p>
                     <h2 className="font-serif text-3xl lg:text-5xl mb-6 leading-tight">{title}</h2>
                     <div className="w-20 h-0.5 bg-lux-gold/50 mx-auto mb-8"></div>
                     <p className="text-gray-400 font-light mb-10 leading-loose text-justify text-sm md:text-base">
@@ -125,6 +127,7 @@ const ProductCarousel = ({ category }: { category: string }) => {
     const scrollRef = useRef<HTMLDivElement>(null);
     const catalog = useCatalogPage({ category, page_size: 8 });
     const items = catalog.data?.results || [];
+    const categoryLabel = ({ suits: 'کت و شلوار', shirts: 'پیراهن', blazers: 'بلیزر', accessories: 'اکسسوری' } as Record<string, string>)[category] || category;
 
     const scroll = (direction: 'next' | 'prev') => {
         if (scrollRef.current) {
@@ -140,19 +143,23 @@ const ProductCarousel = ({ category }: { category: string }) => {
 
     return (
         <div className="relative group px-0 md:px-4 py-8">
-            
+            {catalog.isFetching ? <p role="status" className="text-gray-500">در حال دریافت محصولات…</p>
+                : catalog.isError ? <p role="alert" className="text-gray-500">دریافت محصولات انجام نشد. <button className="underline" onClick={() => void catalog.refetch()}>تلاش دوباره</button></p>
+                : items.length === 0 ? <p className="text-gray-500">در این مجموعه هنوز محصولی ثبت نشده است.</p> : null}
             {items.length > 2 && (
                 <>
                     <button 
+                        aria-label={`محصولات قبلی ${categoryLabel}`}
                         onClick={() => scroll('prev')}
-                        className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 bg-white dark:bg-zinc-800 p-3 rounded-full shadow-lg text-lux-black dark:text-white hover:bg-lux-gold hover:text-white transition-all opacity-0 group-hover:opacity-100 hidden md:block border border-gray-100 dark:border-zinc-700"
+                        className="absolute -right-4 top-1/2 -translate-y-1/2 z-10 bg-white dark:bg-zinc-800 p-3 rounded-full shadow-lg text-lux-black dark:text-white hover:bg-lux-gold hover:text-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 hidden md:block border border-gray-100 dark:border-zinc-700"
                     >
                         <ChevronRight size={24} />
                     </button>
 
                     <button 
+                        aria-label={`محصولات بعدی ${categoryLabel}`}
                         onClick={() => scroll('next')}
-                        className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 bg-white dark:bg-zinc-800 p-3 rounded-full shadow-lg text-lux-black dark:text-white hover:bg-lux-gold hover:text-white transition-all opacity-0 group-hover:opacity-100 hidden md:block border border-gray-100 dark:border-zinc-700"
+                        className="absolute -left-4 top-1/2 -translate-y-1/2 z-10 bg-white dark:bg-zinc-800 p-3 rounded-full shadow-lg text-lux-black dark:text-white hover:bg-lux-gold hover:text-white transition-all opacity-0 group-hover:opacity-100 focus:opacity-100 hidden md:block border border-gray-100 dark:border-zinc-700"
                     >
                         <ChevronLeft size={24} />
                     </button>
@@ -161,11 +168,12 @@ const ProductCarousel = ({ category }: { category: string }) => {
 
             <div 
                 ref={scrollRef}
+                role="region" aria-label={`محصولات ${categoryLabel}`} tabIndex={0}
                 className="flex gap-6 overflow-x-auto snap-x snap-mandatory py-4 px-4 md:px-2 hide-scroll"
             >
                 {items.map(p => (
                     <div key={p.id} className="min-w-[85vw] sm:min-w-[45vw] md:min-w-[300px] lg:min-w-[320px] snap-center">
-                        <ProductCard product={p} className="h-full shadow-md hover:shadow-xl" />
+                        <ProductCard headingLevel="h3" product={p} className="h-full shadow-md hover:shadow-xl" />
                     </div>
                 ))}
                 
@@ -185,6 +193,22 @@ const ProductCarousel = ({ category }: { category: string }) => {
 const HomePage: React.FC = () => {
     const location = useLocation();
     const { siteSettings } = useSettings();
+    const { showToast } = useActions();
+    const [newsletterEmail, setNewsletterEmail] = useState('');
+    const [newsletterBusy, setNewsletterBusy] = useState(false);
+    const [newsletterStatus, setNewsletterStatus] = useState('');
+    const [newsletterError, setNewsletterError] = useState('');
+    const subscribe = async (event: React.FormEvent) => {
+        event.preventDefault();
+        if (newsletterBusy) return;
+        setNewsletterBusy(true); setNewsletterError(''); setNewsletterStatus('');
+        try {
+            await api.subscribeNewsletter(newsletterEmail.trim());
+            setNewsletterEmail(''); setNewsletterStatus('عضویت شما ثبت شد.');
+            showToast('عضویت شما ثبت شد.');
+        } catch (error) { setNewsletterError(errorMessage(error, 'عضویت انجام نشد؛ دوباره تلاش کنید')); }
+        finally { setNewsletterBusy(false); }
+    };
 
     useEffect(() => {
         if (location.state && location.state.scrollTo) {
@@ -204,9 +228,9 @@ const HomePage: React.FC = () => {
         "@type": "MensClothingStore",
         "name": "REZA Formal",
         "description": "لوکس‌ترین فروشگاه کت و شلوار و اکسسوری مردانه در تهران.",
-        "image": "https://rezaformal.com/images/utilities/hero.jpg",
+        "image": absoluteUrl(siteSettings?.heroImage || '/images/utilities/hero.jpg'),
         "telephone": "02122902908",
-        "url": "https://rezaformal.com",
+        "url": `${window.location.origin}/`,
         "address": {
             "@type": "PostalAddress",
             "streetAddress": "خیابان میرداماد، مرکز خرید آریان، طبقه همکف، واحد ۳۵",
@@ -222,7 +246,7 @@ const HomePage: React.FC = () => {
             <SEO 
                 title="خانه"
                 description="رضا فرمال، ارائه دهنده برترین پوشاک مردانه، کت و شلوار دامادی و اکسسوری‌های لوکس با دوخت سفارشی در تهران."
-                image="https://rezaformal.com/images/utilities/hero.jpg"
+                image={siteSettings?.heroImage || '/images/utilities/hero.jpg'}
                 schema={schema}
             />
             <Hero />
@@ -240,11 +264,11 @@ const HomePage: React.FC = () => {
             />
             <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
-                    <h3 className="text-center mb-10">
+                    <h2 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
                             برگزیده‌های فصل
                         </span>
-                    </h3>
+                    </h2>
                     <ProductCarousel category="suits" />
                 </div>
             </section>
@@ -261,11 +285,11 @@ const HomePage: React.FC = () => {
             />
             <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
-                    <h3 className="text-center mb-10">
+                    <h2 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
                             جدیدترین طرح‌ها
                         </span>
-                    </h3>
+                    </h2>
                     <ProductCarousel category="shirts" />
                 </div>
             </section>
@@ -282,11 +306,11 @@ const HomePage: React.FC = () => {
             />
             <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
-                     <h3 className="text-center mb-10">
+                     <h2 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
                             مجموعه بلیزر
                         </span>
-                    </h3>
+                    </h2>
                     <ProductCarousel category="blazers" />
                 </div>
             </section>
@@ -303,11 +327,11 @@ const HomePage: React.FC = () => {
             />
             <section className="py-12 bg-lux-body dark:bg-zinc-900 border-b border-gray-100 dark:border-zinc-800">
                 <div className="container max-w-7xl mx-auto px-4">
-                     <h3 className="text-center mb-10">
+                     <h2 className="text-center mb-10">
                         <span className="text-2xl md:text-3xl font-serif font-bold text-lux-black dark:text-white border-b-2 border-lux-gold pb-3 px-2 inline-block">
                             اکسسوری‌های لوکس
                         </span>
-                    </h3>
+                    </h2>
                     <ProductCarousel category="accessories" />
                 </div>
             </section>
@@ -325,16 +349,19 @@ const HomePage: React.FC = () => {
 
             <section className="bg-lux-gray dark:bg-zinc-900 py-20 border-t border-gray-200 dark:border-zinc-700">
                 <div className="max-w-xl mx-auto px-4 text-center">
-                    <h3 className="font-serif text-2xl mb-2 text-lux-black dark:text-white">عضو باشگاه مشتریان ما شوید</h3>
+                    <h2 className="font-serif text-2xl mb-2 text-lux-black dark:text-white">عضو باشگاه مشتریان ما شوید</h2>
                     <p className="text-gray-500 dark:text-gray-400 text-sm mb-8 font-light">برای اطلاع از محصولات جدید و رویدادهای خصوصی ثبت‌نام کنید.</p>
-                    <form className="flex flex-row gap-2 items-center" onSubmit={(e) => e.preventDefault()}>
+                    <label htmlFor="home-newsletter" className="block text-sm mb-2 dark:text-white">آدرس ایمیل</label>
+                    <form aria-busy={newsletterBusy} className="flex flex-row gap-2 items-center" onSubmit={subscribe}>
                         <div className="flex-1 relative" style={{ minWidth: 0 }}>
-                            <input type="email" placeholder="آدرس ایمیل شما" className="w-full bg-white text-lux-black dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 px-4 py-3 focus:outline-none focus:border-lux-gold text-sm placeholder-gray-400 font-light text-start dark:text-white" />
+                            <input id="home-newsletter" dir="ltr" autoComplete="email" required value={newsletterEmail} onChange={event => setNewsletterEmail(event.target.value)} type="email" placeholder="آدرس ایمیل شما" className="w-full bg-white text-lux-black dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 px-4 py-3 focus:outline-none focus:border-lux-gold text-sm placeholder-gray-400 font-light text-start dark:text-white" />
                         </div>
-                        <button type="submit" className="bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black px-6 py-3 text-xs uppercase tracking-widest hover:opacity-90 transition-colors">
-                            ثبت‌ نام
+                        <button type="submit" disabled={newsletterBusy} className="bg-lux-black dark:bg-lux-gold text-white dark:text-lux-black px-6 py-3 text-xs uppercase tracking-widest hover:opacity-90 transition-colors">
+                            {newsletterBusy ? 'در حال ثبت…' : 'ثبت‌ نام'}
                         </button>
                     </form>
+                    <p role="status" className="mt-3 dark:text-white">{newsletterStatus}</p>
+                    {newsletterError && <p role="alert" className="mt-3 text-red-700 dark:text-red-300">{newsletterError}</p>}
                 </div>
             </section>
         </main>

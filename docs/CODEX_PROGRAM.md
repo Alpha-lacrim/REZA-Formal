@@ -6,19 +6,126 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 8 measured remediation verified; remaining concurrency/saved-data/deployment gates documented |
+| Program status | Partially complete - final source review finished; 15 original findings remain; production release blocked |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 8 - Database and performance |
-| Batch status | Complete for measured scope; verified non-fast-forward merge and normal atomic publication |
-| Batch branch | `codex/batch-08-database-performance` |
-| Batch start commit | `7ac1a7805ee1e1598c4027868536749fdbdd3c6a` (verified Batch 5/6/7 integration) |
-| Final batch / integration merge | `23ede44436df788a42bf76f5e8d5e17e4a8e2d6f` / `d28aabd363a460ef87123b884e2afebaac7b4ec8` |
-| Audit IDs handled | PERF-003/DB-004/FE-005 addressed; PERF-001 retained; PERF-002/DB-001 partial with residuals |
-| Verification performed | Full SQL/SQLite/frontend checks, targeted final probes, Chrome request budgets, index plans/round trip; exact results in Handoff |
-| Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 9 - Security; no next batch started |
+| Current batch | Batch 12 - final architecture review and program closeout |
+| Batch status | Review/docs and functional/SQL/browser/operations verification complete; image release gate fails as documented; integration/publication recorded below |
+| Batch branch | `codex/batch-12-final-review` |
+| Batch start commit | `31e72ea` (clean Batch 11 head); integration initially `db565f6` |
+| Final batch / integration merge | Resolve final batch and integration refs; closeout provenance below |
+| Audit IDs handled | All 43 reassessed; 28 addressed/contained at recorded scope, 15 open/partial (P0 0, P1 2, P2 13, P3 0) |
+| Verification performed | 80 frontend cases, 16 Chrome/axe journeys, SQLite 154 pass/12 deliberate skips, SQL 166/166, lint/typecheck/build/check/drift, both images, proxy/runtime/restore/TLS, configuration/dependency/policy/actionlint gates |
+| Remaining risks | 44 unfixed backend HIGHs across eight advisory IDs (zero CRITICAL); strict image gate blocks release. Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, hosted CI, historical secrets/financial/provider work and expiring build advisory remain |
+| Next batch | No automatic next batch; owner-reviewed follow-up milestones in ROADMAP; human PR into main |
+
+## Batch 12 - Final review and closeout (2026-10-04)
+
+- [FINAL_REVIEW](audit/FINAL_REVIEW.md) maps all system owners, compares the original
+  audit, records remaining severities/owner decisions/retained tradeoffs and gives
+  explicit boundaries against further speculative refactoring. No runtime artifact
+  was deleted, no new abstraction/schema/dependency introduced and no production
+  system or application volume modified.
+- Branch created at clean Batch 11 `31e72ea`; startup log `ec683d7`. Merge `be915be`
+  preserves Batch 10 follow-up `82a9459` and Batch 11 history, resolving only
+  continuity/program documentation conflicts. Batches 9–11 are included in the
+  resulting application tree. The separate operations worktree remains intact.
+- Rerun results: frontend 9 Node + 71 Vitest, 16 real-Django/synthetic-read-stress
+  Chrome/axe journeys; SQLite 166 discovered/154 pass/12 deliberate SQL skips;
+  full disposable SQL 166/166 (157.427s), check and drift; locked image builds,
+  proxy/TLS/ownership/restart/SQL+media recovery and synthetic configuration gates.
+  Runtime npm/Python advisory reports are clear; full npm retains five exact
+  temporary build-only entries. Actionlint and three strict image-policy cases pass.
+- Fresh full image scan completes, rather than failing to download: backend 44
+  unfixed HIGH package findings across eight IDs, zero CRITICAL; frontend zero
+  findings. Strict release gate exits 1. Integration of the reviewed candidate
+  carries that visible blocker; it does not accept risk or approve deployment.
+- Documentation roles reconciled: operating contract in AGENTS, durable map in
+  Codex, chronological Handoff, this control board, historical/canonical audit,
+  routing ADR and remaining ROADMAP. Previous roadmap updates remain in
+  [PROGRAM_ROADMAP_HISTORY](audit/PROGRAM_ROADMAP_HISTORY.md). All unresolved
+  historical rollout, provider, secret and financial obligations remain.
+- Program is **partially complete**, not fully remediated: DB-002/TEST-003 P1
+  evidence remains; 13 P2 records retain explicit closure gates. Local source
+  verification does not establish deployed production safety or hosted CI success.
+
+### Batch 12 integration and publication
+
+Pending final documentation/whitespace/status/ref review, then the authorized
+non-fast-forward merge into `codex/remediation-program` and normal push of batch
+and integration refs. No main/dev/stash update, force push or deployment.
+
+## Batch 11 - UX, accessibility, RTL and SEO (2026-10-03)
+
+- Shared native dialogs, initial/return focus, skip navigation, visible focus,
+  persistent form labels/Persian validation, selected/disclosure state, live
+  feedback and explicit failed-read recovery improve the key customer/staff flows.
+- Responsive navbar/gallery/cart/checkout/table/dialog sizing and measured
+  contrast changes preserve the gold/black identity. Mixed-direction address,
+  email, product attributes and Persian pagination are verified in browser states.
+  Hero/detail priority and lazy decoding/containers reduce unnecessary waiting.
+- Metadata cleanup/defaults, absolute social/schema URLs, private/error noindex,
+  one product h1, breadcrumbs and route/policy/product recovery address UX-003.
+  [ADR 0001](adr/0001-storefront-routing.md) keeps supported hash deep links; product
+  canonicals/sitemap and server product/social/status rendering remain UX-002.
+- Pinned dev-only axe adds no production dependency. WCAG-tagged scans run without
+  disabled rules/exclusions, alongside keyboard/native-validation/viewport tests.
+  The long-copy/gallery and delivered return-read overrides are explicit UI stress
+  fixtures; actual COD/admin writes remain real Django. Manual NVDA/VoiceOver/user
+  review and broader browser/device/zoom coverage remain UX-001 evidence work.
+- Local commits only on the required branch; no merge/push, deployment, new
+  configuration, backend mutation code or migration. [Audit](audit/UX_A11Y_SEO_AUDIT.md)
+  and Handoff retain verification and prior unresolved launch obligations.
+
+## Batch 10 - Production infrastructure and operations (2026-10-03)
+
+- 2026-10-04 advisory remediation is isolated in the required Batch 10 worktree,
+  preserving completed Batch 11 in the primary checkout. Debian 13 security updates
+  remove all five reported CRITICAL and fifteen prior advisory IDs while retaining
+  Python/ODBC/hash-lock versions. Forty-four HIGH package findings across eight IDs
+  remain; every HIGH/CRITICAL now blocks release, including unfixed advisories.
+  No exceptions or unstable package mixing. Runtime privilege bits removed;
+  [vendor matrix and next steps](RUNTIME_VULNERABILITIES.md) track remaining work.
+- Local-only follow-up resolves scanner connectivity through official DB fallback:
+  frontend fixes remove 67 fixable HIGH/CRITICAL findings and the patched snapshot
+  reports zero advisories; the original backend retained 63 unfixed HIGH/CRITICAL
+  findings before the later remediation above. Full reports/provenance retained;
+  no silent exception.
+  Backup-before-ownership maintenance, legacy restore/symlink rejection, disposable
+  HTTPS/SQL certificate validation and local actionlint checks pass. Cleanup remains
+  blocked by automatic review; real production and hosted workflow runs remain out
+  of the owner's explicitly reconfirmed local-only scope.
+- Required branch starts clean at the Batch 9 local head above. No external deployment,
+  real cloud/DNS/payment/production DB change, integration merge or remote publication.
+- Digest-pinned multi-stage images, complete Python hash lock and existing npm lock;
+  no package manager migration. Backend UID 10001, Nginx UID 101/read-only port 8080,
+  no runtime installers/compilers, bounded logs/probes/shutdown and safe static/media
+  ownership. Backend image is approximately 69 MB versus prior local 181 MB.
+- Production override is a review template: no unattended DB creation/migration/seed,
+  separate restricted runtime login, certified SQL encryption/licensed edition,
+  Secure cookies, no DB/API host ports and loopback TLS-ingress contract. Provisioning
+  and actual ingress/client-IP trust are explicitly owner work.
+- Redacted JSON request/error events and overwritten IDs correlate proxy/Django;
+  safe cache/map policies, WhiteNoise static proxy and Docker DNS rediscovery verified.
+  Real-SQL runtime fixture proves denied runtime DDL, restart persistence, graceful
+  shutdown, dependency-failure health and SQL/media recovery to NEW disposable targets.
+- CI pins action commits and runtime patch versions, adds lock/secret-signature checks,
+  synthetic Compose validation, both builds, proxy/recovery and all high/critical
+  image scan gates using checksum-verified Trivy. Actual deployment remains absent.
+- [OPERATIONS](OPERATIONS.md) owns operator runbooks and explicit limitations.
+  Handoff records the public mirror build workaround, exact verification/scanner
+  results and owner obligations. Earlier provider/outbox/financial/secret/TLS gates
+  are not erased by synthetic recovery success.
+
+## Batch 9 - Security hardening (2026-10-03)
+
+- Required branch `codex/batch-09-security` starts at `db565f6c279d1b60d96e981cb2911014903106a4`, clean integration. Main/dev/stash and ignored configuration remain preserved. No fetch, push, merge, production deployment or next batch is claimed in this scope.
+- Auth family rotation/revocation, cross-tab cookies, failed logout, effective staff DTO/native escalation restrictions and disabled incomplete Google/MFA flows address SEC-002/SEC-004/FE-008. Shared atomic throttles/trusted forwarding address SEC-003; site image staging and Nginx containment reinforce SEC-001.
+- Dependency updates retain supported Python/Vite/Router lines; Vitest major has explicit Node/Vite/full-suite compatibility evidence. Zero known production npm/resolved Python advisories at this date. SEC-005 remains partial for five dev-only GHSA-vfj7-8cjw-p6xm entries, with a gate expiring 2026-11-02 00:00 UTC; no forced Tailwind major.
+- Full SQL 161/161 with zero skips, full frontend 9 Node + 69 Vitest, four Chrome and ten proxy status/header/media cases plus two forwarding probes pass. See Handoff for SQLite/check/drift/configuration counts, iterations and durations; see [security policy/evidence/rollout](SECURITY_HARDENING.md).
+- Apply migrations 0009/0010 with coordinated app rollout and require re-login; configure verified proxy CIDRs/TLS/HSTS, schedule security-state pruning and inspect legacy media. Historical credential rotation/history cleanup, financial reconciliation, hosted CI and production image/OS verification remain owner gates.
+- Theme commits: `84c2dc1` sessions/identity; `c10f9b2` shared limits; `28d3248` decorator correction; `98acddd` site media; `647ea09` response/ingress/native login; `afc6c21` dependencies/gates. Final documentation commit is resolvable from the local branch. Local source completion is distinct from integration/publication.
 
 ## Batch 8 - Database and performance (2026-10-03)
 
@@ -201,9 +308,9 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 6 — Frontend state (verified scope; integrated in Batch 8)
 - [x] Batch 7 — Admin/media (verified scope; integrated in Batch 8)
 - [x] Batch 8 — Performance/database (measured remediation; explicit residuals)
-- [ ] Batch 9 — Security
-- [ ] Batch 10 — Production infrastructure
-- [ ] Batch 11 — UX/accessibility/SEO
+- [x] Batch 9 — Security (verified source scope; SEC-005 and production owner gates remain)
+- [x] Batch 10 — Production infrastructure (source/isolated operations scope; owner launch gates remain)
+- [x] Batch 11 — scoped UX/accessibility/SEO work verified; assistive/SEO rollout residuals tracked
 - [ ] Batch 12 — Final architecture review
 
 ## Rules
