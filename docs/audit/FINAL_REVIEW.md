@@ -255,9 +255,16 @@ HIGH/CRITICAL. This is actual hosted execution, separate from Docker Desktop.
 Those green runs also reveal a report-retention gap: upload-artifact excludes
 hidden directories by default, so it warns and retains no `.ops-reports` artifact.
 The workflow now explicitly includes hidden files within that fixed JSON-only
-report path. No application env/config path is included; final upload evidence
-is recorded after hosted verification. Earlier success without artifacts remains
-visible rather than being rewritten as complete report-retention proof.
+report path. No application env/config path is included. Fix `83d77e2` merged at
+`d23e71c`, normally pushed on both branches. [Final push CI](https://github.com/Alpha-lacrim/REZA-Formal/actions/runs/37161600860)
+and [final PR CI](https://github.com/Alpha-lacrim/REZA-Formal/actions/runs/37161604699)
+pass all jobs and retain `runtime-image-scans`; both security workflows pass too.
+Downloaded full push backend/frontend JSON reports have **zero advisories at every
+severity**, clean source `d23e71c`, official Docker Hub DB updated
+`2026-10-03T19:02:38Z`/downloaded `2026-10-03T23:25:43Z`, strict gate true.
+Ignored local copy: `.ops-reports/github-37161600860/`. Earlier success without
+artifacts remains history. This documentation-only evidence record follows on
+integration with application/workflow files unchanged from that hosted-tested tree.
 
 Full scan JSON/provenance: `.ops-reports/2026-10-03T23-01-55-283Z-d10fc3f8/`;
 official Docker Hub DB updated `2026-10-03T19:02:38Z`, downloaded
@@ -277,7 +284,8 @@ capacity and backup rollout. Main remains outside automatic integration.
 1. **First month:** assign release/security/database/operations/business owners;
    preserve the supported-runtime fix and unchanged scan policy on immutable
    artifacts. Retire the temporary build
-   exception before 2026-11-02. Obtain hosted CI and branch-protection evidence.
+   exception before 2026-11-02. Preserve hosted fast/security/container evidence;
+   verify manual browser/SQL lanes and enforce branch protection.
 2. **Months 1–2:** characterize/fix BE-009 without widening permissions; prioritize
    DB-002/TEST-003 mixed SQL schedules and a documented lock order. Reconcile
    legacy financial/inventory data from verified records in a backed-up staging

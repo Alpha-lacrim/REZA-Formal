@@ -43,10 +43,11 @@ reports, Nginx probes, the TLS/ownership/recovery/runtime fixture and the full b
 suite on disposable SQL Server. Record actual image/scan/hosted evidence in
 [Handoff](../../Handoff.md) and the [final review](../audit/FINAL_REVIEW.md).
 
-The initial Alpine probe reports zero advisories under the unchanged strict gate
-and passes the full runtime drill. Final artifact verification follows that probe;
-only completed results belong in the execution log. Local and hosted verification
-targets linux/amd64. The arm64 package is pinned and signature-verified, but a full
+The final Alpine artifacts pass the full runtime drill, SQLite checks/suite and
+166/166 disposable SQL tests. Hosted push/PR checks pass and retain full reports
+with zero advisories under the unchanged gate; immutable evidence is in the final
+review/execution log. Local and hosted verification targets linux/amd64.
+The arm64 package is pinned and signature-verified, but a full
 arm64 runtime/SQL validation is required before deploying that architecture.
 
 musl replaces glibc, and future native dependencies must provide compatible wheels

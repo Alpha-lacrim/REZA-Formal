@@ -14,7 +14,7 @@ as historical audit evidence.
 | --- | --- | --- |
 | Maintain verified runtime artifacts | OPS-002; original Debian image blocker cleared on tested Alpine/ODBC artifacts | Preserve full scan/immutable image provenance and repeat the unchanged all-HIGH/CRITICAL gate on refreshes. Validate arm64 before deployment there; see [runtime decision](adr/0002-backend-runtime-base.md). Production provisioning remains open. |
 | Retire build-only advisory exception | SEC-005 | Compatible dependency change, full frontend/browser checks and unexcepted full audit before 2026-11-02 00:00 UTC. No forced major solely to clear a count. |
-| Verify hosted CI and branch protection | TEST/OPS evidence | Observe required fast/security/container and manual SQL/browser checks on the candidate; record image release failures separately. Human PR/review into main, no automatic deployment. |
+| Preserve hosted CI and enforce branch protection | TEST/OPS evidence | Fast/security/container push and PR checks pass with retained zero-advisory reports on the container follow-up. Observe manual SQL/browser lanes and enforce required review checks; human PR review into main, no automatic deployment. |
 | Assign operational/business owners | OPS-002/003/004 and historical obligations | Named security/release, database, infrastructure, backup/monitoring and business/finance owners; credential-history and policy obligations explicitly tracked. |
 
 ## Months 1–2: close correctness and reconciliation gaps

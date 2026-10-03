@@ -14,10 +14,10 @@ pre-codex-remediation-2026-09-10
 | Batch status | Review/docs complete; requested container CI repair clears the image gate on supported Alpine/ODBC artifacts; verification/publication recorded below |
 | Batch branch | `codex/batch-12-final-review` |
 | Batch start commit | `31e72ea` (clean Batch 11 head); integration initially `db565f6` |
-| Final batch / integration merge | Batch `0a99f80`; non-fast-forward integration merge `ecb7867`; documentation-only publication record follows on integration |
+| Final batch / integration merge | Initial review `0a99f80`/`ecb7867`; container follow-up `83d77e2`/`d23e71c`; documentation-only hosted evidence record follows on integration |
 | Audit IDs handled | All 43 reassessed; 28 addressed/contained at recorded scope, 15 open/partial (P0 0, P1 2, P2 13, P3 0) |
 | Verification performed | 80 frontend cases, 16 Chrome/axe journeys, SQLite 154 pass/12 deliberate skips, SQL 166/166, lint/typecheck/build/check/drift, both images, proxy/runtime/restore/TLS, configuration/dependency/policy/actionlint gates |
-| Remaining risks | Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, arm64 validation if selected, hosted evidence, historical secrets/financial/provider work and expiring build advisory remain. Original Debian image blocker cleared without an exception |
+| Remaining risks | Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, arm64 validation if selected, manual browser/SQL hosted lanes and branch protection, historical secrets/financial/provider work and expiring build advisory remain. Original Debian image blocker cleared without an exception |
 | Next batch | No automatic next batch; owner-reviewed follow-up milestones in ROADMAP; human PR into main |
 
 ## Batch 12 - Final review and closeout (2026-10-04)
@@ -52,7 +52,12 @@ pre-codex-remediation-2026-09-10
   Vercel pass; PR #2 remains open/CLEAN, with main untouched.
 - Hosted artifact inspection finds that upload-artifact silently excludes hidden
   `.ops-reports`. Enable hidden files only within the existing JSON report glob;
-  verify upload separately. No scanner/release policy changes.
+  no scanner/release policy changes. Fix `83d77e2` merged at `d23e71c`; normal
+  atomic push updates both branches. Push CI `37161600860` and PR CI `37161604699`
+  and both security workflows pass. Both retain scan artifacts; downloaded full
+  push reports show zero findings at every severity, clean `d23e71c` and a fresh
+  official DB. PR #2 remains OPEN/CLEAN. This documentation-only hosted evidence
+  record follows on integration; final SHA resolves from that branch. Main is untouched.
 
 ### Initial review
 
