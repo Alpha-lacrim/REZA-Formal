@@ -264,7 +264,6 @@ def login(request):
         # Enrollment, replay protection and recovery were never implemented.
         # Fail closed for legacy MFA-marked accounts instead of bypassing MFA.
         return Response({'detail': 'This sign-in method is unavailable.', 'code': 'feature_unavailable'}, status=503)
-@throttle_classes([RefreshRateThrottle])
     revoke_cookies(request.COOKIES)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': serialize_user(user)})
@@ -292,6 +291,7 @@ def logout_view(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([RefreshRateThrottle])
 def refresh_auth(request):
     enforce_csrf(request)
     raw_refresh = request.COOKIES.get('refresh')
