@@ -21,6 +21,13 @@ including Debian 13, the stricter image gate and the UX work. Only documentation
 changes follow this tested application tree. Batch 12 adds no runtime abstraction,
 dependency, schema migration, persistence deletion or production change.
 
+Final review commit `0a99f80` merged into `codex/remediation-program` at `ecb7867`;
+the merge tree equals the reviewed branch and includes all Batch 9–12 ancestors.
+Normal atomic push published Batch 12 and the integration candidate. A subsequent
+documentation-only publication record on integration records those exact SHAs.
+Local and remote main, dev and stash retain their starting refs. Human review/PR
+into main remains an owner action; this publication does not clear the release gate.
+
 ## Current architecture
 
 | Area | Current owner and flow | Change from the original audit |

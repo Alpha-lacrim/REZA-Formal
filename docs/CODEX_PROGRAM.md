@@ -14,7 +14,7 @@ pre-codex-remediation-2026-09-10
 | Batch status | Review/docs and functional/SQL/browser/operations verification complete; image release gate fails as documented; integration/publication recorded below |
 | Batch branch | `codex/batch-12-final-review` |
 | Batch start commit | `31e72ea` (clean Batch 11 head); integration initially `db565f6` |
-| Final batch / integration merge | Resolve final batch and integration refs; closeout provenance below |
+| Final batch / integration merge | Batch `0a99f80`; non-fast-forward integration merge `ecb7867`; documentation-only publication record follows on integration |
 | Audit IDs handled | All 43 reassessed; 28 addressed/contained at recorded scope, 15 open/partial (P0 0, P1 2, P2 13, P3 0) |
 | Verification performed | 80 frontend cases, 16 Chrome/axe journeys, SQLite 154 pass/12 deliberate skips, SQL 166/166, lint/typecheck/build/check/drift, both images, proxy/runtime/restore/TLS, configuration/dependency/policy/actionlint gates |
 | Remaining risks | 44 unfixed backend HIGHs across eight advisory IDs (zero CRITICAL); strict image gate blocks release. Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, hosted CI, historical secrets/financial/provider work and expiring build advisory remain |
@@ -52,9 +52,27 @@ pre-codex-remediation-2026-09-10
 
 ### Batch 12 integration and publication
 
-Pending final documentation/whitespace/status/ref review, then the authorized
-non-fast-forward merge into `codex/remediation-program` and normal push of batch
-and integration refs. No main/dev/stash update, force push or deployment.
+- Final review commit: `0a99f80472db69e4fdbd7a44d5634fe81b15dada` on the required
+  Batch 12 branch. Non-fast-forward merge:
+  `ecb78672f8cfa3e02df5e9d8443457f45da55338`, first parent integration start
+  `db565f6c279d1b60d96e981cb2911014903106a4`, second parent final review commit.
+  Merge tree equals the reviewed batch tree. All Batch 9/10/11/12 tips are ancestors;
+  subsequent changes here/Handoff/FINAL_REVIEW are documentation only.
+- Normal atomic push succeeded: created origin Batch 12 at `0a99f80` and advanced
+  origin integration from `db565f6` to `ecb7867`. This publication record follows
+  on integration with subject `docs(audit): record final candidate publication`;
+  resolve its final SHA from `git rev-parse codex/remediation-program` after push.
+  No force push, main/dev/stash update, deployment or hosted CI outcome is claimed.
+- Local main `449c5a142c0f840b55b468d88e6b17f8d7ff329d`, dev
+  `f76f232ab658e836f594fb9dc40ff53b1ddececf`, stash
+  `bd371510428d76e6587eaa20913c23bfd12af3c8` and remote main
+  `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` are preserved. Earlier Batch 9–11
+  local-only/unmerged statements describe their original sessions and are superseded
+  by this authorized candidate integration/publication, not by a production rollout.
+- Candidate verification is successful at application/database/browser/operations
+  scope. The independently executed image release gate remains visibly blocked;
+  integration accepts the partial review outcome, not the production security risk.
+  Human PR/review into main and the remaining ROADMAP gates are the next owner steps.
 
 ## Batch 11 - UX, accessibility, RTL and SEO (2026-10-03)
 
