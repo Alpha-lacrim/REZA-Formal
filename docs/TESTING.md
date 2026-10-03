@@ -2,6 +2,36 @@
 
 Run commands from the nested `REZA-Formal` Git root. Node 22 and Python 3.11 are the CI baselines. Install Python dependencies from `backend/requirements.txt` into a virtual environment. No command below uses the application SQL Server database.
 
+## Security gates (Batch 9)
+
+Run `npm.cmd audit --omit=dev` and `npm.cmd run audit:security` in frontend.
+The full policy gate accepts only GHSA-vfj7-8cjw-p6xm in five dev-only build entries,
+expires 2026-11-02 00:00 UTC, and rejects new/runtime advisories or service errors.
+Python: install `pip-audit==2.10.1` as verification tooling, then run
+`python -m pip_audit -r backend/requirements.txt` from the root. This audits fresh
+runtime resolution rather than all incidental packages in an existing environment.
+
+`node scripts/test-nginx-security.mjs` runs disposable Docker fixtures: ten
+status/header/media cases (including 502), two spoofed forwarding probes, and cleanup
+of only its own containers/network/temp media. It uses nginx:1.27-alpine by default;
+`NGINX_TEST_IMAGE` can select an available Nginx image. Batch 9 locally used the cached
+`reza-formal-frontend:latest` (Nginx 1.27.5) with the checked-in source config mounted read-only.
+No real application media/DB is mounted. Actual TLS/HSTS deployment remains separate.
+
+`test_sessions.py` and `test_hardening.py` cover session/cookie/CSRF, role/ownership,
+image/storage, counter/proxy and disclosure/header negatives. `test_security_sql.py`
+adds three separate-connection refresh reuse, refresh/logout and shared counter tests.
+Twelve SQL-only cases skip explicitly under SQLite. Migration-backfill/index tests
+restore the latest graph before subsequent security tests; no assertion is removed.
+Native admin login is also throttled across IPs/accounts and returns Retry-After.
+The security workflow runs dependency/proxy gates on PRs, program pushes, weekly and
+manually. Hosted CI results are not implied by local success.
+
+Vitest 4.1.11 was compatibility-tested against Node 22 and Vite 6 with the full suite.
+Four Chrome journeys include a save/reopen gallery assertion; the editor waits for
+fresh staff records before closing. No live provider is used. See
+[security rollout and remaining limitations](SECURITY_HARDENING.md).
+
 ## Fast gates
 
 ```powershell
@@ -39,7 +69,7 @@ If the Chromium download is unavailable, an installed Chrome or Edge can run the
 
 The backend runner creates a marked temporary directory, migrates SQLite and seeds synthetic `.invalid` customer/admin accounts plus one product/variant/shipping method. `e2e_settings.py` rejects directories lacking that marker. Test account passwords are fixtures confined to this runner, not development or production credentials. No HTTP mock reports checkout/payment success. The customer journey submits supported COD and asserts the order is unpaid; no provider is simulated. The administrator edits the product through the actual staff form and verifies it after reload.
 
-Three tests cover seven requested flows: storefront; customer authentication; product/cart; COD checkout; history; staff authentication; product edit. The customer and staff cases run sequentially against the disposable seed. Traces/reports are ignored and contain only synthetic data. A process killed forcibly may leave its temporary directory for the OS to clean; it contains no live data.
+Four tests cover customer/staff/media flows: storefront; customer authentication; product/cart; COD checkout; history; staff authentication; product edit. The customer and staff cases run sequentially against the disposable seed. Traces/reports are ignored and contain only synthetic data. A process killed forcibly may leave its temporary directory for the OS to clean; it contains no live data.
 
 If Windows reserves frontend port 3100, set `$env:REZA_E2E_FRONTEND_PORT='18180'`
 (or another free loopback port) before running the browser suite. Playwright, Vite and

@@ -102,7 +102,7 @@ docker compose config --quiet
 
 The Django application depends on SQL Server, native ODBC support, uploaded-media persistence, and startup migrations. Deploy it on a persistent container/application host rather than through the old Vercel Python configuration.
 
-Cookie auth includes an explicit CSRF bootstrap/header flow, but deployment still requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com`. A default `project.vercel.app` frontend plus an unrelated API host will not reliably receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; third-party-cookie deployments are intentionally unsupported. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login additionally requires a configured backend `GOOGLE_OAUTH_CLIENT_ID` and a frontend Google Identity flow that supplies a verified ID token.
+Cookie auth includes an explicit CSRF bootstrap/header flow, but deployment still requires the frontend and API to remain **same-site**, for example `www.example.com` and `api.example.com`. A default `project.vercel.app` frontend plus an unrelated API host will not reliably receive `SameSite=Lax/Strict` cookies. Use same-site custom domains or a same-origin API proxy; third-party-cookie deployments are intentionally unsupported. Also configure allowed hosts/origins and secure-cookie/HTTPS proxy settings for the actual topology. Google login, OTP and TOTP enrollment/recovery are unavailable. See [security policies, verification and rollout](docs/SECURITY_HARDENING.md) for session rotation/revocation, trusted proxy settings and remaining deployment gates.
 
 ## Project structure
 

@@ -52,6 +52,8 @@ cd ..
 docker compose config --quiet
 ```
 
+For authentication, authorization, uploads, proxy or dependency changes, also run the relevant fixtures/gates in `docs/TESTING.md`: resolved Python advisory scan, production npm audit, full `audit:security` policy, disposable SQL security schedules and Nginx probes as applicable. Never treat the expiring build-only advisory exception as a zero-advisory full report or claim local checks prove deployed TLS/headers.
+
 If a command is unavailable or requires an external service, record that fact in `Handoff.md`; do not claim it passed.
 
 ## Mandatory session close

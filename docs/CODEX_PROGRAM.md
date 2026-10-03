@@ -6,19 +6,28 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 8 measured remediation verified; remaining concurrency/saved-data/deployment gates documented |
+| Program status | Batch 9 security scope verified; dependency and production owner gates documented |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 8 - Database and performance |
-| Batch status | Complete for measured scope; verified non-fast-forward merge and normal atomic publication |
-| Batch branch | `codex/batch-08-database-performance` |
-| Batch start commit | `7ac1a7805ee1e1598c4027868536749fdbdd3c6a` (verified Batch 5/6/7 integration) |
-| Final batch / integration merge | `23ede44436df788a42bf76f5e8d5e17e4a8e2d6f` / `d28aabd363a460ef87123b884e2afebaac7b4ec8` |
-| Audit IDs handled | PERF-003/DB-004/FE-005 addressed; PERF-001 retained; PERF-002/DB-001 partial with residuals |
-| Verification performed | Full SQL/SQLite/frontend checks, targeted final probes, Chrome request budgets, index plans/round trip; exact results in Handoff |
-| Remaining risks | DB-002/TEST-003 SQL concurrency, production media headers/legacy media review, historical refund reconciliation, other open audit records |
-| Next batch | Batch 9 - Security; no next batch started |
+| Current batch | Batch 9 - Security hardening |
+| Batch status | Complete for confirmed source hardening; SEC-005 partial with expiring exception; local commits only |
+| Batch branch | `codex/batch-09-security` |
+| Batch start commit | `db565f6c279d1b60d96e981cb2911014903106a4` (clean integration) |
+| Final batch / integration merge | Final local head: `git rev-parse codex/batch-09-security`; Batch 9 has no integration merge/push |
+| Audit IDs handled | SEC-002/SEC-003/FE-008 fixed; SEC-004 disabled; SEC-001 reinforced; SEC-005 partial |
+| Verification performed | 161 SQL tests, SQLite/frontend/Chrome, runtime advisory checks and disposable proxy negatives; exact results in Handoff |
+| Remaining risks | Build-only dependency exception expires 2026-11-02, deployed TLS/proxy/media, historical secrets/refunds and other open audit records |
+| Next batch | Batch 10 - Production infrastructure; not started |
+
+## Batch 9 - Security hardening (2026-10-03)
+
+- Required branch `codex/batch-09-security` starts at `db565f6c279d1b60d96e981cb2911014903106a4`, clean integration. Main/dev/stash and ignored configuration remain preserved. No fetch, push, merge, production deployment or next batch is claimed in this scope.
+- Auth family rotation/revocation, cross-tab cookies, failed logout, effective staff DTO/native escalation restrictions and disabled incomplete Google/MFA flows address SEC-002/SEC-004/FE-008. Shared atomic throttles/trusted forwarding address SEC-003; site image staging and Nginx containment reinforce SEC-001.
+- Dependency updates retain supported Python/Vite/Router lines; Vitest major has explicit Node/Vite/full-suite compatibility evidence. Zero known production npm/resolved Python advisories at this date. SEC-005 remains partial for five dev-only GHSA-vfj7-8cjw-p6xm entries, with a gate expiring 2026-11-02 00:00 UTC; no forced Tailwind major.
+- Full SQL 161/161 with zero skips, full frontend 9 Node + 69 Vitest, four Chrome and ten proxy status/header/media cases plus two forwarding probes pass. See Handoff for SQLite/check/drift/configuration counts, iterations and durations; see [security policy/evidence/rollout](SECURITY_HARDENING.md).
+- Apply migrations 0009/0010 with coordinated app rollout and require re-login; configure verified proxy CIDRs/TLS/HSTS, schedule security-state pruning and inspect legacy media. Historical credential rotation/history cleanup, financial reconciliation, hosted CI and production image/OS verification remain owner gates.
+- Theme commits: `84c2dc1` sessions/identity; `c10f9b2` shared limits; `28d3248` decorator correction; `98acddd` site media; `647ea09` response/ingress/native login; `afc6c21` dependencies/gates. Final documentation commit is resolvable from the local branch. Local source completion is distinct from integration/publication.
 
 ## Batch 8 - Database and performance (2026-10-03)
 
@@ -201,7 +210,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 6 — Frontend state (verified scope; integrated in Batch 8)
 - [x] Batch 7 — Admin/media (verified scope; integrated in Batch 8)
 - [x] Batch 8 — Performance/database (measured remediation; explicit residuals)
-- [ ] Batch 9 — Security
+- [x] Batch 9 — Security (verified source scope; SEC-005 and production owner gates remain)
 - [ ] Batch 10 — Production infrastructure
 - [ ] Batch 11 — UX/accessibility/SEO
 - [ ] Batch 12 — Final architecture review

@@ -94,7 +94,7 @@ Common root `.env` settings:
 | `RUN_SEED_DATA` | Bootstrap empty catalog/shipping, settings, and optional admin | `true` |
 | `DB_AUTO_CREATE` | Create `DB_NAME` when absent | `true` |
 | `VITE_API_BASE` | Frontend API origin or prefix | `/api` |
-| `GOOGLE_OAUTH_CLIENT_ID` | Backend Google token audience; blank disables it | Blank |
+| `TRUSTED_PROXY_CIDRS` | Verified immediate proxy networks for single-IP XFF; never guess broad ranges | Blank ignores XFF |
 | `AUTH_COOKIE_SECURE` | Send JWT cookies only over HTTPS | `False` locally |
 | `AUTH_COOKIE_SAMESITE` | Access-cookie SameSite policy (`Lax` or `Strict`) | `Lax` |
 | `AUTH_REFRESH_COOKIE_SAMESITE` | Refresh-cookie SameSite policy | `Strict` |

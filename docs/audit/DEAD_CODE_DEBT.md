@@ -1,5 +1,7 @@
 # Dead code and compatibility debt
 
+Batch 9 revalidation (2026-10-03): Google issuance/linking helpers, pyotp/google-auth dependencies and the incomplete frontend MFA challenge are removed. Routed Google/OTP return 501; preserved legacy MFA markers fail closed at password login. Native admin login is throttled. See [current security policies](../SECURITY_HARDENING.md). The inventory below preserves earlier reachability evidence.
+
 See [architecture](ARCHITECTURE_AUDIT.md) for live boundaries. Reachability was checked against repository routes, imports, client call sites and tests, not inferred from names.
 
 | Candidate | Reachability / disposition | Removal precondition |

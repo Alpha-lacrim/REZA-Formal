@@ -2,6 +2,20 @@
 
 Source/probe baseline established 2026-09-10 by Batch 1, with documentation completion review on 2026-09-13, on unchanged application commit `94d665881e3e929c41121d057385c28f822002fe`. Start with [AUDIT_INDEX](audit/AUDIT_INDEX.md), which owns the 43-finding register and all 18 hypothesis verdicts. This roadmap schedules work; it does not authorize starting another batch in this session or claim that any finding is fixed.
 
+## Batch 9 update - 2026-10-03
+
+Security scope is verified on `codex/batch-09-security` from integration `db565f6`.
+SEC-002/SEC-003 and FE-008 are fixed in source and isolated SQL/browser/proxy fixtures;
+SEC-004 unfinished identity paths fail closed. SEC-001 now includes all site fields
+and tested media serving headers. SEC-005 remains partial under an exact build-only
+exception expiring 2026-11-02; runtime dependency scans are clear at this date.
+See [security evidence, limits and rollout](SECURITY_HARDENING.md).
+
+Deploy both applications with migrations 0009/0010 and require re-login. Verified
+proxy CIDRs/TLS/HSTS, pruning, legacy media review, OS/image scanning and historical
+credential rotation remain owner/Batch 10 gates. No production deployment, integration
+merge/push, or next batch is claimed for Batch 9.
+
 ## Batch 8 update - 2026-10-03
 
 Measured critical paths and implemented cart/return read graphs, batched unlocked quotes, SQL net revenue aggregation, compact paginated public catalog with coordinated search/filters, customer/review page controls and confirmed detail-request suppression. [Evidence, stock ownership/transaction review, index assessment, rollout and residuals](DATABASE_PERFORMANCE.md) owns before/after counts/bytes. DB-004 and PERF-003 addressed; FE-005 page consumers addressed; DB-001/PERF-002 partial for wider invariants and whole saved snapshots/legacy inline media. PERF-001 remains verified from Batch 4.
