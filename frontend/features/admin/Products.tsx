@@ -137,7 +137,7 @@ return <>
 <Pagination page={query.data} current={currentPage} onChange={setCurrentPage} busy={query.isFetching} />
                         </div>
                     </div>
-{editingProduct && <ProductEditor product={editingProduct} onClose={() => setEditingProduct(null)} onSaved={async () => { setEditingProduct(null); await query.invalidate(); await refreshProducts(); }} />}
+{editingProduct && <ProductEditor product={editingProduct} onClose={() => setEditingProduct(null)} onSaved={async () => { await query.invalidate(); await refreshProducts(); setEditingProduct(null); }} />}
                 {deleteConfirmation.isOpen && (
                     <Dialog title="حذف محصول" size="confirm" onClose={() => setDeleteConfirmation({ isOpen: false, productId: null })} busy={deleting}>
                         <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-2xl shadow-2xl overflow-hidden p-8 text-center animate-in zoom-in duration-200 border border-gray-100 dark:border-zinc-800">

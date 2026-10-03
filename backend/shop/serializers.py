@@ -205,6 +205,20 @@ class ContactMessageSerializer(serializers.ModelSerializer):
 
 
 class SiteSettingsSerializer(serializers.ModelSerializer):
+    about_image = ProductImageField(required=False, allow_null=True)
+    hero_image = ProductImageField(required=False, allow_null=True)
+    suits_section_image = ProductImageField(required=False, allow_null=True)
+    shirts_section_image = ProductImageField(required=False, allow_null=True)
+    blazers_section_image = ProductImageField(required=False, allow_null=True)
+    accessories_section_image = ProductImageField(required=False, allow_null=True)
+    bespoke_section_image = ProductImageField(required=False, allow_null=True)
+
+    def validate(self, attrs):
+        from .product_media import MAX_UPLOAD_BYTES
+        if sum(value.size for value in attrs.values() if hasattr(value, 'size')) > MAX_UPLOAD_BYTES:
+            raise serializers.ValidationError({'images': 'Combined image uploads must be at most 40 MiB.'})
+        return attrs
+
     class Meta:
         model = SiteSettings
         fields = [

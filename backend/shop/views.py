@@ -29,10 +29,8 @@ from .serializers import (
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.exceptions import TokenError
 import uuid
-import base64
 from django.conf import settings
 from django.middleware.csrf import get_token
-from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
 from django.db.models import Case, Count, DecimalField, F, Q, Sum, Value, When
@@ -44,6 +42,7 @@ from .auth import enforce_csrf
 from .sessions import new_session, revoke_cookies, revoke_token, rotate_session
 from .commerce_services import CommerceError
 from .product_services import save_product
+from .site_services import save_site_settings
 from .selectors import product_reads, order_reads
 from .pagination import page_response
 from .product_media import MAX_GALLERY_IMAGES, MAX_UPLOAD_BYTES
@@ -118,32 +117,6 @@ def serialize_user(user):
 
 
 
-
-def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentFile:
-    """
-    Decode an image data URL into a serializer-compatible ContentFile.
-    """
-    try:
-        header, encoded = dataurl.split(',', 1)
-        import base64
-        import uuid
-        data = base64.b64decode(encoded, validate=True)
-        # guess extension from header
-        if 'image/png' in header:
-            ext = '.png'
-        elif 'image/jpeg' in header or 'image/jpg' in header:
-            ext = '.jpg'
-        elif 'image/gif' in header:
-            ext = '.gif'
-        elif 'image/webp' in header:
-            ext = '.webp'
-        else:
-            # fallback to png
-            ext = '.png'
-        name = f"{prefix.rstrip('/')}_{uuid.uuid4().hex}{ext}"
-        return ContentFile(data, name=name)
-    except Exception as exc:
-        raise ValueError('Invalid image data URL') from exc
 
 def prepare_product_data(request):
     """Normalize multipart values without writing any file before validation."""
@@ -445,49 +418,24 @@ def site_settings(request):
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
 
-    # Prepare mutable data copy so we can convert data-URLs to stored files
-    if hasattr(request.data, 'dict'):
-        data = request.data.dict()
-    else:
-        try:
-            data = request.data.copy()
-        except Exception:
-            data = request.data
+    if not isinstance(request.data, Mapping):
+        raise ValidationError({'non_field_errors': ['Expected an object.']})
+    data = request.data.dict() if hasattr(request.data, 'dict') else request.data.copy()
+    if request.FILES:
+        files = [file for key in request.FILES for file in request.FILES.getlist(key)]
+        if len(files) > 7 or any(len(request.FILES.getlist(key)) > 1 for key in request.FILES):
+            raise ValidationError({'images': 'At most one upload per site image field is allowed.'})
+        if sum(file.size for file in files) > MAX_UPLOAD_BYTES:
+            raise ValidationError({'images': 'Combined image uploads must be at most 40 MiB.'})
+    for field in ('about_image', 'hero_image', 'suits_section_image', 'shirts_section_image',
+                  'blazers_section_image', 'accessories_section_image', 'bespoke_section_image'):
+        if str(data.pop(f'clear_{field}', '')).strip().lower() in {'1', 'true', 'yes', 'on'}:
+            data[field] = None
 
-    # Convert data URLs to uploaded files and process explicit clear flags.
-    image_fields = ['about_image', 'hero_image', 'suits_section_image', 'shirts_section_image', 'blazers_section_image', 'accessories_section_image', 'bespoke_section_image']
-    for f in image_fields:
-        clear_value = str(data.pop(f'clear_{f}', '')).strip().lower()
-        if clear_value in {'1', 'true', 'yes', 'on'}:
-            data[f] = None
-
-    for f in image_fields:
-        val = data.get(f)
-        if isinstance(val, str) and val.startswith('data:image/'):
-            try:
-                data[f] = _dataurl_to_content_file(val, prefix=f)
-            except ValueError:
-                return Response({f: ['Invalid image data URL']}, status=400)
-
-    old_files = {
-        f: getattr(settings, f, None)
-        for f in image_fields
-    } if settings else {}
 
     serializer = SiteSettingsSerializer(settings, data=data, partial=True)
     if serializer.is_valid():
-        instance = serializer.save()
-        remaining_names = {
-            getattr(instance, f).name
-            for f in image_fields
-            if getattr(instance, f, None)
-        }
-        for old_file in old_files.values():
-            if old_file and old_file.name not in remaining_names:
-                try:
-                    old_file.delete(save=False)
-                except Exception:
-                    logger.warning('Could not delete replaced site image %s', old_file.name)
+        instance = save_site_settings(settings, serializer.validated_data)
         return Response(SiteSettingsSerializer(instance, context={'request': request}).data)
     return Response(serializer.errors, status=400)
 

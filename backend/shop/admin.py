@@ -314,5 +314,5 @@ class MessageAdmin(admin.ModelAdmin):
 
 
 @admin.register(SiteSettings)
-class SettingsAdmin(admin.ModelAdmin):
+class SettingsAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('id',)

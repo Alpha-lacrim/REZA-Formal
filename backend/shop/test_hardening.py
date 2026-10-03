@@ -78,3 +78,50 @@ class SharedThrottleTests(TestCase):
         call_command('prune_security_state', stdout=StringIO())
         self.assertEqual(AuthSession.objects.count(), 1)
         self.assertEqual(list(ThrottleBucket.objects.values_list('key', flat=True)), ['active'])
+
+
+class SiteImageHardeningTests(TestCase):
+    def setUp(self):
+        self.media = TemporaryDirectory()
+        self.addCleanup(self.media.cleanup)
+        override = override_settings(MEDIA_ROOT=self.media.name)
+        override.enable()
+        self.addCleanup(override.disable)
+        self.client = APIClient()
+        self.client.force_authenticate(User.objects.create_superuser('site-security', 'site-security@example.invalid', 'Test-only-493!'))
+
+    def files(self):
+        return [path for path in Path(self.media.name).rglob('*') if path.is_file()]
+
+    def test_all_site_fields_validate_real_content_extension_mime_and_size(self):
+        for field in ['about_image', 'hero_image', 'suits_section_image', 'shirts_section_image',
+                      'blazers_section_image', 'accessories_section_image', 'bespoke_section_image']:
+            for file in [upload('spoof.html'), upload('fake.png', b'invalid'), upload(mime='text/html'),
+                         upload(content=png_bytes((8001, 1))), upload(content=png_bytes() + b'x' * (10 * 1024 * 1024))]:
+                response = self.client.put('/api/settings/', {field: file}, format='multipart')
+                self.assertEqual(response.status_code, 400)
+        self.assertEqual(self.files(), [])
+        self.assertFalse(SiteSettings.objects.exists())
+
+    def test_site_image_reencoding_and_inline_compatibility_discard_trailing_content(self):
+        image = png_bytes() + b'<script>synthetic-inert-marker</script>'
+        response = self.client.put('/api/settings/', {'hero_image': upload('../../chosen.png', image)}, format='multipart')
+        self.assertEqual(response.status_code, 200)
+        self.assertRegex(self.files()[0].name, r'^[a-f0-9]{32}\.png$')
+        self.assertNotIn(b'synthetic-inert-marker', self.files()[0].read_bytes())
+        response = self.client.put('/api/settings/', {'about_image': 'data:image/png;base64,' + base64.b64encode(image).decode()}, format='json')
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn('data:', str(response.data))
+
+    def test_site_db_failure_leaves_no_new_files(self):
+        with patch.object(SiteSettings, 'save', side_effect=RuntimeError('synthetic rollback')):
+            with self.assertRaises(RuntimeError):
+                self.client.put('/api/settings/', {'hero_image': upload()}, format='multipart')
+        self.assertEqual(self.files(), [])
+        self.assertFalse(SiteSettings.objects.exists())
+
+    def test_site_binary_budget_is_checked_before_decoding(self):
+        with patch('shop.views.MAX_UPLOAD_BYTES', 100), patch('shop.product_media.Image.open') as decode:
+            response = self.client.put('/api/settings/', {'hero_image': upload(), 'about_image': upload()}, format='multipart')
+        self.assertEqual(response.status_code, 400)
+        decode.assert_not_called()
