@@ -119,6 +119,15 @@ Git SHA, lockfiles, scan reports, migration plan and rollback image before relea
 Refresh digest/ODBC/OS inputs deliberately and rerun gates; a frozen vulnerable
 image is not an acceptable long-term update policy.
 
+The frontend removes unused dynamic Nginx modules and updates packages within the
+pinned base's Alpine release. Nginx itself uses the explicit maintained Alpine
+security package version in `NGINX_PACKAGE_VERSION` (currently 1.28.3-r7), preserving
+the 1.28 branch. APK signatures remain enforced. This replaces the old upstream
+package pin that prevented security updates; Nginx configuration, numeric UID 101,
+port 8080 and shutdown/read-only contracts are verified after the change. Like apt,
+Alpine repository updates prevent byte-identical whole images; release the scanned
+image digest rather than rebuilding an unverified image during rollout.
+
 ## Startup and one controlled migration job
 
 These commands are an operator checklist, not authorization to deploy. First
@@ -186,6 +195,38 @@ after backup and an owner-reviewed maintenance window, correct ownership to UID/
 modes or add an automatic recursive root chown to every startup. Validate actual
 host ACLs for bind mounts. The new non-root runtime will fail visibly on an
 unprepared existing volume; it does not silently change persistent ownership.
+
+`scripts/prepare-volume-ownership.py` provides a separate maintenance tool. Check
+mode reports only entry counts and returns 2 when preparation is needed. `--apply`
+first writes a new mode-0600 tar archive and JSON checksum manifest to a separate
+backup mount, verifies archived bytes and rejects a changed inventory before
+ownership changes. It then sets UID/GID 10001 and file/directory modes 0644/0755.
+Symlinks, special files, hard links and nested filesystems require manual review
+and are rejected. It cannot safely coordinate active writers: stop every container
+or host process using the volume first. Ownership changes are not atomic; preserve
+the verified archive if a later filesystem operation fails.
+
+The following is an operator example, not an executed application-volume change:
+
+```powershell
+$opsImage = 'reza-b10-backend:local'
+$opsVolume = 'REPLACE_WITH_VERIFIED_MEDIA_OR_STATIC_VOLUME'
+docker volume inspect $opsVolume | Out-Null
+if ($LASTEXITCODE -ne 0) { throw 'The exact named volume must already exist' }
+docker ps --filter "volume=$opsVolume" --format '{{.Names}}'
+# Stop all writers; bind mounts require a separately reviewed host ACL plan.
+$opsScript = (Resolve-Path .\scripts\prepare-volume-ownership.py).Path
+docker run --rm --user 0:0 --network none --read-only --cap-drop ALL --cap-add DAC_OVERRIDE --entrypoint python --mount "type=volume,src=$opsVolume,dst=/volume,readonly" --mount "type=bind,src=$opsScript,dst=/prepare.py,readonly" $opsImage /prepare.py
+```
+
+For an approved preparation window, create a private backup directory, mount it at
+`/backup`, mount the selected volume writable, add only CHOWN and FOWNER to the
+capabilities above and append `--apply`. Copy the archive/manifest to encrypted
+off-host custody and perform a restore drill before rollout. Restore the archive
+into a NEW volume first; it preserves the original ownership/modes for rollback.
+The disposable runtime gate tests legacy root-only files, byte/mode-preserving
+archive restoration, readable non-root results and rejected symlinks. No real
+application volume was repaired in this local-only batch.
 
 For a media backup, pause uploads/deletes and archive the entire media root from a
 read-only mount using a matching backend image or trusted archive tool. Include
@@ -314,6 +355,10 @@ Compose validation, both image builds, proxy regressions and a disposable real-S
 runtime/recovery fixture. That fixture verifies non-root/read-only execution,
 startup, static/media, restricted runtime DB access, graceful stop, backend recreation
 at a different IP, database-failure readiness and SQL/media restore into new targets.
+It also uses a two-day disposable CA to test certificate-validated encrypted SQL,
+rejected unknown CAs/wrong hostnames, HTTPS ingress, HTTP redirect, HSTS and Secure
+cookies. Trust is confined to test containers and per-request clients; no host trust
+store, real certificates or production SQL provisioning is changed.
 It creates/removes only uniquely named fixture containers/networks/volumes, not the
 application's persistent data. Run it after local image builds:
 
@@ -322,22 +367,30 @@ docker build -t reza-b10-backend:local backend
 docker build -t reza-b10-frontend:local frontend
 node scripts/test-nginx-security.mjs
 node scripts/test-production-runtime.mjs
+node scripts/scan-runtime-images.mjs
 ```
 
 CI locks action commits and runs on program pushes, PRs, weekly and manual triggers.
 It installs checksum-verified Trivy 0.75.0 directly from its immutable release and
-gates fixable HIGH/CRITICAL image findings; scanner/database download errors fail
-the job. Unfixed findings still need owner assessment and full release scan reports.
+runs `scan-runtime-images.mjs --trivy <verified-binary>`. Local mode uses the
+digest-pinned scanner container and owned cache. The script attempts official Docker
+Hub, GHCR and public ECR database sources in order, requires a successful update,
+stores full-severity reports and verifies that scanned filesystems/timestamps match
+the selected images. Fixable HIGH/CRITICAL findings or scanner/download failures
+fail the gate; unfixed findings are recorded for review, never silently accepted.
+Reports and source/worktree provenance live in ignored `.ops-reports/`; CI retains
+JSON artifacts for 14 days. The script performs no registry login, push or deployment.
+Checksum-verified actionlint validates workflow syntax/expressions locally and in CI.
 The existing dev-only npm advisory exception expires 2026-11-02; it is not expanded.
 Hosted CI, actual ingress/TLS, owner backup storage/retention, real recovery targets,
 production certificate/login grants, legacy volume permissions and historical secret
 rotation/history cleanup remain launch gates. Local fixtures cannot close them.
 
-Batch 10 local image scans did not complete: the default DB mirror returned HTTP
-403, and primary-registry downloads timed out or ended with protocol/EOF errors.
-This is unavailable scan evidence, not a zero-vulnerability result. The required CI
-scan step remains enabled and fails on database/download errors; repeat it from an
-environment with working access before any release.
+The initial Batch 10 scans failed database downloads. The local follow-up completed
+through the official Docker Hub source and found fixable frontend OS/Nginx findings;
+the rebuilt runtime is re-scanned after patching. See Handoff for exact image IDs,
+severity counts and report locations. A fixable-finding gate pass is not a claim of
+zero advisories, deployed TLS assurance or observed GitHub-hosted execution.
 
 ## Primary references
 
@@ -349,3 +402,7 @@ environment with working access before any release.
 - [SQL Server container restore](https://learn.microsoft.com/en-us/sql/linux/tutorial-restore-backup-in-sql-server-container?view=sql-server-ver16)
 - [sqlcmd authentication/environment behavior](https://learn.microsoft.com/en-us/sql/tools/sqlcmd/sqlcmd-utility?view=sql-server-ver17)
 - [Trivy immutable release](https://github.com/aquasecurity/trivy/releases/tag/v0.75.0)
+- [Trivy official database locations](https://trivy.dev/docs/latest/configuration/db/)
+- [Nginx security advisories](https://nginx.org/en/security_advisories.html)
+- [SQL Server certificate-validated encryption](https://learn.microsoft.com/en-us/sql/linux/security/encrypted-connections?view=sql-server-ver16)
+- [actionlint release](https://github.com/rhysd/actionlint/releases/tag/v1.7.12)

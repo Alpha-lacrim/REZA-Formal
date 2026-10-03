@@ -17,11 +17,19 @@ pre-codex-remediation-2026-09-10
 | Final batch / integration merge | Final local head: `git rev-parse codex/batch-10-production-ops`; no integration merge/push |
 | Audit IDs handled | OPS-002/OPS-003/OPS-004 partial: implemented/tested infrastructure and recovery, qualified owner gates |
 | Verification performed | 166 SQL cases, 166 SQLite cases (12 SQL-only skips), 78 frontend cases, four Chrome journeys, locked image builds and runtime/proxy/recovery fixtures; exact results in Handoff |
-| Remaining risks | Image vulnerability DB download failures, hosted CI, actual TLS/IP trust, SQL certificate/license/grants/capacity, legacy volume preparation, real backup objectives, expiring build advisory and historical secrets/financial/provider work |
+| Remaining risks | 63 unfixed backend HIGH/CRITICAL package findings across 23 advisory IDs, hosted CI, actual TLS/IP trust, SQL certificate/license/grants/capacity, legacy volume preparation, real backup objectives, expiring build advisory and historical secrets/financial/provider work |
 | Next batch | Batch 11 - UX/accessibility/SEO; not started |
 
 ## Batch 10 - Production infrastructure and operations (2026-10-03)
 
+- Local-only follow-up resolves scanner connectivity through official DB fallback:
+  frontend fixes remove 67 fixable HIGH/CRITICAL findings and the patched snapshot
+  reports zero advisories; backend has no fixable HIGH/CRITICAL but retains the
+  unfixed findings above. Full reports/provenance retained; no silent exception.
+  Backup-before-ownership maintenance, legacy restore/symlink rejection, disposable
+  HTTPS/SQL certificate validation and local actionlint checks pass. Cleanup remains
+  blocked by automatic review; real production and hosted workflow runs remain out
+  of the owner's explicitly reconfirmed local-only scope.
 - Required branch starts clean at the Batch 9 local head above. No external deployment,
   real cloud/DNS/payment/production DB change, integration merge or remote publication.
 - Digest-pinned multi-stage images, complete Python hash lock and existing npm lock;

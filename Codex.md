@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-03 (Batch 10; locked builds, SQL/SQLite/frontend/Chrome, proxy and disposable runtime/recovery gates)
+Last verified: 2026-10-03 (Batch 10 and local follow-up; locked builds, image scans, proxy/TLS and disposable runtime/recovery gates)
 
 ## Purpose and product
 
@@ -71,6 +71,18 @@ Backend runs as UID/GID 10001 with a hash-locked binary-wheel dependency venv, d
 
 `reza_backend/observability.py` provides JSON stdout logging and bounded request IDs, safe route patterns/status/duration and exception type/stack locations without body/query/cookie/SQL/error-text capture. Nginx overwrites request IDs and emits JSON access events; successful probes are quiet. Compose local logs rotate; error reporting/collection is an owner-selected handler/consumer integration point, with no paid vendor or network reporter installed.
 
+The local follow-up patches Alpine runtime packages and pins its maintained Nginx
+security package on the 1.28 branch; unused dynamic modules are removed. Image scans
+now download from official fallback registries and retain full reports/provenance in
+ignored `.ops-reports/` plus CI artifacts. Frontend has zero reported advisories in
+the observed snapshot; backend has zero fixable HIGH/CRITICAL and 63 unfixed package
+findings across 23 advisory IDs, requiring release review. This is not risk acceptance.
+The runtime fixture verifies a disposable TLS ingress/SQL CA with wrong-host/unknown-CA
+rejections; no host trust store or real certificates are changed. The explicit volume
+maintenance tool checks by default and verifies recovery archives before changing
+ownership. It runs only on owned synthetic volumes in tests; existing application
+volumes remain owner work. Hosted CI has local actionlint checks but no observed run.
+
 The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-13. This workstation uses ignored `MSSQL_PORT=11433` because Windows rejected host port `1433`; services still connect to `db:1433` inside Compose.
 
 ## Important files
@@ -86,6 +98,7 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `backend/gunicorn.conf.py`, `backend/healthcheck.py`, `backend/reza_backend/observability.py` | Worker/shutdown configuration, bounded probes and redacted JSON/request correlation. |
 | `frontend/.nvmrc`, `frontend/nginx-main.conf` | CI Node patch baseline and unprivileged Nginx JSON logging/temp-path setup. |
 | `scripts/check-build-inputs.py`, `scripts/validate-production-config.py`, `scripts/test-production-runtime.mjs` | Read-only lock/secret-signature checks, synthetic configuration validation and isolated real-SQL/media recovery fixture. |
+| `scripts/prepare-volume-ownership.py`, `scripts/scan-runtime-images.mjs` | Explicit backup-before-ownership maintenance and full-report image scan gate with official DB source fallback. |
 | `scripts/Setup-DevelopmentEnv.ps1` | Creates ignored development env files, generates required secrets without displaying them, synchronizes the fresh database password, and removes obsolete Gemini variables. |
 | `.env.docker.example` | Names and safe examples for Docker configuration; never add real secrets. |
 | `frontend/package.json` | Frontend scripts and dependency contract. |

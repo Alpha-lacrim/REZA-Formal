@@ -21,8 +21,21 @@ SQL checksum/new-database restore and media/new-volume restore, plus liveness wh
 SQL is unavailable. `OPS_BACKEND_IMAGE`/`OPS_FRONTEND_IMAGE` may select local test
 images. Cleanup touches only this fixture's names; no application env or volume is used.
 
+The expanded fixture also restores a root-owned legacy archive with original bytes/
+modes, prepares non-root volume ownership and rejects symlinks. It uses a short-lived
+test CA to prove encrypted/certificate-validated SQL, wrong-host/unknown-CA rejection
+and HTTPS ingress with redirects/HSTS/Secure cookies. No host trust store is modified.
+
 CI also gates fixable high/critical image advisories with checksum-verified Trivy
-0.75.0; it has no image push/deployment job. Full launch approval, TLS/backup targets,
+0.75.0 through `scripts/scan-runtime-images.mjs`; local mode uses its pinned Docker
+image, CI passes the checksum-verified native binary. Official database fallback
+sources are tried without allowing unavailable or stale-scan evidence to pass.
+Full-severity reports and a summary are stored in ignored `.ops-reports/` and CI
+JSON artifacts; unfixed findings remain visible for review. The final local snapshot
+has zero frontend advisories and zero fixable HIGH/CRITICAL backend findings, with
+63 unfixed HIGH/CRITICAL package findings (23 advisory IDs). No risk acceptance or
+hosted execution is implied. Workflow syntax/expressions pass actionlint 1.7.12.
+CI has no image push/deployment job. Full launch approval, TLS/backup targets,
 unfixed vulnerabilities and hosted execution remain owner gates. See
 [operations runbook](OPERATIONS.md). Runtime evidence is recorded in Handoff.
 

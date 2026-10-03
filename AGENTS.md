@@ -63,6 +63,10 @@ fixtures. Follow `docs/OPERATIONS.md` for hash-lock updates, volume ownership an
 recovery gates. Keep production deployment disabled; real ingress/DB/backup/capacity
 changes need explicit owner scope. Record image scanner/database failures separately
 from a successful vulnerability scan; hosted CI is separate from local evidence.
+Run `node scripts/scan-runtime-images.mjs` after image changes and preserve full
+reports, including unfixed findings; a fixable-advisory gate pass is not risk acceptance.
+Volume maintenance must use an explicit operator window and verified backup; test
+`prepare-volume-ownership.py` only on the runtime fixture's uniquely owned volumes.
 
 ## Mandatory session close
 

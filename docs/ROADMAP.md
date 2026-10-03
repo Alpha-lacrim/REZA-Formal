@@ -9,8 +9,12 @@ from clean Batch 9 head `5e9e89d`. OPS-002/003/004 are partial with explicit evi
 locked non-root builds, production override, redacted JSON/request IDs, safe static/media
 and shutdown, synthetic configuration, proxy/recreation and real SQL/media recovery.
 All 166 SQL cases, SQLite/frontend/Chrome, image builds, proxy/runtime and Compose
-gates pass. Image scans could not complete because vulnerability DB downloads failed;
-Handoff records the exact network failures. [OPERATIONS](OPERATIONS.md)
+gates pass. Initial image database downloads failed; the local follow-up now completes
+scans through an official source. Patched frontend reports zero advisories; backend
+has zero fixable HIGH/CRITICAL and 63 unfixed package findings across 23 advisory IDs.
+Full reports remain visible for release review. Backup-before-ownership maintenance,
+legacy archive restore and disposable HTTPS/SQL certificate gates pass; actionlint
+validates workflows locally. Handoff records the exact evidence. [OPERATIONS](OPERATIONS.md)
 owns migration/backup/restore/ownership/health/log/rollback and TLS-ingress instructions.
 
 Production TLS/IP trust, SQL certificate/login/license, measured capacity, legacy-volume
