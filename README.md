@@ -119,6 +119,11 @@ REZA-Formal/
 
 ## Configuration and hygiene
 
+Production preparation and recovery: [operations runbook](docs/OPERATIONS.md).
+The reviewed production Compose override is a template; it requires owner-provisioned
+SQL credentials/certificates, TLS ingress and prepared volume ownership. CI builds
+and tests disposable infrastructure only; no production deployment is enabled.
+
 - Root `.env` is read by Docker Compose; `backend/.env` is read by manual Django runs. Both are ignored.
 - Uploaded media, local databases, virtual environments, Python caches, cookie jars, archives, dependencies, and build output are ignored.
 - `frontend/services/api.ts` is the primary server integration. `frontend/services/db.ts` is only a read-only emergency catalog fallback.

@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-03 (Batch 9; frontend/backend/Chrome, advisory and disposable SQL/Nginx security gates)
+Last verified: 2026-10-03 (Batch 10; locked builds, SQL/SQLite/frontend/Chrome, proxy and disposable runtime/recovery gates)
 
 ## Purpose and product
 
@@ -63,7 +63,13 @@ The remediation baseline and stable finding IDs live in [docs/audit/AUDIT_INDEX.
 
 ### Docker request flow
 
-The `frontend` image builds Vite assets and serves them with Nginx. Nginx proxies `/api/` to Gunicorn and serves `/media/` from the read-only shared volume. The backend waits for SQL Server, optionally creates the database, applies migrations, collects static files, and runs bootstrap data before Gunicorn. Compose health checks form a real dependency chain: SQL query -> Django readiness query -> Nginx-proxied readiness.
+The `frontend` image builds Vite assets with a digest-pinned Node/npm builder and serves them with unprivileged Nginx (UID 101, internal port 8080). It proxies `/api/` to Gunicorn, `/static/` to WhiteNoise and serves `/media/` from the read-only shared volume. Embedded Docker DNS follows backend recreation. Index HTML revalidates, hashed Vite assets cache immutably and source maps are disabled/blocked. Container builds exclude local env variants and enforce the same-origin public API contract.
+
+Backend runs as UID/GID 10001 with a hash-locked binary-wheel dependency venv, digest-pinned Python and version-pinned ODBC 18; runtime compilers/installers are absent. Fresh media/static volumes inherit image ownership, but existing volumes need owner-reviewed permission preparation. Local startup retains optional DB creation/migration/static/seed flags before exec Gunicorn. When creation is off, DB wait connects directly to the application DB rather than master. Compose readiness is SQL -> Django query -> Nginx proxy; image-level liveness is independent. Gunicorn SIGTERM and Nginx SIGQUIT have bounded graceful stop budgets.
+
+`docker-compose.production.yml` is a review template, not approved deployment automation: bootstrap/migration/seed/static flags off, separate restricted runtime SQL login, licensed SQL edition, validated DB TLS, Secure cookies, no DB/API host ports and loopback-only Nginx. TLS ingress owns external redirect/HSTS; Django ignores external forwarded scheme to avoid loops. Actual ingress/client IP trust, SQL certificates/login grants, capacity and backups require owner decisions. Each environment must have a distinct project/env/database/media namespace. See [operations](docs/OPERATIONS.md).
+
+`reza_backend/observability.py` provides JSON stdout logging and bounded request IDs, safe route patterns/status/duration and exception type/stack locations without body/query/cookie/SQL/error-text capture. Nginx overwrites request IDs and emits JSON access events; successful probes are quiet. Compose local logs rotate; error reporting/collection is an owner-selected handler/consumer integration point, with no paid vendor or network reporter installed.
 
 The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-13. This workstation uses ignored `MSSQL_PORT=11433` because Windows rejected host port `1433`; services still connect to `db:1433` inside Compose.
 
@@ -75,6 +81,11 @@ The complete stack was first-launch tested on Windows/Docker Desktop on 2026-07-
 | `Handoff.md` | Newest-first record of changes, checks, incomplete work, and owner actions. |
 | `README.md` | Supported local and Docker entry points. |
 | `docker-compose.yml` | Complete local multi-container topology and environment wiring. |
+| `docker-compose.production.yml`, `.env.production.example`, `docs/OPERATIONS.md` | Reviewed production configuration template and startup/migration/backup/restore/media/log/rollback/health runbooks; no deployment approval. |
+| `backend/requirements.in`, `backend/requirements.txt` | Compatible Python inputs and complete version/hash lock; pip remains the installer. |
+| `backend/gunicorn.conf.py`, `backend/healthcheck.py`, `backend/reza_backend/observability.py` | Worker/shutdown configuration, bounded probes and redacted JSON/request correlation. |
+| `frontend/.nvmrc`, `frontend/nginx-main.conf` | CI Node patch baseline and unprivileged Nginx JSON logging/temp-path setup. |
+| `scripts/check-build-inputs.py`, `scripts/validate-production-config.py`, `scripts/test-production-runtime.mjs` | Read-only lock/secret-signature checks, synthetic configuration validation and isolated real-SQL/media recovery fixture. |
 | `scripts/Setup-DevelopmentEnv.ps1` | Creates ignored development env files, generates required secrets without displaying them, synchronizes the fresh database password, and removes obsolete Gemini variables. |
 | `.env.docker.example` | Names and safe examples for Docker configuration; never add real secrets. |
 | `frontend/package.json` | Frontend scripts and dependency contract. |
@@ -130,6 +141,8 @@ When the contract changes, update the backend route/view/serializer, `frontend/s
 - Core backend names include `DJANGO_SECRET_KEY`, `DEBUG`, `ALLOWED_HOSTS`, `ALLOWED_ORIGINS`, `CSRF_TRUSTED_ORIGINS`, `DB_NAME`, `DB_USER`, `DB_PASSWORD`, `DB_HOST`, `DB_PORT`, `DB_DRIVER`, `DB_ENCRYPT`, and `DB_TRUST_SERVER_CERTIFICATE`.
 - Optional auth/deployment names include `DJANGO_SUPERUSER_*`, `TRUSTED_PROXY_CIDRS`, `AUTH_COOKIE_*`, `SESSION_COOKIE_SECURE`, `CSRF_COOKIE_SECURE`, `SECURE_SSL_REDIRECT`, `SECURE_HSTS_*`, and `TRUST_X_FORWARDED_PROTO`.
 - Docker startup flags include `DB_AUTO_CREATE`, `RUN_MIGRATIONS`, `RUN_COLLECTSTATIC`, and `RUN_SEED_DATA`.
+- Logging/worker names: `LOG_LEVEL`, `GUNICORN_WORKERS`, `GUNICORN_TIMEOUT`, `GUNICORN_GRACEFUL_TIMEOUT`.
+- Production template names: `PRODUCTION_DB_USER`, `PRODUCTION_DB_PASSWORD`, `PRODUCTION_MSSQL_PID`, `PRODUCTION_ALLOWED_HOSTS`, `PRODUCTION_CSRF_TRUSTED_ORIGINS`. Optional public build mirror: `PIP_INDEX_URL` (never credentials).
 - `MSSQL_PORT` controls only the optional host mapping. `DB_PORT` remains the backend-to-SQL Server port and is normally `1433` in Compose.
 
 Never record environment values here. When adding a variable, update the appropriate example, Compose wiring, setup documentation, and this name-only inventory.
@@ -162,7 +175,7 @@ python manage.py runserver
 
 Use the repository's isolated test settings/command documented in `AGENTS.md` for automated tests so the live SQL Server is never modified by a test run.
 
-Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm.cmd run test:e2e`. Both loopback ports 3100/18080 must be free (override the frontend port with `REZA_E2E_FRONTEND_PORT` if Windows reserves 3100); `vite.e2e.config.ts` isolates the test proxy from normal development. The runner always creates synthetic data in a temporary SQLite database. SQL commands and test-only names (`REZA_SQL_TEST`, `REZA_SQL_TEST_HOST`, `REZA_SQL_TEST_PASSWORD`, `REZA_E2E_DIRECTORY`, `E2E_PYTHON`, `PLAYWRIGHT_CHANNEL`) are documented in [docs/TESTING.md](docs/TESTING.md); never substitute production data or connection settings. Fast CI covers `codex/**`; expensive lanes are manually dispatched separately.
+Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm.cmd run test:e2e`. Both loopback ports 3100/18080 must be free (override the frontend port with `REZA_E2E_FRONTEND_PORT` if Windows reserves 3100); `vite.e2e.config.ts` isolates the test proxy from normal development. The runner always creates synthetic data in a temporary SQLite database. SQL commands and test-only names (`REZA_SQL_TEST`, `REZA_SQL_TEST_HOST`, `REZA_SQL_TEST_PASSWORD`, `REZA_E2E_DIRECTORY`, `E2E_PYTHON`, `PLAYWRIGHT_CHANNEL`, `OPS_BACKEND_IMAGE`, `OPS_FRONTEND_IMAGE`) are documented in [docs/TESTING.md](docs/TESTING.md); never substitute production data or connection settings. CI covers `codex/**`, locks action commits and adds image/proxy/recovery/scan gates without registry login/push/deployment. The broader SQL/browser lanes remain manually dispatched; hosted results are not implied by local checks.
 
 ## Stable implementation constraints
 

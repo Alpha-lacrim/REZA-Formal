@@ -6,19 +6,43 @@ pre-codex-remediation-2026-09-10
 | Program metadata | Value |
 | --- | --- |
 | Program | REZA-Formal Codex Remediation |
-| Program status | Batch 9 security scope verified; dependency and production owner gates documented |
+| Program status | Batch 10 source/runtime/recovery verified; production owner gates remain |
 | Baseline commit | `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e` |
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
-| Current batch | Batch 9 - Security hardening |
-| Batch status | Complete for confirmed source hardening; SEC-005 partial with expiring exception; local commits only |
-| Batch branch | `codex/batch-09-security` |
-| Batch start commit | `db565f6c279d1b60d96e981cb2911014903106a4` (clean integration) |
-| Final batch / integration merge | Final local head: `git rev-parse codex/batch-09-security`; Batch 9 has no integration merge/push |
-| Audit IDs handled | SEC-002/SEC-003/FE-008 fixed; SEC-004 disabled; SEC-001 reinforced; SEC-005 partial |
-| Verification performed | 161 SQL tests, SQLite/frontend/Chrome, runtime advisory checks and disposable proxy negatives; exact results in Handoff |
-| Remaining risks | Build-only dependency exception expires 2026-11-02, deployed TLS/proxy/media, historical secrets/refunds and other open audit records |
-| Next batch | Batch 10 - Production infrastructure; not started |
+| Current batch | Batch 10 - Production infrastructure and operations |
+| Batch status | Source and isolated operations scope verified; deployment/provisioning remains disabled and owner-controlled |
+| Batch branch | `codex/batch-10-production-ops` |
+| Batch start commit | `5e9e89dcca4f100b475bc93b7e33f65f33773757` (clean Batch 9 head) |
+| Final batch / integration merge | Final local head: `git rev-parse codex/batch-10-production-ops`; no integration merge/push |
+| Audit IDs handled | OPS-002/OPS-003/OPS-004 partial: implemented/tested infrastructure and recovery, qualified owner gates |
+| Verification performed | 166 SQL cases, 166 SQLite cases (12 SQL-only skips), 78 frontend cases, four Chrome journeys, locked image builds and runtime/proxy/recovery fixtures; exact results in Handoff |
+| Remaining risks | Image vulnerability DB download failures, hosted CI, actual TLS/IP trust, SQL certificate/license/grants/capacity, legacy volume preparation, real backup objectives, expiring build advisory and historical secrets/financial/provider work |
+| Next batch | Batch 11 - UX/accessibility/SEO; not started |
+
+## Batch 10 - Production infrastructure and operations (2026-10-03)
+
+- Required branch starts clean at the Batch 9 local head above. No external deployment,
+  real cloud/DNS/payment/production DB change, integration merge or remote publication.
+- Digest-pinned multi-stage images, complete Python hash lock and existing npm lock;
+  no package manager migration. Backend UID 10001, Nginx UID 101/read-only port 8080,
+  no runtime installers/compilers, bounded logs/probes/shutdown and safe static/media
+  ownership. Backend image is approximately 69 MB versus prior local 181 MB.
+- Production override is a review template: no unattended DB creation/migration/seed,
+  separate restricted runtime login, certified SQL encryption/licensed edition,
+  Secure cookies, no DB/API host ports and loopback TLS-ingress contract. Provisioning
+  and actual ingress/client-IP trust are explicitly owner work.
+- Redacted JSON request/error events and overwritten IDs correlate proxy/Django;
+  safe cache/map policies, WhiteNoise static proxy and Docker DNS rediscovery verified.
+  Real-SQL runtime fixture proves denied runtime DDL, restart persistence, graceful
+  shutdown, dependency-failure health and SQL/media recovery to NEW disposable targets.
+- CI pins action commits and runtime patch versions, adds lock/secret-signature checks,
+  synthetic Compose validation, both builds, proxy/recovery and fixable high/critical
+  image scan gates using checksum-verified Trivy. Actual deployment remains absent.
+- [OPERATIONS](OPERATIONS.md) owns operator runbooks and explicit limitations.
+  Handoff records the public mirror build workaround, exact verification/scanner
+  results and owner obligations. Earlier provider/outbox/financial/secret/TLS gates
+  are not erased by synthetic recovery success.
 
 ## Batch 9 - Security hardening (2026-10-03)
 
@@ -211,7 +235,7 @@ The historical Batch 0 handoff scheduled Batch 1 on `codex/batch-01-forensic-aud
 - [x] Batch 7 — Admin/media (verified scope; integrated in Batch 8)
 - [x] Batch 8 — Performance/database (measured remediation; explicit residuals)
 - [x] Batch 9 — Security (verified source scope; SEC-005 and production owner gates remain)
-- [ ] Batch 10 — Production infrastructure
+- [x] Batch 10 — Production infrastructure (source/isolated operations scope; owner launch gates remain)
 - [ ] Batch 11 — UX/accessibility/SEO
 - [ ] Batch 12 — Final architecture review
 

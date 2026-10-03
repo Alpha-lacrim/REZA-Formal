@@ -56,6 +56,14 @@ For authentication, authorization, uploads, proxy or dependency changes, also ru
 
 If a command is unavailable or requires an external service, record that fact in `Handoff.md`; do not claim it passed.
 
+For container/startup/production operations changes, also run `scripts/check-build-inputs.py`
+and `scripts/validate-production-config.py`, build both runtime images, run the proxy
+gate and `node scripts/test-production-runtime.mjs` using only its owned disposable
+fixtures. Follow `docs/OPERATIONS.md` for hash-lock updates, volume ownership and
+recovery gates. Keep production deployment disabled; real ingress/DB/backup/capacity
+changes need explicit owner scope. Record image scanner/database failures separately
+from a successful vulnerability scan; hosted CI is separate from local evidence.
+
 ## Mandatory session close
 
 Before the final response:

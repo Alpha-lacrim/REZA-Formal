@@ -16,6 +16,7 @@ Use the project-tested Python 3.11/3.12 baseline. The Docker image uses 3.11 and
 py -3.12 -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m pip check
 ```
 
 4. Ensure SQL Server is running, the target database exists, and the configured login can access it.
@@ -43,6 +44,11 @@ python -m pip install -r requirements.txt
 ```
 
 The Microsoft ODBC driver still must be installed through the operating system.
+
+`requirements.in` holds compatible inputs; `requirements.txt` is the complete
+version/hash lock. Docker and CI enforce hashes and binary wheels. See
+[operations](../docs/OPERATIONS.md) for lock updates, restricted runtime/migration
+logins, JSON logging, UID 10001 volume ownership and recovery procedures.
 
 ## Configuration
 

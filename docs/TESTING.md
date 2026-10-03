@@ -2,6 +2,30 @@
 
 Run commands from the nested `REZA-Formal` Git root. Node 22 and Python 3.11 are the CI baselines. Install Python dependencies from `backend/requirements.txt` into a virtual environment. No command below uses the application SQL Server database.
 
+## Production infrastructure gates (Batch 10)
+
+CI pins the patch versions in the runtime builders and installs the complete Python
+hash lock. `python scripts/check-build-inputs.py` checks input/lock compatibility,
+image digests, npm root metadata and tracked secret/backup filenames. It does not
+claim a history or ignored-file secret audit. `python scripts/validate-production-config.py`
+uses only a synthetic env file to check the production override and never starts
+services or prints resolved configuration.
+
+`docker build -t reza-b10-backend:local backend` and
+`docker build -t reza-b10-frontend:local frontend`, then
+`node scripts/test-production-runtime.mjs` exercise real Gunicorn/Nginx/SQL on a
+unique disposable network with synthetic credentials/data and owned volumes. The
+fixture tests restricted DB runtime login, startup flags, non-root/read-only paths,
+static/media serving, correlation/redaction, graceful stop, recreation at a new IP,
+SQL checksum/new-database restore and media/new-volume restore, plus liveness when
+SQL is unavailable. `OPS_BACKEND_IMAGE`/`OPS_FRONTEND_IMAGE` may select local test
+images. Cleanup touches only this fixture's names; no application env or volume is used.
+
+CI also gates fixable high/critical image advisories with checksum-verified Trivy
+0.75.0; it has no image push/deployment job. Full launch approval, TLS/backup targets,
+unfixed vulnerabilities and hosted execution remain owner gates. See
+[operations runbook](OPERATIONS.md). Runtime evidence is recorded in Handoff.
+
 ## Security gates (Batch 9)
 
 Run `npm.cmd audit --omit=dev` and `npm.cmd run audit:security` in frontend.
@@ -12,9 +36,11 @@ Python: install `pip-audit==2.10.1` as verification tooling, then run
 runtime resolution rather than all incidental packages in an existing environment.
 
 `node scripts/test-nginx-security.mjs` runs disposable Docker fixtures: ten
-status/header/media cases (including 502), two spoofed forwarding probes, and cleanup
-of only its own containers/network/temp media. It uses nginx:1.27-alpine by default;
-`NGINX_TEST_IMAGE` can select an available Nginx image. Batch 9 locally used the cached
+status/header/media cases (including 502/504), two spoofed forwarding probes, and cleanup
+of only its own containers/network/temp media. It defaults to the digest-pinned
+unprivileged image from `frontend/Dockerfile` and tests JSON logs, request IDs,
+index/hashed-asset cache policies, source-map blocking and non-root/read-only runtime.
+`NGINX_TEST_IMAGE` can select an available compatible unprivileged Nginx image. Batch 9 locally used the cached
 `reza-formal-frontend:latest` (Nginx 1.27.5) with the checked-in source config mounted read-only.
 No real application media/DB is mounted. Actual TLS/HSTS deployment remains separate.
 

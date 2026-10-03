@@ -2,6 +2,10 @@
 
 Run the full local stack from the repository root.
 
+This file describes development startup. For owner-reviewed production preparation,
+migration/backup/restore, volume ownership and rollback, use [OPERATIONS](OPERATIONS.md).
+Do not promote local debug/bootstrap/SQL Developer defaults to production.
+
 ## 1. Configure the environment
 
 ```powershell
@@ -40,6 +44,15 @@ Open:
 - `db`: SQL Server 2022 Developer with the persistent `mssql_data` volume.
 - `backend`: installs ODBC Driver 18, waits for SQL Server with `pyodbc`, optionally creates the database, applies migrations, collects static assets, seeds idempotent data, and starts Gunicorn.
 - `frontend`: builds the Vite application and serves it with Nginx. Nginx proxies `/api/` to Django and serves `/media/` from the read-only `django_media` volume shared with the backend.
+
+Backend runs as UID/GID 10001, Nginx as UID/GID 101 on internal port 8080.
+Fresh volumes inherit prepared image ownership. Existing root-owned volumes need
+backed-up, owner-reviewed permission preparation before this non-root image starts;
+startup does not automatically chown persistent data. Nginx serves Django static
+files through WhiteNoise. SQL/media/static survive ordinary container recreation.
+Application images have independent liveness probes; Compose uses dependency-aware
+readiness. Stop budgets permit graceful Gunicorn SIGTERM/Nginx SIGQUIT shutdown;
+Docker logs rotate locally. Nginx follows backend recreation through embedded DNS.
 
 All three services expose health checks. SQL Server must answer a real query, backend readiness must answer a database query, and frontend readiness verifies that Nginx can proxy backend readiness. Compose starts dependent services only after the dependency is healthy.
 
@@ -127,3 +140,10 @@ This does not change the container-to-container database port, which remains `14
 ### Frontend receives API errors
 
 Check `docker compose logs backend`, then confirm `VITE_API_BASE=/api` and rebuild the frontend because Vite environment variables are embedded at build time.
+
+### Backend build cannot download Python wheels
+
+Keep the version/hash lock intact. An optional public `PIP_INDEX_URL` build argument
+can select an available artifact mirror; hash verification remains mandatory.
+Do not pass authenticated URLs/secrets as build arguments or change host/service
+DNS configuration to work around a transient build connectivity failure.

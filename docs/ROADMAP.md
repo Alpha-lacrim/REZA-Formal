@@ -2,6 +2,23 @@
 
 Source/probe baseline established 2026-09-10 by Batch 1, with documentation completion review on 2026-09-13, on unchanged application commit `94d665881e3e929c41121d057385c28f822002fe`. Start with [AUDIT_INDEX](audit/AUDIT_INDEX.md), which owns the 43-finding register and all 18 hypothesis verdicts. This roadmap schedules work; it does not authorize starting another batch in this session or claim that any finding is fixed.
 
+## Batch 10 update - 2026-10-03
+
+Verified source/isolated operations scope on required `codex/batch-10-production-ops`
+from clean Batch 9 head `5e9e89d`. OPS-002/003/004 are partial with explicit evidence:
+locked non-root builds, production override, redacted JSON/request IDs, safe static/media
+and shutdown, synthetic configuration, proxy/recreation and real SQL/media recovery.
+All 166 SQL cases, SQLite/frontend/Chrome, image builds, proxy/runtime and Compose
+gates pass. Image scans could not complete because vulnerability DB downloads failed;
+Handoff records the exact network failures. [OPERATIONS](OPERATIONS.md)
+owns migration/backup/restore/ownership/health/log/rollback and TLS-ingress instructions.
+
+Production TLS/IP trust, SQL certificate/login/license, measured capacity, legacy-volume
+permissions, real backup scheduling/objectives and hosted CI remain owner launch gates.
+Providers/outbox, historical credentials/financial reconciliation and the expiring
+dev-only advisory retain their previous obligations. No external deployment, actual
+cloud/DNS/payment/production DB configuration, merge/push or next batch was performed.
+
 ## Batch 9 update - 2026-10-03
 
 Security scope is verified on `codex/batch-09-security` from integration `db565f6`.
@@ -69,7 +86,7 @@ Batch 2 must include the defect-specific tests needed to prove its fixes, includ
 | 7 / codex/batch-07-admin-media | ARCH-002 feature extraction, FE-002 full media pipeline/migration, FE-005 staff pagination completion, SEC-001 all upload paths | Staff forms preserve data on errors, page through records and use validated assets; quarantine/migrate old galleries with rollback; shared accessible dialogs feed Batch 11 |
 | 8 / codex/batch-08-performance-database | PERF-001 product aggregates, PERF-002 bounded lists/stats, PERF-003 cart queries; DB-001 enforce/reconcile invariants, DB-004 index review | Query-count/response-byte budgets on representative data; SQL plans before index changes; clients must understand pagination before endpoints are bounded |
 | 9 / codex/batch-09-security | SEC-002 session revocation policy, SEC-003 trusted-IP/shared throttles, SEC-004 dormant identity policy, SEC-005 dependency triage; SEC-001 defense/serving review | Threat/applicability review, dependency updates with fresh checks, replay/CSRF/CORS/provider-negative tests and real proxy abuse tests; no claim of rotation/history cleanup without external evidence |
-| 10 / codex/batch-10-production-infrastructure | OPS-002 runtime hardening, OPS-003 TLS/headers, OPS-004 recovery/operations; scoped provider work only after owner choices | Production config/image build and smoke; least-privilege users, durable media, controlled migration job, isolated DB/media restore and monitoring; provider integrations need separate explicit scope if too large |
+| 10 / codex/batch-10-production-ops | OPS-002 runtime hardening, OPS-003 TLS/headers, OPS-004 recovery/operations; scoped provider work only after owner choices | Source/template and isolated image/runtime/recovery gates verified; actual ingress, certificates/login/license/capacity, legacy ownership and real recovery objectives remain owner launch gates. Provider integrations require separate explicit scope |
 | 11 / codex/batch-11-ux-a11y-seo | UX-001 keyboard/semantics, UX-002 crawlable public routes, UX-003 metadata/not-found; state/action UX follow-through | Manual keyboard/screen-reader/mobile RTL plus automated checks, direct-link/status/metadata/social preview tests, owner-approved policies and routing migration |
 | 12 / codex/batch-12-final-review | Reassess every open ID and cross-domain invariants; no new ID reuse | Repeat supported baseline and targeted production-engine/browser/security/recovery gates; record accepted residual risks, owners and evidence; main merge remains separately authorized |
 

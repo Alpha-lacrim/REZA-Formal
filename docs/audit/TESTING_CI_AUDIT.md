@@ -300,13 +300,14 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | OPS-002 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - deployment hardening gap |
-| Evidence | Static Compose/Dockerfile/entrypoint review. Config validation passed; runtime credentials/config were not dumped. |
+| Status | Partial - runtimes/locks/production template verified; owner provisioning/capacity gates |
+| Batch 10 evidence | 2026-10-03: digest-pinned multi-stage non-root images, complete Python hash lock, npm/Node inputs, bounded logs/shutdown/probes and read-only/capability restrictions. Synthetic production override disables bootstrap/migration/seed/static tasks, removes public DB/API ports, requires separate runtime login/licensed edition and validated SQL TLS. Real-SQL runtime fixture verifies restricted login with denied DDL, volume ownership/static/media, graceful stop and recreation at a different IP. Production certificate/login/capacity/legacy-volume preparation and hosted image scan execution remain owner gates. See [operations](../OPERATIONS.md) and Handoff. |
+| Evidence | Baseline static Compose/Dockerfile/entrypoint review; Batch 10 locked builds, synthetic production config and isolated runtime/recovery fixture pass. Runtime credentials/config were not dumped. |
 | File/function references | docker-compose.yml; backend/Dockerfile; frontend/Dockerfile; backend/docker-entrypoint.sh |
-| Current behaviour | Debug/insecure-cookie/default-SA/no-encryption development options, root backend, mutable images, startup migrations and no resource/capability limits. |
+| Current behaviour | Local Compose preserves explicit development bootstrap assumptions; production override and operations runbook provide separate restricted preparation. Images are non-root, bases use digests and Python/npm dependencies are locked; Debian package repositories still vary. Actual production hosting/provisioning and measured resource limits are not selected. |
 | Impact | Unsafe if promoted unchanged; migration startup can race across replicas. This audit did not establish that production currently uses these defaults. |
 | Reproduction/proof | Static Compose/Dockerfile/entrypoint review. Config validation passed; runtime credentials/config were not dumped. |
-| Root cause | Local first-launch topology is also the only checked-in deployment topology. |
+| Root cause | Baseline local first-launch topology lacked a separate production contract; owner provisioning and capacity still require review. |
 | Remediation recommendation | Provide production configuration, least-privilege runtime/DB, durable media, pinned/scanned images, one controlled migration job and resource limits; keep local development usable. |
 | Regression testing needed | Build/run as intended user, writable media/static paths, TLS/security settings, multi-replica startup/migrations, readiness and rollback. |
 | Dependencies | SEC-001, SEC-003, SEC-005, TEST-003; hosting decisions |
@@ -322,10 +323,11 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | OPS-003 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - conditional deployment risk |
+| Status | Partial - proxy headers/ingress contract verified; real TLS/IP trust remains |
+| Batch 10 evidence | 2026-10-03: Nginx unprivileged/read-only fixtures verify effective per-location/error headers, overwritten XFF/request IDs, caching, map blocking and backend rediscovery. Private loopback production ingress contract assigns HTTPS redirect/HSTS to the external TLS edge, with Django forwarded scheme/redirect disabled to prevent loops. No real TLS, certificates, original-client-IP ingress policy or DNS change was performed. |
 | Evidence | Static config plus Nginx documented inheritance: child add_header overrides inherited set. No production ingress was tested. |
 | File/function references | frontend/nginx.conf:10,26,30,37; backend/reza_backend/settings.py:SECURE_PROXY_SSL_HEADER |
-| Current behaviour | Nginx sets X-Forwarded-Proto=$scheme. If an upstream terminates TLS then forwards HTTP, backend sees http. Media/static locations define their own add_header and omit several server headers. |
+| Current behaviour | Nginx overwrites protocol/XFF/IDs and supplies headers on each location/error. The production template is a private HTTP inner edge behind owner-operated TLS redirect/HSTS; Django does not trust external protocol. A reviewed real-IP policy and deployed TLS verification remain necessary. |
 | Impact | Secure-redirect loops or incorrect absolute URLs are possible in that TLS topology; media/static do not inherit all stated headers. |
 | Reproduction/proof | Static config plus Nginx documented inheritance: child add_header overrides inherited set. No production ingress was tested. |
 | Root cause | Proxy trust/TLS termination is unspecified; location header inheritance is assumed. |
@@ -344,12 +346,13 @@ The current tracked-tree secret signature scan returned zero matches for private
 | ID | OPS-004 |
 | Severity | P2 |
 | Confidence | High |
-| Status | Open - operational evidence gap |
-| Evidence | Code/capability/management-command inventory and unresolved prior Handoff. No backup restore or provider call was run. |
+| Status | Partial - isolated SQL/media recovery verified; real objectives/providers remain |
+| Batch 10 evidence | 2026-10-03: disposable real SQL checksum/COPY_ONLY backup, VERIFYONLY and restore into a NEW database preserve migration rows; media archive restores identical bytes into a NEW owned volume. Runtime/health/shutdown tests and all 166 SQL cases pass without application volumes. Runbooks document environment isolation, one migration operator, off-host encrypted recovery sets, ownership/static rollback, redacted logs and health. Actual owner backup scheduling/destinations/retention/RPO/RTO, restored financial reconciliation and provider/outbox delivery remain unapproved and unverified. |
+| Evidence | Baseline code/capability/management-command inventory and prior Handoff; Batch 10 disposable SQL/media backup and restore pass. No production restore or provider call was run. |
 | File/function references | docs/COMMERCE_OPERATIONS.md; Handoff.md; backend/shop/models.py:NotificationOutbox; backend/shop/commerce_services.py:commerce_capabilities |
-| Current behaviour | Backup/restore and monitoring are documented obligations, not automated/verified procedures here. Outbox rows remain pending with no worker; online payment/carrier/tax integrations are absent. |
+| Current behaviour | Local/CI recovery fixtures and monitoring integration points are implemented and runbooks are executable operator checklists. Production backup/restore/monitoring owners and external providers remain decisions; outbox rows still have no delivery worker. |
 | Impact | Production cannot promise delivery/refunds/notifications/recovery beyond the supported offline bookkeeping; pending outbox requires retention/operations ownership. |
-| Reproduction/proof | Code/capability/management-command inventory and unresolved prior Handoff. No backup restore or provider call was run. |
+| Reproduction/proof | Isolated runtime fixture restores SQL into a new database and media into a new volume; real recovery objectives and provider calls remain unverified. |
 | Root cause | Provider/hosting/process choices remain external dependencies. |
 | Remediation recommendation | Assign owners and measurable recovery objectives, perform isolated restore, implement selected provider flows with retries/idempotency and reconcile offline payment references. |
 | Regression testing needed | Restore DB plus media, rollback drill, outbox retry/duplicate delivery, signed provider callbacks and failure reconciliation once configured. |

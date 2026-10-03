@@ -39,4 +39,13 @@ Checkout is disabled whenever only the emergency offline catalog is available. T
 
 Rebuild after changing the value. Cross-origin deployments must also configure Django's allowed hosts, CORS origins, and CSRF trusted origins.
 
-The root `vercel.json` installs/builds this directory and publishes `frontend/dist`; it does not deploy Django or SQL Server.
+The root `vercel.json` describes frontend-only hosting; it does not deploy Django or SQL Server.
+
+## Production build and container operations
+
+Use `npm ci` with the checked-in lock and the Node version in `.nvmrc`. The
+multi-stage Docker builder fixes the Node/npm image digest; its runtime is
+unprivileged Nginx on port 8080. Compose retains the existing local public port.
+`VITE_API_BASE` is public build-time configuration; the container's same-origin
+API/CSP/cookie contract is validated during its build. Source maps are disabled.
+See [operations](../docs/OPERATIONS.md) for cache, media, ingress and rollback rules.
