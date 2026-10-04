@@ -1,6 +1,6 @@
 services:
   db:
-    image: mcr.microsoft.com/mssql/server:2022-latest
+    image: mcr.microsoft.com/mssql/server:2022-latest@sha256:e07b9699a2b749969f19d86563ceeea22bd3a69f7f1db85a8d1ac4bdaf0c6f56
     container_name: reza-formal-db
     environment:
       ACCEPT_EULA: "Y"
@@ -11,12 +11,18 @@ services:
     volumes:
       - mssql_data:/var/opt/mssql
     healthcheck:
-      test: ["CMD-SHELL", "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q \"SELECT 1\" -b -o /dev/null"]
+      test: ["CMD-SHELL", "SQLCMDPASSWORD=\"$$MSSQL_SA_PASSWORD\" /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -C -Q \"SELECT 1\" -b -o /dev/null"]
       interval: 10s
       timeout: 5s
       retries: 18
       start_period: 30s
     restart: unless-stopped
+    stop_grace_period: 60s
+    logging: &bounded-logs
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
 
   backend:
     build:
@@ -34,7 +40,7 @@ services:
       ALLOWED_HOSTS: "${ALLOWED_HOSTS:-localhost,127.0.0.1,0.0.0.0,backend}"
       ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000}"
       CSRF_TRUSTED_ORIGINS: "${CSRF_TRUSTED_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:8000,http://127.0.0.1:8000}"
-      GOOGLE_OAUTH_CLIENT_ID: "${GOOGLE_OAUTH_CLIENT_ID:-}"
+      TRUSTED_PROXY_CIDRS: "${TRUSTED_PROXY_CIDRS:-}"
       AUTH_COOKIE_SECURE: "${AUTH_COOKIE_SECURE:-False}"
       AUTH_COOKIE_SAMESITE: "${AUTH_COOKIE_SAMESITE:-Lax}"
       AUTH_REFRESH_COOKIE_SAMESITE: "${AUTH_REFRESH_COOKIE_SAMESITE:-Strict}"
@@ -61,18 +67,27 @@ services:
       RUN_MIGRATIONS: "${RUN_MIGRATIONS:-true}"
       RUN_COLLECTSTATIC: "${RUN_COLLECTSTATIC:-true}"
       RUN_SEED_DATA: "${RUN_SEED_DATA:-true}"
+      LOG_LEVEL: "${LOG_LEVEL:-INFO}"
+      GUNICORN_WORKERS: "${GUNICORN_WORKERS:-3}"
+      GUNICORN_TIMEOUT: "${GUNICORN_TIMEOUT:-30}"
+      GUNICORN_GRACEFUL_TIMEOUT: "${GUNICORN_GRACEFUL_TIMEOUT:-30}"
     ports:
       - "127.0.0.1:${BACKEND_PORT:-8000}:8000"
     volumes:
       - django_media:/app/media
       - django_static:/app/staticfiles
     healthcheck:
-      test: ["CMD", "curl", "--fail", "--silent", "http://localhost:8000/api/health/ready/"]
+      test: ["CMD", "python", "/app/healthcheck.py", "ready"]
       interval: 15s
       timeout: 5s
       retries: 8
       start_period: 45s
     restart: unless-stopped
+    init: true
+    stop_grace_period: 45s
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    logging: *bounded-logs
 
   frontend:
     build:
@@ -84,16 +99,24 @@ services:
       backend:
         condition: service_healthy
     ports:
-      - "${FRONTEND_PORT:-3000}:80"
+      - "${FRONTEND_PORT:-3000}:8080"
     volumes:
       - django_media:/var/www/media:ro
     healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://127.0.0.1/api/health/ready/"]
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--timeout=4", "-O", "/dev/null", "http://127.0.0.1:8080/api/health/ready/"]
       interval: 15s
       timeout: 5s
       retries: 5
       start_period: 10s
     restart: unless-stopped
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    stop_signal: SIGQUIT
+    stop_grace_period: 45s
+    logging: *bounded-logs
 
 volumes:
   mssql_data:

@@ -1,6 +1,8 @@
+from collections.abc import Mapping
 from decimal import Decimal
 
 from rest_framework import serializers
+from .serializers import StrictCharField
 
 from .models import (
     Address,
@@ -23,6 +25,8 @@ class AliasedModelSerializer(serializers.ModelSerializer):
     aliases = {}
 
     def to_internal_value(self, data):
+        if not isinstance(data, Mapping):
+            return super().to_internal_value(data)
         if hasattr(data, 'copy'):
             data = data.copy()
         for alias, canonical in self.aliases.items():
@@ -84,11 +88,17 @@ class ProductSummarySerializer(serializers.ModelSerializer):
         ]
 
 
+class CartProductSerializer(ProductSummarySerializer):
+    class Meta(ProductSummarySerializer.Meta):
+        fields = [field for field in ProductSummarySerializer.Meta.fields if field != 'description']
+
+
 class ShippingMethodSerializer(AliasedModelSerializer):
+    price = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'), required=False)
     currency = serializers.SerializerMethodField()
     active = serializers.BooleanField(source='is_active', required=False)
     free_above = serializers.DecimalField(
-        source='free_over', max_digits=12, decimal_places=2, required=False, allow_null=True,
+        source='free_over', max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=Decimal('0'),
     )
 
     aliases = {
@@ -109,14 +119,29 @@ class ShippingMethodSerializer(AliasedModelSerializer):
     def get_currency(self, obj):
         return 'Toman'
 
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and isinstance(data.get('code'), str):
+            data = data.copy()
+            data['code'] = data['code'].strip().upper()
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        minimum = attrs.get('estimated_days_min', getattr(self.instance, 'estimated_days_min', 1))
+        maximum = attrs.get('estimated_days_max', getattr(self.instance, 'estimated_days_max', 3))
+        if minimum > maximum:
+            raise serializers.ValidationError({'estimated_days_max': 'Must be at least the minimum delivery days.'})
+        return attrs
+
 
 class CouponSerializer(AliasedModelSerializer):
+    value = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0'))
+    max_uses_per_user = serializers.IntegerField(min_value=1, required=False)
     type = serializers.ChoiceField(source='discount_type', choices=Coupon.DISCOUNT_TYPES)
     minimum_order_amount = serializers.DecimalField(
-        source='min_subtotal', max_digits=12, decimal_places=2, required=False,
+        source='min_subtotal', max_digits=12, decimal_places=2, required=False, min_value=Decimal('0'),
     )
     maximum_discount_amount = serializers.DecimalField(
-        source='max_discount', max_digits=12, decimal_places=2, required=False, allow_null=True,
+        source='max_discount', max_digits=12, decimal_places=2, required=False, allow_null=True, min_value=Decimal('0'),
     )
     expires_at = serializers.DateTimeField(source='ends_at', required=False, allow_null=True)
     usage_limit = serializers.IntegerField(source='max_uses', required=False, allow_null=True, min_value=1)
@@ -153,6 +178,22 @@ class CouponSerializer(AliasedModelSerializer):
 
     def get_discount_amount(self, obj):
         return self.context.get('discount_amount', Decimal('0.00'))
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict) and isinstance(data.get('code'), str):
+            data = data.copy()
+            data['code'] = data['code'].strip().upper()
+        return super().to_internal_value(data)
+
+    def validate(self, attrs):
+        def merged(field, default=None):
+            return attrs.get(field, getattr(self.instance, field, default))
+        if merged('discount_type') == 'percent' and merged('value') > 100:
+            raise serializers.ValidationError({'value': 'A percentage cannot exceed 100.'})
+        start, end = merged('starts_at'), merged('ends_at')
+        if start and end and start >= end:
+            raise serializers.ValidationError({'expires_at': 'Must be after the start date.'})
+        return attrs
 
 
 class PaymentSerializer(serializers.ModelSerializer):
@@ -310,8 +351,29 @@ class CheckoutItemSerializer(serializers.Serializer):
         }
 
 
+class CheckoutAddressSerializer(serializers.Serializer):
+    recipient_name = StrictCharField(max_length=255)
+    phone = StrictCharField(max_length=32)
+    province = StrictCharField(max_length=128)
+    city = StrictCharField(max_length=128)
+    postal_code = StrictCharField(max_length=32, required=False, allow_blank=True)
+    address_line = StrictCharField(max_length=512)
+    line2 = StrictCharField(max_length=512, required=False, allow_blank=True)
+
+    def to_internal_value(self, data):
+        if isinstance(data, dict):
+            data = data.copy()
+            for alias, canonical in (
+                ('recipientName', 'recipient_name'), ('postalCode', 'postal_code'),
+                ('addressLine', 'address_line'), ('line1', 'address_line'), ('address', 'address_line'),
+            ):
+                if alias in data and canonical not in data:
+                    data[canonical] = data[alias]
+        return super().to_internal_value(data)
+
+
 class CheckoutRequestSerializer(serializers.Serializer):
-    items = CheckoutItemSerializer(many=True, allow_empty=False)
+    items = CheckoutItemSerializer(many=True, allow_empty=False, max_length=100)
     idempotency_key = serializers.UUIDField(required=False)
     shipping_address = serializers.JSONField(required=False)
     address_id = serializers.IntegerField(required=False, min_value=1)
@@ -321,6 +383,20 @@ class CheckoutRequestSerializer(serializers.Serializer):
     customer_note = serializers.CharField(required=False, allow_blank=True, max_length=2000)
     quote_id = serializers.CharField(required=False, allow_blank=True, max_length=128)
     total = serializers.DecimalField(required=False, max_digits=12, decimal_places=2)
+
+    def validate_shipping_address(self, value):
+        if isinstance(value, str):
+            return StrictCharField(max_length=2000).run_validation(value)
+        serializer = CheckoutAddressSerializer(data=value)
+        serializer.is_valid(raise_exception=True)
+        return serializer.validated_data
+
+
+class QuoteRequestSerializer(CheckoutRequestSerializer):
+    # Pricing depends on items/shipping method, not a completed delivery address.
+    # The storefront requests its initial quote before the buyer fills the form.
+    shipping_address = None
+    address_id = None
 
 
 class SavedCartLineInputSerializer(CheckoutItemSerializer):
@@ -381,7 +457,12 @@ class ReturnRequestSerializer(serializers.ModelSerializer):
         return [str(obj.order_item_id)] if obj.order_item_id else []
 
     def get_refund_amount(self, obj):
-        return obj.order_item.price * obj.quantity if obj.order_item else Decimal('0.00')
+        from .commerce_services import CommerceError
+        from .refunds import return_refund_amount
+        try:
+            return return_refund_amount(obj, obj.order.payment)
+        except (CommerceError, Payment.DoesNotExist):
+            return None
 
 
 class BespokeRequestSerializer(AliasedModelSerializer):
@@ -416,6 +497,7 @@ class BespokeRequestSerializer(AliasedModelSerializer):
 
 
 class NewsletterSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(max_length=254)
     active = serializers.BooleanField(source='is_active', read_only=True)
 
     class Meta:
@@ -426,6 +508,18 @@ class NewsletterSerializer(serializers.ModelSerializer):
 
 class PaymentUpdateSerializer(serializers.Serializer):
     status = serializers.ChoiceField(choices=[choice[0] for choice in Payment.STATUSES])
+    refund_amount = serializers.DecimalField(max_digits=12, decimal_places=2, min_value=Decimal('0.01'), required=False)
+    currency = serializers.CharField(max_length=16, required=False)
+    reason = serializers.CharField(max_length=500, required=False)
+    reference = serializers.CharField(max_length=128, required=False)
+    confirmed = serializers.BooleanField(required=False)
+
+    def validate(self, attrs):
+        if attrs['status'] in {'partially_refunded', 'refunded'}:
+            missing = [field for field in ('refund_amount', 'currency', 'reason', 'reference', 'confirmed') if field not in attrs]
+            if missing or attrs.get('confirmed') is not True:
+                raise serializers.ValidationError('Refund amount, currency, reason, reference and confirmation are required.')
+        return attrs
 
 
 class ReviewAdminUpdateSerializer(serializers.Serializer):

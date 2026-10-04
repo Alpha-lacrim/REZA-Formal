@@ -29,6 +29,25 @@ class User(AbstractUser):
         super().save(*args, **kwargs)
 
 
+class AuthSession(models.Model):
+    """One browser session; never stores a bearer token or password."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='auth_sessions')
+    refresh_digest = models.CharField(max_length=64)
+    password_digest = models.CharField(max_length=64)
+    expires_at = models.DateTimeField(db_index=True)
+    revoked_at = models.DateTimeField(null=True, blank=True)
+
+
+class ThrottleBucket(models.Model):
+    """Shared fixed-window counters; identities are HMAC digests."""
+
+    key = models.CharField(max_length=64, primary_key=True)
+    count = models.PositiveIntegerField(default=0)
+    expires_at = models.DateTimeField(db_index=True)
+
+
 # Ensure any Django superuser is treated as admin (keeps role/is_staff in sync).
 from django.db.models.signals import post_save
 from django.dispatch import receiver
@@ -63,7 +82,7 @@ class Product(models.Model):
     image = models.ImageField(upload_to='products/', blank=True, null=True)
     images = models.JSONField(default=list, blank=True)
     fabric = models.CharField(max_length=255, blank=True)
-    # Kept as the legacy/default-variant stock projection for existing clients.
+    # Compatibility projection of active SKU stock; see docs/DATABASE_PERFORMANCE.md.
     stock = models.IntegerField(default=0)
     is_active = models.BooleanField(default=True)
     featured = models.BooleanField(default=False)
@@ -110,7 +129,6 @@ class ProductVariant(models.Model):
         ordering = ['product_id', 'size', 'color', 'sku']
         indexes = [
             models.Index(fields=['product', 'is_active'], name='variant_prod_active_idx'),
-            models.Index(fields=['sku'], name='variant_sku_idx'),
         ]
         constraints = [
             models.UniqueConstraint(fields=['product', 'size', 'color'], name='uniq_product_size_color'),

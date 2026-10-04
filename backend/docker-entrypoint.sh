@@ -35,7 +35,7 @@ sql = f"IF DB_ID(N'{db_literal}') IS NULL CREATE DATABASE [{db_identifier}]"
 
 with pyodbc.connect(connection, autocommit=True) as conn:
     conn.cursor().execute(sql)
-print(f"Database ready: {db_name}", flush=True)
+print('Application database is available', flush=True)
 PY
 fi
 

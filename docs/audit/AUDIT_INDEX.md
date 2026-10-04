@@ -1,0 +1,139 @@
+# Batch 1 forensic audit index
+
+Source/probe audit: **2026-09-10**; documentation completion review: **2026-09-13**. Application baseline: `94d665881e3e929c41121d057385c28f822002fe` (Batch 0 integration tip), descended from `pre-codex-remediation-2026-09-10` at `99a1ea5d1a5d3444d4063ad6c9ac29303830f14e`. Branch: `codex/batch-01-forensic-audit`; integration target: `codex/remediation-program`.
+
+Batch 1 established documentation and evidence only. Its original source/probe observations are retained below. **Batch 2 updates (2026-09-14) are recorded in the register and canonical entries:** nine findings addressed, including the six confirmed P1 defects and explicitly requested auth/media work. No production database was accessed and no schema migration was introduced. Passing isolated checks are not a production-readiness approval.
+
+## Reading order and ownership
+
+| Document | Purpose |
+| --- | --- |
+| [Architecture](ARCHITECTURE_AUDIT.md) | System boundaries, contract/state ownership and end-to-end workflow traces |
+| [Backend](BACKEND_AUDIT.md) | Validation, state transitions, transactions, inventory and financial correctness |
+| [Frontend](FRONTEND_AUDIT.md) | Authentication hydration, API/state/races, media and pagination |
+| [Database](DATABASE_AUDIT.md) | Schema, migrations, authority, SQL Server/SQLite differences and locking limits |
+| [Security](SECURITY_AUDIT.md) | JWT/CSRF/CORS/permissions/uploads, dependency evidence and historical secrets |
+| [Performance](PERFORMANCE_AUDIT.md) | Measured query growth, unbounded data and request/render costs |
+| [Testing/CI/operations](TESTING_CI_AUDIT.md) | Exact baseline commands/results, test inventory, reproducible probes and infrastructure gaps |
+| [UX/accessibility/SEO](UX_A11Y_SEO_AUDIT.md) | Static markup/RTL/routing/metadata review and limits |
+| [Dead code/debt](DEAD_CODE_DEBT.md) | Routed versus retained compatibility implementations and removal preconditions |
+| [Final review](FINAL_REVIEW.md) | Current system, all residual priorities/owners, verification and production blockers as of 2026-10-04 |
+| [Historical roadmap](PROGRAM_ROADMAP_HISTORY.md) | Original batch sequencing and dated updates preserved at closeout |
+| [Roadmap](../ROADMAP.md) | Priority, dependencies, acceptance gates and owner decisions |
+| [Program](../CODEX_PROGRAM.md) | Batch/Git tracking |
+| [Handoff](../../Handoff.md) | Chronological session record |
+
+File/function line references describe the unchanged application baseline. A finding has exactly one canonical record; other documents reference its stable ID. Later batches must update that record's status/evidence and this register, not renumber or reuse an ID.
+
+## Classification
+
+- **P0:** verified immediate critical compromise/data-loss emergency. None established.
+- **P1:** serious integrity/security defect or high-impact risk/verification gap to resolve before relying on affected workflows.
+- **P2:** material functional/scalability/tooling issue or scoped design/deployment risk.
+- **P3:** lower-priority maintenance debt with no demonstrated current critical effect.
+
+Severity is remediation priority, **not confidence or a vulnerability scanner's severity**. Confidence is High (direct code/probe evidence for stated behavior) or Medium (credible conditional mechanism requiring target-environment verification). All records were Open at Batch 1; current status is in the register. Architectural size/coupling is not classified as a confirmed application defect.
+
+**43 findings: P0 0; P1 8; P2 33; P3 2.** P1 entries include DB-002 (unverified SQL concurrency risk) and TEST-003 (coverage gap); do not report all P1 entries as reproduced bugs. No production incident or successful deployed exploit was demonstrated.
+
+**Batch 12 final review (2026-10-04): 15 remaining open/partial records: P0 0,
+P1 2, P2 13, P3 0; 28 addressed/contained at their recorded source scope.**
+Remaining IDs: ARCH-003, BE-009, FE-006, DB-001/002/003, SEC-005, PERF-002,
+TEST-002/003, OPS-002/003/004 and UX-001/002. FE-006 includes the open price-change
+policy despite implemented race guards; disabled SEC-004 is contained, not a
+completed identity integration. Rollout/owner obligations on fixed records remain
+in [FINAL_REVIEW](FINAL_REVIEW.md). The later supported Alpine/ODBC container repair
+clears the original 44-HIGH image blocker under the unchanged policy; OPS-002 still
+requires production owner evidence. Scanner severity
+does not renumber/reclassify original audit priorities. Program is partially complete.
+
+## Supplied hypotheses: verdicts
+
+| # | Hypothesis | Verdict and scope | Canonical finding |
+| --- | --- | --- | --- |
+| 1 | Auth hydration uses stale user for public/admin product load | Confirmed by closure/control-flow trace; initial effect captures null | FE-001 |
+| 2 | Product image admin persists/transmits base64 Data URLs | Confirmed by multipart DB/response probe; primary File also uploads | FE-002 |
+| 3 | ProductSerializer aggregates reviews per product | Confirmed: 1 product uses 5 queries, 2 products use 7; two aggregates each | PERF-001 |
+| 4 | fields='__all__' makes fragile contracts | Present; maintenance risk, not proof of current sensitive disclosure; active commerce Order is explicit | ARCH-003 |
+| 5 | Legacy order code coexists with commerce | Confirmed as unrouted definitions; active order URLs use commerce, not both implementations | ARCH-004 |
+| 6 | GlobalContext owns too many domains | Broad ownership confirmed; maintenance debt, no arbitrary size defect | ARCH-001 |
+| 7 | AdminPanel combines unrelated features | Confirmed six tabs/seven commerce sections; maintenance debt | ARCH-002 |
+| 8 | API service has excessive any/normalization/casts | 48 lexical any occurrences, unchecked request<T>, many alias normalizers; type/contract debt confirmed | ARCH-003, TEST-002 |
+| 9 | Concurrent 401s duplicate refresh | Confirmed by actual adapter with mocked transport: two 401s/two refreshes | FE-003 |
+| 10 | Frontend automated tests insufficient | Confirmed absent tracked runner/test suite/test script | TEST-001 |
+| 11 | Frontend lint missing | Confirmed no lint script/config/CI job | TEST-002 |
+| 12 | SQLite does not prove SQL Server transactions | Confirmed test-evidence limitation; no equivalent SQL concurrency lane | TEST-003, DB-002 |
+| 13 | Staff endpoints unbounded | Partly confirmed: orders/users/messages/products; new commerce endpoints already paginated | PERF-002, FE-005 |
+| 14 | Multiple product mutation surfaces | Confirmed staff API, public detail mutations with admin guard, native admin; no unauthenticated mutation found | BE-002, ARCH-003 |
+| 15 | Upload security incomplete | Confirmed gallery bypass and orphan persistence; primary/site ImageFields do validate images | SEC-001 |
+| 16 | Product vs variant stock authority unclear | Partly confirmed: intended projection exists, default-variant input and bypass writers violate a single authority | BE-001, BE-002, DB-001 |
+| 17 | Runtime config needs hardening | Confirmed development defaults/gaps; actual production configuration is unknown | OPS-002, OPS-003 |
+| 18 | Hash routing imposes SEO limitations | Confirmed architecture limitation; actual index/ranking loss not measured | UX-002 |
+
+No hypothesis was accepted merely because it was supplied. Several claims require qualification: old commerce staff lists differ from new pages; legacy order handlers are dead routes; primary image validation exists; stock projection logic exists; SQL concurrency and production exposure remain unverified.
+
+## Finding register
+
+| ID | Priority | Confidence | Status | Finding / canonical record | Batch |
+| --- | --- | --- | --- | --- | --- |
+| ARCH-001 | P2 | High | Implemented - Batch 6 ownership split | [GlobalContext couples unrelated state domains](ARCHITECTURE_AUDIT.md#arch-001) | 6 |
+| ARCH-002 | P2 | High | Addressed - Batch 7 feature decomposition | [AdminPanel combines unrelated administration features](ARCHITECTURE_AUDIT.md#arch-002) | 7 |
+| ARCH-003 | P2 | High | Partial - backend and auth/catalog contracts explicit; remaining frontend DTO debt | [API contracts depend on model-wide fields and duplicate adapters](ARCHITECTURE_AUDIT.md#arch-003) | 4/5 |
+| ARCH-004 | P3 | High | Fixed - Batch 4; routed commerce contracts retained | [Unrouted legacy order implementation remains beside commerce](DEAD_CODE_DEBT.md#arch-004) | 4 |
+| BE-001 | P1 | High | Fixed - Batch 2; SQL evidence open | [Stale product saves can overwrite sold stock](BACKEND_AUDIT.md#be-001) | 2 |
+| BE-002 | P1 | High | Fixed - Batch 2 | [Native Django admin bypasses inventory and lifecycle services](BACKEND_AUDIT.md#be-002) | 2 |
+| BE-003 | P1 | High | Fixed - Batch 2 | [Return refunds ignore discounts and overstate item entitlement](BACKEND_AUDIT.md#be-003) | 2 |
+| BE-004 | P1 | High | Fixed - Batch 2 | [Manual partial refunds change status without recording money](BACKEND_AUDIT.md#be-004) | 2 |
+| BE-005 | P1 | High | Fixed - Batch 2 | [Staff order update commits before validating the full request](BACKEND_AUDIT.md#be-005) | 2 |
+| BE-006 | P2 | High | Fixed - Batch 2 | [Cancellation leaves the order payment projection stale](BACKEND_AUDIT.md#be-006) | 2 |
+| BE-007 | P2 | High | Fixed - Batch 4; bounded request contracts | [Input validation falls through to database errors](BACKEND_AUDIT.md#be-007) | 4 (prioritize unsafe write cases in 2) |
+| BE-008 | P2 | High | Fixed - Batch 4; idempotent subscription verified | [Newsletter repeat/reactivation path is rejected by serializer uniqueness](BACKEND_AUDIT.md#be-008) | 4 |
+| BE-009 | P2 | High | Open - confirmed defect | [Customer cancellation capability describes staff transitions](BACKEND_AUDIT.md#be-009) | 5 |
+| FE-001 | P2 | High | Fixed - Batch 2; explicit priority | [Authentication hydration loads products with stale user state](FRONTEND_AUDIT.md#fe-001) | 2 |
+| FE-002 | P2 | High | Fixed - Batch 2; explicit priority | [Product previews persist and transmit inline gallery images](FRONTEND_AUDIT.md#fe-002) | 2 |
+| FE-003 | P2 | High | Addressed - Batch 5 | [Concurrent 401 responses each refresh the token](FRONTEND_AUDIT.md#fe-003) | 5 |
+| FE-004 | P2 | High | Implemented - Batch 6 identity/order guards | [Cart and wishlist synchronization lacks identity and ordering guards](FRONTEND_AUDIT.md#fe-004) | 6 |
+| FE-005 | P2 | High | Addressed - Batch 8 public/customer/review and Batch 7 staff pages | [Pagination is discarded by customer and commerce admin screens](FRONTEND_AUDIT.md#fe-005) | 5/7/8 |
+| FE-006 | P2 | High | Implemented guards; price-confirmation policy open | [Late detail and quote responses can replace newer state](FRONTEND_AUDIT.md#fe-006) | 6 |
+| FE-007 | P2 | High | Fixed - Batch 6 | [Legacy cart migration returns before reading legacy entries](FRONTEND_AUDIT.md#fe-007) | 6 |
+| FE-008 | P2 | High | Fixed - Batch 9 effective capability DTO | [Frontend staff access disagrees with backend role rules](FRONTEND_AUDIT.md#fe-008) | 5/9 |
+| DB-001 | P2 | High | Partial - ownership/reconciliation verified; wider invariants remain | [Several cross-record invariants rely on cooperative application writers](DATABASE_AUDIT.md#db-001) | 8 |
+| DB-002 | P1 | Medium | Open - unverified concurrency risk | [Lock acquisition order differs between mutation paths](DATABASE_AUDIT.md#db-002) | 2 (SQL verification in 3) |
+| DB-003 | P2 | High | Open - confirmed compatibility gap | [Legacy migration does not establish payment history](DATABASE_AUDIT.md#db-003) | 4 |
+| DB-004 | P3 | High | Fixed - Batch 8 SQL index/plan/migration evidence | [SKU has an explicit index alongside a uniqueness index](DATABASE_AUDIT.md#db-004) | 8 |
+| SEC-001 | P1 | High | Fixed - product/site/proxy source; historical deployment review open | [Gallery upload bypasses image validation and persists before validation](SECURITY_AUDIT.md#sec-001) | 2 (deployment in 9/10) |
+| SEC-002 | P2 | High | Fixed - Batch 9 rotating revocable sessions | [Logout cannot revoke a copied refresh token](SECURITY_AUDIT.md#sec-002) | 9 (coordinate API work in 5) |
+| SEC-003 | P2 | High | Fixed - shared counters/trusted forwarding; deployment CIDRs pending | [Throttle identity and cache are weak across proxies/workers](SECURITY_AUDIT.md#sec-003) | 9 |
+| SEC-004 | P2 | Medium | Disabled - Batch 9 dormant identity fails closed | [Dormant identity features do not share a complete MFA policy](SECURITY_AUDIT.md#sec-004) | 9 |
+| SEC-005 | P2 | High | Partial - runtime clear; five build-only entries expire 2026-11-02 | [Known dependency advisories and incomplete repeatable scanning](SECURITY_AUDIT.md#sec-005) | 9 (scanning foundation in 3) |
+| PERF-001 | P2 | High | Fixed - Batch 4; constant product read query budget | [Product review aggregates run twice per product](PERFORMANCE_AUDIT.md#perf-001) | 8 |
+| PERF-002 | P2 | High | Partial - paged collections/SQL stats fixed; saved snapshots/legacy media remain | [Several endpoints return unbounded collections](PERFORMANCE_AUDIT.md#perf-002) | 8 |
+| PERF-003 | P2 | High | Fixed - Batch 8 two-query compact cart graph | [Saved-cart summaries refetch variants for each line](PERFORMANCE_AUDIT.md#perf-003) | 8 |
+| TEST-001 | P2 | High | Fixed - Batch 3 initial regression foundation | [Frontend behavior has no automated regression suite](TESTING_CI_AUDIT.md#test-001) | 3 |
+| TEST-002 | P2 | High | Partial - lint and auth/catalog DTO gates added; remaining strict typing deferred | [Linting is absent and TypeScript safety checks are relaxed](TESTING_CI_AUDIT.md#test-002) | 3/5 |
+| TEST-003 | P1 | High | Partial - SQL baseline passes; broader races remain | [SQLite tests do not establish SQL Server transactional safety](TESTING_CI_AUDIT.md#test-003) | 3 (required evidence for Batch2 concurrency fixes) |
+| OPS-001 | P2 | High | Fixed - Batch 3 branch filters; hosted run unverified | [Remediation branch pushes are outside CI triggers](TESTING_CI_AUDIT.md#ops-001) | 3 |
+| OPS-002 | P2 | High | Partial - runtimes/locks/production template verified; owner provisioning/capacity gates | [Runtime containers retain development defaults](TESTING_CI_AUDIT.md#ops-002) | 10 |
+| OPS-003 | P2 | High | Partial - proxy headers/ingress contract verified; real TLS/IP trust remains | [TLS forwarding and security header inheritance need an explicit ingress design](TESTING_CI_AUDIT.md#ops-003) | 10 |
+| OPS-004 | P2 | High | Partial - isolated SQL/media recovery verified; real objectives/providers remain | [Recovery and provider-dependent workflows lack launch evidence](TESTING_CI_AUDIT.md#ops-004) | 10 (provider work requires explicit scoped batch) |
+| UX-001 | P2 | High | Partial - keyboard/semantics verified; assistive review pending | [Dialogs and controls lack consistent keyboard and naming semantics](UX_A11Y_SEO_AUDIT.md#ux-001) | 11 |
+| UX-002 | P2 | High | Partial - metadata/robots improved; routing deferred | [Hash routes and client-only metadata limit storefront discoverability](UX_A11Y_SEO_AUDIT.md#ux-002) | 11 |
+| UX-003 | P2 | High | Addressed - client fallback/metadata verified | [Unknown routes and metadata cleanup have incomplete fallbacks](UX_A11Y_SEO_AUDIT.md#ux-003) | 11 |
+
+## Batch 4 update - 2026-09-30
+
+Dead order handlers removed after reachability checks; explicit product/account/content contracts, product/subscription services, bounded admin APIs with complete-page consumers, request validation and review aggregates verified. See [API contract/schema decision](../API_CONTRACTS.md). ARCH-004, BE-007, BE-008 and PERF-001 are addressed; ARCH-003 and PERF-002 remain partial. DB-003 legacy missing-payment reads/refund denial are characterized, with financial reconciliation still open. Later-batch UI pagination, DTO typing and broader concurrency are not closed by this cleanup.
+
+## Baseline summary and open evidence
+
+September 28 SQL follow-up: all 99 tests pass on disposable SQL Server 2022 Developer with zero skips. The run exposed and fixed a same-key replay race and corrected a JSON fixture; six SQL-only cases now pass. TEST-003 moves to partial; DB-002 mixed lock-order coverage remains open. The initial Batch 3 environment exception below is superseded by this [executed SQL evidence](TESTING_CI_AUDIT.md#sql-server-follow-up---2026-09-28), not by a hosted CI claim.
+
+Batch 3 (2026-09-16): clean lockfile install, lint, typecheck, 18 frontend tests, build and three real-backend Chrome smoke tests pass. Backend has 93 passing cases and five explicit SQL-only skips. Both Compose topologies validate. TEST-001 and OPS-001 are addressed at foundation/configuration scope; TEST-002 remains partial. There are now 11 addressed findings and 32 open/partial records. See [dated verification](TESTING_CI_AUDIT.md#batch-3-verification---2026-09-16). SQL Server is unavailable locally, so DB-002/TEST-003 remain open. New tooling does not imply hosted CI success or close remaining TypeScript safety debt.
+
+Batch 2 final verification (2026-09-14): 81 backend tests, 10 mounted frontend/API tests, typecheck, production build, Django system/drift checks and Compose validation pass. Nine findings are addressed; 34 remain open or partially addressed. The remaining P1 records are DB-002 and TEST-003, both SQL concurrency/evidence gaps. No SQL Server or live Nginx check ran because the Docker daemon was unavailable. See the dated [testing results](TESTING_CI_AUDIT.md#batch-2-final-checks---2026-09-14); the following paragraph preserves Batch 1's baseline.
+
+Required isolated Django check/drift/50-test suite, frontend typecheck/production build and Compose config pass. The first build was blocked by sandbox filesystem access and passed after approved retry. Compose warned about unreadable global Docker config. npm advisory query completed with six affected package entries; Python advisory scan was unavailable. Exact commands/results and fixture probes are in [testing](TESTING_CI_AUDIT.md).
+
+No SQL Server concurrency/production schema test, live Docker launch, browser/a11y run, production load test, restore drill, external provider verification or external credential-history remediation was performed. Historical July verification remains historical. Signature scanning found no current tracked-tree token/private-key/credential-URL matches, and audit changes were reviewed without copying ignored configuration values.
+
+The principal correctness work is stock authority/native admin writes, atomic order updates, refund accounting, upload validation and SQL Server evidence. The [roadmap](../ROADMAP.md) sequences that work before general refactoring.

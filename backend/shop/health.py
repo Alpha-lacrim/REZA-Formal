@@ -1,10 +1,11 @@
 from django.db import connection
 from rest_framework import permissions, status
-from rest_framework.decorators import api_view, permission_classes, throttle_classes
+from rest_framework.decorators import api_view, authentication_classes, permission_classes, throttle_classes
 from rest_framework.response import Response
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([])
 def live(request):
@@ -12,6 +13,7 @@ def live(request):
 
 
 @api_view(['GET'])
+@authentication_classes([])
 @permission_classes([permissions.AllowAny])
 @throttle_classes([])
 def ready(request):

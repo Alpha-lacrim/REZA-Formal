@@ -21,12 +21,15 @@ export interface ProductVariant {
 
 export interface Product {
   id: string;
+  inventoryVersion?: string;
   name: string;
   name_fa?: string;
   price: number;
   compareAtPrice?: number;
   currency: CurrencyCode;
   image: string;
+  // Persisted primary reference, distinct from the display fallback in image.
+  primaryImage?: string | null;
   images: string[];
   short: string;
   short_fa?: string;

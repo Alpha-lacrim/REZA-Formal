@@ -28,6 +28,15 @@ from .models import (
 
 @admin.register(User)
 class UserAdmin(DjangoUserAdmin):
+    def has_add_permission(self, request):
+        return request.user.is_superuser and super().has_add_permission(request)
+
+    def has_change_permission(self, request, obj=None):
+        return request.user.is_superuser and super().has_change_permission(request, obj)
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser and super().has_delete_permission(request, obj)
+
     list_display = ('username', 'email', 'phone', 'role', 'is_active', 'is_staff')
     list_filter = ('role', 'is_active', 'is_staff', 'is_superuser')
     search_fields = ('username', 'email', 'phone', 'first_name', 'last_name')
@@ -40,14 +49,30 @@ class UserAdmin(DjangoUserAdmin):
     )
 
 
-class ProductVariantInline(admin.TabularInline):
+class ServiceOwnedReadOnly:
+    """Inspect here; mutate through the service-backed storefront staff interface."""
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    def get_readonly_fields(self, request, obj=None):
+        return tuple(field.name for field in self.model._meta.fields)
+
+
+class ProductVariantInline(ServiceOwnedReadOnly, admin.TabularInline):
     model = ProductVariant
     extra = 0
     fields = ('sku', 'size', 'color', 'price', 'stock', 'is_active')
 
 
 @admin.register(Product)
-class ProductAdmin(admin.ModelAdmin):
+class ProductAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('id', 'name', 'price', 'compare_at_price', 'stock', 'category', 'is_active', 'featured')
     list_filter = ('is_active', 'featured', 'category')
     search_fields = ('id', 'name', 'category', 'fabric', 'variants__sku')
@@ -56,7 +81,7 @@ class ProductAdmin(admin.ModelAdmin):
 
 
 @admin.register(ProductVariant)
-class ProductVariantAdmin(admin.ModelAdmin):
+class ProductVariantAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('sku', 'product', 'size', 'color', 'price', 'stock', 'is_active', 'updated_at')
     list_filter = ('is_active', 'size', 'color')
     search_fields = ('sku', 'product__id', 'product__name', 'size', 'color')
@@ -75,13 +100,13 @@ class OrderItemInline(admin.TabularInline):
         return False
 
 
-class PaymentInline(admin.StackedInline):
+class PaymentInline(ServiceOwnedReadOnly, admin.StackedInline):
     model = Payment
     extra = 0
     max_num = 1
     can_delete = False
     fields = ('method', 'status', 'amount', 'currency', 'provider', 'reference', 'paid_at', 'refunded_at')
-    readonly_fields = ('amount', 'currency', 'provider', 'reference', 'paid_at', 'refunded_at')
+    readonly_fields = fields
 
     def has_add_permission(self, request, obj=None):
         return False
@@ -100,7 +125,7 @@ class OrderEventInline(admin.TabularInline):
 
 
 @admin.register(Order)
-class OrderAdmin(admin.ModelAdmin):
+class OrderAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('id', 'user', 'total', 'currency', 'status', 'payment_status', 'created_at')
     list_filter = ('status', 'payment_status', 'payment_method', 'currency', 'created_at')
     search_fields = ('id', 'user__email', 'recipient_name', 'phone', 'tracking_code')
@@ -136,7 +161,7 @@ class OrderAdmin(admin.ModelAdmin):
 
 
 @admin.register(Payment)
-class PaymentAdmin(admin.ModelAdmin):
+class PaymentAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('order', 'method', 'status', 'amount', 'currency', 'provider', 'reference', 'updated_at')
     list_filter = ('method', 'status', 'provider', 'currency')
     search_fields = ('order__id', 'order__user__email', 'reference')
@@ -243,7 +268,7 @@ class ProductReviewAdmin(admin.ModelAdmin):
 
 
 @admin.register(ReturnRequest)
-class ReturnRequestAdmin(admin.ModelAdmin):
+class ReturnRequestAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('id', 'order', 'user', 'quantity', 'reason', 'status', 'requested_at')
     list_filter = ('status', 'requested_at')
     search_fields = ('order__id', 'user__email', 'reason', 'details')
@@ -289,5 +314,5 @@ class MessageAdmin(admin.ModelAdmin):
 
 
 @admin.register(SiteSettings)
-class SettingsAdmin(admin.ModelAdmin):
+class SettingsAdmin(ServiceOwnedReadOnly, admin.ModelAdmin):
     list_display = ('id',)

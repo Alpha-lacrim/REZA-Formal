@@ -1,6 +1,6 @@
 # REZA Formal Codebase Analysis - 2026-06-28
 
-> Historical snapshot: the OTP-echo and unsigned-Google-token findings below were resolved in the 2026-07-12 audit. OTP delivery now fails closed until a real provider/enrollment flow exists, and Google ID tokens are verified server-side. See `Handoff.md` for current status.
+> Historical snapshot: OTP echo and unsigned Google tokens were contained in the 2026-07-12 audit. Batch 9 (2026-10-03) disables incomplete Google/OTP flows and fails closed for legacy MFA-marked accounts; it does not offer enrollment/recovery. See [current security policies](SECURITY_HARDENING.md) and Handoff.
 
 ## Scope
 

@@ -2,79 +2,63 @@ from rest_framework import status, permissions
 from rest_framework.decorators import api_view, permission_classes, parser_classes, throttle_classes
 from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework.response import Response
+from rest_framework.exceptions import ValidationError
+from collections.abc import Mapping
 from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from .models import (
     ContactMessage,
-    InventoryMovement,
     Order,
-    OrderItem,
     Product,
     ProductVariant,
     SiteSettings,
 )
 from .serializers import (
     ContactMessageSerializer,
-    CreateOrderSerializer,
-    OrderSerializer,
-    ProductSerializer,
+    PublicProductReadSerializer,
+    ProductCardSerializer,
+    AdminProductReadSerializer,
+    AdminProductWriteSerializer,
     ProductVariantInputSerializer,
     RegisterSerializer,
+    LoginSerializer,
+    ProfileWriteSerializer,
+    AccountReadSerializer,
     SiteSettingsSerializer,
 )
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.exceptions import TokenError
-from rest_framework_simplejwt.tokens import RefreshToken
-import pyotp
 import uuid
 from django.conf import settings
 from django.middleware.csrf import get_token
-from django.core.files.storage import default_storage
-from django.core.files.base import ContentFile
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import IntegrityError, transaction
-from django.db.models import F
-from .throttles import ContactRateThrottle, LoginRateThrottle, RegisterRateThrottle
+from django.db.models import Case, Count, DecimalField, F, Q, Sum, Value, When
+from django.db.models.fields.json import KeyTextTransform
+from django.db.models.functions import Cast, Coalesce
+from django.utils.dateparse import parse_date
+from .throttles import ContactRateThrottle, LoginRateThrottle, LoginAccountRateThrottle, RegisterRateThrottle, RefreshRateThrottle
 from .auth import enforce_csrf
-import os
+from .sessions import new_session, revoke_cookies, revoke_token, rotate_session
+from .commerce_services import CommerceError
+from .product_services import save_product
+from .site_services import save_site_settings
+from .selectors import product_reads, order_reads
+from .pagination import page_response
+from .product_media import MAX_GALLERY_IMAGES, MAX_UPLOAD_BYTES
 import json
 import logging
+import time
 from decimal import Decimal
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
 
 
-class InvalidGoogleToken(Exception):
-    pass
 
-
-class GoogleTokenVerificationUnavailable(Exception):
-    pass
-
-
-def _verify_google_token(raw_id_token, client_id):
-    try:
-        from google.auth.exceptions import GoogleAuthError, TransportError
-        from google.auth.transport import requests as google_requests
-        from google.oauth2 import id_token as google_id_token
-    except ImportError as exc:
-        raise GoogleTokenVerificationUnavailable from exc
-
-    try:
-        return google_id_token.verify_oauth2_token(
-            raw_id_token,
-            google_requests.Request(),
-            client_id,
-        )
-    except TransportError as exc:
-        raise GoogleTokenVerificationUnavailable from exc
-    except (GoogleAuthError, ValueError) as exc:
-        raise InvalidGoogleToken from exc
 
 def get_tokens_for_user(user):
-    refresh = RefreshToken.for_user(user)
-    return {'refresh': str(refresh), 'access': str(refresh.access_token)}
+    return new_session(user)
 
 
 @api_view(['GET'])
@@ -92,26 +76,32 @@ def _set_auth_cookies(response, tokens):
     }
     response.set_cookie(
         'access',
-        tokens['access'],
+        str(tokens['access']),
+        max_age=max(0, tokens['access']['exp'] - int(time.time())),
         samesite=settings.AUTH_COOKIE_SAMESITE,
         **cookie_options,
     )
     response.set_cookie(
         'refresh',
-        tokens['refresh'],
+        str(tokens['refresh']),
+        max_age=max(0, tokens['refresh']['exp'] - int(time.time())),
         samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
         **cookie_options,
     )
 
 
 def _clear_auth_cookies(response):
-    response.delete_cookie(
+    response.set_cookie(
         'access',
+        '', max_age=0, expires='Thu, 01 Jan 1970 00:00:00 GMT',
+        httponly=True, secure=settings.AUTH_COOKIE_SECURE,
         path='/',
         samesite=settings.AUTH_COOKIE_SAMESITE,
     )
-    response.delete_cookie(
+    response.set_cookie(
         'refresh',
+        '', max_age=0, expires='Thu, 01 Jan 1970 00:00:00 GMT',
+        httponly=True, secure=settings.AUTH_COOKIE_SECURE,
         path='/',
         samesite=settings.AUTH_REFRESH_COOKIE_SAMESITE,
     )
@@ -123,147 +113,39 @@ def _new_username(email):
 
 
 def serialize_user(user):
-    return {
-        'id': user.id,
-        'email': user.email,
-        'first_name': user.first_name,
-        'last_name': user.last_name,
-        'role': getattr(user, 'role', 'user'),
-        'phone': getattr(user, 'phone', ''),
-        'address': getattr(user, 'address', ''),
-        'date_joined': user.date_joined,
-        'last_login': user.last_login,
-    }
-
-# Helper for Gallery Images (JSON List) ONLY
-def _save_uploaded_file_get_url(fobj, request=None):
-    ext = os.path.splitext(getattr(fobj, 'name', ''))[1] or ''
-    name = f"uploads/{uuid.uuid4().hex}{ext}"
-    saved_name = default_storage.save(name, ContentFile(fobj.read()))
-    try:
-        urlpath = default_storage.url(saved_name)
-    except Exception:
-        media_url = getattr(settings, 'MEDIA_URL', '/media/')
-        urlpath = media_url.rstrip('/') + '/' + saved_name.lstrip('/')
-    try:
-        if request is not None:
-            return request.build_absolute_uri(urlpath)
-    except Exception:
-        pass
-    return urlpath
+    return AccountReadSerializer(user).data
 
 
-def _dataurl_to_content_file(dataurl: str, prefix: str = 'uploads/') -> ContentFile:
-    """
-    Decode an image data URL into a serializer-compatible ContentFile.
-    """
-    try:
-        header, encoded = dataurl.split(',', 1)
-        import base64
-        import uuid
-        data = base64.b64decode(encoded, validate=True)
-        # guess extension from header
-        if 'image/png' in header:
-            ext = '.png'
-        elif 'image/jpeg' in header or 'image/jpg' in header:
-            ext = '.jpg'
-        elif 'image/gif' in header:
-            ext = '.gif'
-        elif 'image/webp' in header:
-            ext = '.webp'
-        else:
-            # fallback to png
-            ext = '.png'
-        name = f"{prefix.rstrip('/')}_{uuid.uuid4().hex}{ext}"
-        return ContentFile(data, name=name)
-    except Exception as exc:
-        raise ValueError('Invalid image data URL') from exc
+
 
 def prepare_product_data(request):
-    """
-    Prepares data for the serializer.
-    1. Copies request.data to a mutable dict.
-    2. SKIPS manual processing of 'image' (let Serializer handle it).
-    3. Manually processes 'images' list (gallery) to URLs for JSONField.
-    """
-    # Create mutable copy of request data (but preserve file objects separately)
-    if hasattr(request.data, 'dict'):
-        data = request.data.dict()
-    else:
-        data = request.data.copy()
-
-    for client_name, model_name in (
-        ('active', 'is_active'),
-        ('compareAtPrice', 'compare_at_price'),
-    ):
+    """Normalize multipart values without writing any file before validation."""
+    if not isinstance(request.data, Mapping):
+        raise ValidationError({'non_field_errors': ['Expected an object.']})
+    data = request.data.dict() if hasattr(request.data, 'dict') else request.data.copy()
+    for client_name, model_name in (('active', 'is_active'), ('compareAtPrice', 'compare_at_price')):
         if client_name in data and model_name not in data:
             data[model_name] = data.pop(client_name)
-
-    # If an image file was uploaded, preserve the UploadedFile so the
-    # serializer's ImageField can validate and save it (preferred flow).
-    if request.FILES and 'image' in request.FILES:
-        try:
-            data['image'] = request.FILES.get('image')
-        except Exception:
-            pass
-
-    # NOTE: We do NOT process data['image'] here. 
-    # We let the File object pass through to the serializer's ImageField.
-
-    # Process 'images' (Gallery) - Assume JSONField of strings
     if request.FILES:
-        imgs = []
-        for key in ['images', 'images[]']:
-            if key in request.FILES:
-                for f in request.FILES.getlist(key):
-                    try:
-                        # Save file and get URL string
-                        imgs.append(_save_uploaded_file_get_url(f, request))
-                    except Exception:
-                        continue
-        
-        # Merge with existing gallery images
-        if imgs:
-            try:
-                existing = data.get('images') or []
-                if isinstance(existing, str):
-                    try:
-                        existing = json.loads(existing)
-                    except Exception:
-                        existing = []
-                
-                if not isinstance(existing, list):
-                    existing = []
-                    
-                data['images'] = existing + imgs
-            except Exception:
-                data['images'] = imgs
-            
-        # Fallback: if `image` field was provided as a data-URL (or list with a data-URL),
-        # decode it into a ContentFile so the serializer ImageField can accept it.
-        try:
-            img_field = data.get('image')
-            if isinstance(img_field, list) and len(img_field) > 0:
-                img_field = img_field[0]
-
-            if isinstance(img_field, str) and img_field.startswith('data:image/'):
-                # Decode and wrap as ContentFile with a generated name
-                header, encoded = img_field.split(',', 1)
-                import base64
-                binary = base64.b64decode(encoded)
-                # choose extension
-                if 'image/png' in header:
-                    ext = '.png'
-                elif 'image/jpeg' in header or 'image/jpg' in header:
-                    ext = '.jpg'
-                elif 'image/gif' in header:
-                    ext = '.gif'
-                else:
-                    ext = '.png'
-                filename = f"img_{uuid.uuid4().hex}{ext}"
-                data['image'] = ContentFile(binary, name=filename)
-        except Exception:
-            pass
+        uploaded = [file for key in request.FILES for file in request.FILES.getlist(key)]
+        if len(uploaded) > MAX_GALLERY_IMAGES or len(request.FILES.getlist('image')) > 1:
+            raise ValidationError({'images': 'At most 12 images and one primary image are allowed.'})
+        if sum(file.size for file in uploaded) > MAX_UPLOAD_BYTES:
+            raise ValidationError({'images': 'Combined image uploads must be at most 40 MiB.'})
+        files = [file for key in ('images', 'images[]') for file in request.FILES.getlist(key)]
+        if files:
+            data['gallery_files'] = files
+            # request.data.dict() can return the last file for this key.
+            text_values = [value for value in request.data.getlist('images') if isinstance(value, str)]
+            if text_values:
+                data['images'] = text_values[-1]
+            else:
+                data.pop('images', None)
+        data.pop('images[]', None)
+    if data.get('image') == '':
+        data['image'] = None
+    if data.get('compare_at_price') == '':
+        data['compare_at_price'] = None
     return data
 
 
@@ -289,86 +171,6 @@ def _extract_variants(data):
         return None, None
     return serializer.validated_data, None
 
-
-def _sync_product_variants(product, variants, actor):
-    """Keep SKU inventory auditable and maintain legacy Product.stock as a projection."""
-    if variants is None:
-        current = list(product.variants.select_for_update())
-        if len(current) > 1 or (current and (current[0].size or current[0].color)):
-            projected_stock = sum(item.stock for item in current if item.is_active)
-            if product.stock != projected_stock:
-                product.stock = projected_stock
-                product.save(update_fields=['stock', 'updated_at'])
-            return
-        if current:
-            variant = current[0]
-            created = False
-        else:
-            variant = ProductVariant.objects.create(
-                product=product,
-                size='',
-                color='',
-                sku=f'DEFAULT-{product.pk}'.upper(),
-                stock=product.stock,
-                is_active=product.is_active,
-            )
-            created = True
-        old_stock = variant.stock
-        if not created and (variant.stock != product.stock or variant.is_active != product.is_active):
-            variant.stock = product.stock
-            variant.is_active = product.is_active
-            variant.save(update_fields=['stock', 'is_active', 'updated_at'])
-        delta = product.stock if created else product.stock - old_stock
-        if delta:
-            InventoryMovement.objects.create(
-                variant=variant,
-                actor=actor,
-                sku=variant.sku,
-                delta=delta,
-                resulting_stock=variant.stock,
-                reason='initial' if created else 'adjustment',
-                reference=f'PRODUCT-{product.pk}',
-            )
-        return
-
-    existing = {str(item.id): item for item in product.variants.select_for_update()}
-    retained = set()
-    active_stock = 0
-    for values in variants:
-        variant_id = str(values.pop('id', ''))
-        variant = existing.get(variant_id) if variant_id else None
-        if variant is None:
-            variant = ProductVariant(product=product)
-            old_stock = 0
-            reason = 'initial'
-        else:
-            old_stock = variant.stock
-            retained.add(str(variant.id))
-            reason = 'adjustment'
-        for field in ('sku', 'size', 'color', 'price', 'stock', 'is_active'):
-            if field in values:
-                setattr(variant, field, values[field])
-        variant.full_clean()
-        variant.save()
-        retained.add(str(variant.id))
-        if variant.is_active:
-            active_stock += variant.stock
-        delta = variant.stock - old_stock
-        if delta:
-            InventoryMovement.objects.create(
-                variant=variant,
-                actor=actor,
-                sku=variant.sku,
-                delta=delta,
-                resulting_stock=variant.stock,
-                reason=reason,
-                reference=f'PRODUCT-{product.pk}',
-            )
-
-    product.variants.exclude(id__in=retained).update(is_active=False)
-    if product.stock != active_stock:
-        product.stock = active_stock
-        product.save(update_fields=['stock', 'updated_at'])
 
 # ==============================================================================
 # VIEWS
@@ -399,6 +201,7 @@ def register(request):
         if User.objects.filter(email__iexact=email).exists():
             return Response({'detail': 'Email already exists'}, status=400)
         return Response({'detail': 'Unable to create account; please retry'}, status=409)
+    revoke_cookies(request.COOKIES)
     tokens = get_tokens_for_user(user)
     response = Response(
         {'detail': 'registered', 'user': serialize_user(user)},
@@ -409,17 +212,20 @@ def register(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
-@throttle_classes([LoginRateThrottle])
+@throttle_classes([LoginRateThrottle, LoginAccountRateThrottle])
 def login(request):
     enforce_csrf(request)
-    email = str(request.data.get('email') or '').strip()
-    password = request.data.get('password') or ''
-    otp = request.data.get('otp')
-    if not email or not password:
+    if isinstance(request.data, Mapping) and (not request.data.get('email') or not request.data.get('password')):
         return Response({'detail': 'Email and password are required'}, status=400)
+    serializer = LoginSerializer(data=request.data)
+    if not serializer.is_valid():
+        return Response(serializer.errors, status=400)
+    email, password = serializer.validated_data['email'], serializer.validated_data['password']
     try:
         user = User.objects.get(email__iexact=email)
     except User.DoesNotExist:
+        # Match Django's unknown-user password hashing cost without logging input.
+        User().set_password(password)
         return Response({'detail':'Invalid credentials'}, status=400)
     except User.MultipleObjectsReturned:
         logger.error('Multiple users share the same normalized email')
@@ -428,11 +234,10 @@ def login(request):
     if not user_auth:
         return Response({'detail':'Invalid credentials'}, status=400)
     if user.two_factor_secret:
-        if not otp:
-            return Response({'detail':'2FA_REQUIRED'}, status=403)
-        totp = pyotp.TOTP(user.two_factor_secret)
-        if not totp.verify(otp):
-            return Response({'detail':'Invalid 2FA code'}, status=403)
+        # Enrollment, replay protection and recovery were never implemented.
+        # Fail closed for legacy MFA-marked accounts instead of bypassing MFA.
+        return Response({'detail': 'This sign-in method is unavailable.', 'code': 'feature_unavailable'}, status=503)
+    revoke_cookies(request.COOKIES)
     tokens = get_tokens_for_user(user)
     resp = Response({'user': serialize_user(user)})
     _set_auth_cookies(resp, tokens)
@@ -449,6 +254,9 @@ def me(request):
 @permission_classes([permissions.AllowAny])
 def logout_view(request):
     enforce_csrf(request)
+    revoke_cookies(request.COOKIES)
+    if request.user.is_authenticated and request.auth:
+        revoke_token(request.auth)
     resp = Response({'detail': 'logged out'})
     _clear_auth_cookies(resp)
     return resp
@@ -456,96 +264,40 @@ def logout_view(request):
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
+@throttle_classes([RefreshRateThrottle])
 def refresh_auth(request):
     enforce_csrf(request)
     raw_refresh = request.COOKIES.get('refresh')
     if not raw_refresh:
-        return Response({'detail': 'Refresh token required'}, status=401)
+        response = Response({'detail': 'Refresh token required'}, status=401)
+        _clear_auth_cookies(response)
+        return response
 
     try:
-        refresh = RefreshToken(raw_refresh)
-        access = str(refresh.access_token)
+        tokens = rotate_session(raw_refresh)
     except TokenError:
         response = Response({'detail': 'Invalid or expired refresh token'}, status=401)
         _clear_auth_cookies(response)
         return response
 
     response = Response({'detail': 'refreshed'})
-    response.set_cookie(
-        'access',
-        access,
-        httponly=True,
-        secure=settings.AUTH_COOKIE_SECURE,
-        samesite=settings.AUTH_COOKIE_SAMESITE,
-        path='/',
-    )
+    _set_auth_cookies(response, tokens)
     return response
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
 def update_profile(request):
-    user = request.user
-    data = request.data
-    if 'first_name' in data:
-        user.first_name = data.get('first_name')
-    if 'last_name' in data:
-        user.last_name = data.get('last_name')
-    if 'name' in data and 'first_name' not in data:
-        user.first_name = data.get('name')
-    if 'address' in data:
-        user.address = data.get('address') or ''
-    if 'phone' in data:
-        user.phone = str(data.get('phone') or '').strip()
-    user.save()
-    return Response(serialize_user(user))
+    serializer = ProfileWriteSerializer(request.user, data=request.data, partial=True)
+    if not serializer.is_valid():
+        return Response({'detail': 'Validation failed.', 'code': 'validation_error', 'errors': serializer.errors}, status=400)
+    return Response(serialize_user(serializer.save()))
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
 def google_auth(request):
     enforce_csrf(request)
-    raw_id_token = request.data.get('id_token')
-    if not raw_id_token:
-        return Response({'detail': 'id_token required'}, status=400)
+    return Response({'detail': 'Google sign-in is unavailable.', 'code': 'feature_unavailable'}, status=501)
 
-    client_id = settings.GOOGLE_OAUTH_CLIENT_ID
-    if not client_id:
-        logger.error('Google authentication requested without GOOGLE_OAUTH_CLIENT_ID')
-        return Response({'detail': 'Google authentication is not configured'}, status=503)
-
-    try:
-        payload = _verify_google_token(raw_id_token, client_id)
-    except GoogleTokenVerificationUnavailable:
-        logger.warning('Google token verification service is unavailable')
-        return Response({'detail': 'Google authentication is temporarily unavailable'}, status=503)
-    except InvalidGoogleToken:
-        return Response({'detail': 'Invalid id_token'}, status=400)
-
-    email = str(payload.get('email') or '').strip().lower()
-    if not email or payload.get('email_verified') is not True or not payload.get('sub'):
-        return Response({'detail': 'Google account email is not verified'}, status=400)
-
-    user = User.objects.filter(email__iexact=email).first()
-    if user is None:
-        name = str(payload.get('name') or email.split('@', 1)[0])[:150]
-        try:
-            with transaction.atomic():
-                user = User.objects.create_user(
-                    username=_new_username(email),
-                    email=email,
-                    password=None,
-                    first_name=name,
-                )
-        except IntegrityError:
-            user = User.objects.filter(email__iexact=email).first()
-            if user is None:
-                return Response({'detail': 'Unable to create account; please retry'}, status=409)
-    if not user.is_active:
-        return Response({'detail': 'Account is disabled'}, status=403)
-
-    tokens = get_tokens_for_user(user)
-    resp = Response({'user': serialize_user(user)})
-    _set_auth_cookies(resp, tokens)
-    return resp
 
 @api_view(['POST'])
 @permission_classes([permissions.AllowAny])
@@ -559,9 +311,46 @@ def send_otp(request):
 @api_view(['GET'])
 @permission_classes([permissions.AllowAny])
 def products_list(request):
-    qs = Product.objects.filter(is_active=True).prefetch_related('variants', 'reviews')
-    serializer = ProductSerializer(qs, many=True, context={'request': request})
-    return Response(serializer.data)
+    qs = product_reads().filter(is_active=True)
+    search = request.query_params.get('search', '').strip()
+    if search:
+        qs = qs.filter(Q(name__icontains=search) | Q(short__icontains=search) | Q(category__icontains=search))
+    for field in ('category', 'fabric'):
+        value = request.query_params.get(field)
+        if value:
+            qs = qs.filter(**{field: value})
+    ids = request.query_params.get('ids')
+    if ids:
+        values = ids.split(',')
+        if len(values) > 100:
+            raise ValidationError({'ids': 'At most 100 product IDs are allowed.'})
+        qs = qs.filter(pk__in=values)
+    for parameter, lookup in [('price_min', 'price__gte'), ('price_max', 'price__lte')]:
+        value = request.query_params.get(parameter)
+        if value:
+            try:
+                price = Decimal(value)
+                if not price.is_finite() or price < 0 or price > Decimal('9999999999.99'):
+                    raise ValueError
+            except (ValueError, ArithmeticError):
+                raise ValidationError({parameter: 'Supply a nonnegative finite price.'})
+            qs = qs.filter(**{lookup: price})
+    orderings = {'default': 'id', 'price-asc': 'price', 'price-desc': '-price', 'name-asc': 'name'}
+    ordering = request.query_params.get('ordering', 'default')
+    if ordering not in orderings:
+        raise ValidationError({'ordering': 'Invalid product ordering.'})
+    return page_response(request, qs.order_by(orderings[ordering]), ProductCardSerializer)
+
+
+@api_view(['GET'])
+@permission_classes([permissions.AllowAny])
+def product_facets(request):
+    qs = Product.objects.filter(is_active=True)
+    category = request.query_params.get('category')
+    if category:
+        qs = qs.filter(category=category)
+    # Facets are bounded independently of catalog size.
+    return Response({'fabrics': list(qs.exclude(fabric='').order_by('fabric').values_list('fabric', flat=True).distinct()[:100])})
 
 @api_view(['GET','POST','PUT','DELETE'])
 @permission_classes([permissions.AllowAny])
@@ -569,11 +358,11 @@ def products_list(request):
 def product_detail(request, pk=None):
     if request.method == 'GET':
         prod = get_object_or_404(
-            Product.objects.prefetch_related('variants', 'reviews'),
+            product_reads(),
             pk=pk,
             is_active=True,
         )
-        return Response(ProductSerializer(prod, context={'request': request}).data)
+        return Response(PublicProductReadSerializer(prod, context={'request': request}).data)
     
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
@@ -586,93 +375,36 @@ def product_detail(request, pk=None):
 
         if request.method == 'POST':
              data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
-             serializer = ProductSerializer(data=data)
+             serializer = AdminProductWriteSerializer(data=data)
         else: # PUT
              prod = get_object_or_404(Product, pk=pk)
-             serializer = ProductSerializer(prod, data=data, partial=True)
+             serializer = AdminProductWriteSerializer(prod, data=data, partial=True)
 
         if serializer.is_valid():
             try:
-                with transaction.atomic():
-                    serializer.save()
-                    _sync_product_variants(serializer.instance, variants, request.user)
-            except (DjangoValidationError, IntegrityError) as exc:
-                return Response({'variants': [str(exc)]}, status=400)
+                serializer.instance = save_product(
+                    serializer.instance, serializer.validated_data, variants, request.user,
+                    expected_version=serializer.initial_data.get('inventory_version'),
+                )
+            except CommerceError as exc:
+                return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+            except DjangoValidationError as exc:
+                return Response({'variants': exc.messages}, status=400)
+            except IntegrityError:
+                return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
             response_status = status.HTTP_201_CREATED if request.method == 'POST' else status.HTTP_200_OK
             return Response(
-                ProductSerializer(serializer.instance, context={'request': request}).data,
+                AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data,
                 status=response_status,
             )
         
-        logger.warning('Product detail error: %s', serializer.errors)
+        logger.warning('Product validation rejected')
         return Response(serializer.errors, status=400)
 
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)
         prod.delete()
         return Response(status=204)
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def create_order(request):
-    serializer = CreateOrderSerializer(data=request.data)
-    if not serializer.is_valid():
-        return Response(serializer.errors, status=400)
-    items = serializer.validated_data['items']
-    shipping_address = serializer.validated_data['shipping_address']
-    quantities = {}
-    for item in items:
-        quantities[item['id']] = quantities.get(item['id'], 0) + item['qty']
-
-    with transaction.atomic():
-        products = Product.objects.select_for_update().filter(pk__in=quantities.keys())
-        products_by_id = {product.id: product for product in products}
-        missing_ids = [product_id for product_id in quantities if product_id not in products_by_id]
-        if missing_ids:
-            return Response({'detail': f'Product not found: {missing_ids[0]}'}, status=404)
-
-        for product_id, qty in quantities.items():
-            product = products_by_id[product_id]
-            if product.stock < qty:
-                return Response({'detail': f'Insufficient stock for {product.name}'}, status=400)
-
-        total = sum(products_by_id[product_id].price * qty for product_id, qty in quantities.items())
-        order_id = f'ORD-{uuid.uuid4().hex[:28]}'
-        order = Order.objects.create(id=order_id, user=request.user, total=total, shipping_address=shipping_address)
-
-        for product_id, qty in quantities.items():
-            product = products_by_id[product_id]
-            product.stock -= qty
-            product.save(update_fields=['stock'])
-            OrderItem.objects.create(order=order, product=product, qty=qty, price=product.price)
-
-    return Response(OrderSerializer(order, context={'request': request}).data, status=201)
-
-@api_view(['GET'])
-@permission_classes([permissions.IsAuthenticated])
-def my_orders(request):
-    qs = Order.objects.filter(user=request.user)
-    return Response(OrderSerializer(qs, many=True, context={'request': request}).data)
-
-
-@api_view(['POST'])
-@permission_classes([permissions.IsAuthenticated])
-def cancel_order(request, pk):
-    with transaction.atomic():
-        order = get_object_or_404(Order.objects.select_for_update(), pk=pk)
-        if order.user_id != request.user.id and not request.user.is_admin():
-            return Response({'detail': 'Not allowed'}, status=403)
-        if order.status != 'pending':
-            return Response({'detail': 'Only pending orders can be cancelled'}, status=400)
-
-        for item in order.items.select_related('product').all():
-            if item.product_id:
-                Product.objects.filter(pk=item.product_id).update(stock=F('stock') + item.qty)
-
-        order.status = 'cancelled'
-        order.save(update_fields=['status'])
-
-    return Response(OrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET','PUT'])
 @permission_classes([permissions.AllowAny])
@@ -686,49 +418,24 @@ def site_settings(request):
     if not request.user.is_authenticated or not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
 
-    # Prepare mutable data copy so we can convert data-URLs to stored files
-    if hasattr(request.data, 'dict'):
-        data = request.data.dict()
-    else:
-        try:
-            data = request.data.copy()
-        except Exception:
-            data = request.data
+    if not isinstance(request.data, Mapping):
+        raise ValidationError({'non_field_errors': ['Expected an object.']})
+    data = request.data.dict() if hasattr(request.data, 'dict') else request.data.copy()
+    if request.FILES:
+        files = [file for key in request.FILES for file in request.FILES.getlist(key)]
+        if len(files) > 7 or any(len(request.FILES.getlist(key)) > 1 for key in request.FILES):
+            raise ValidationError({'images': 'At most one upload per site image field is allowed.'})
+        if sum(file.size for file in files) > MAX_UPLOAD_BYTES:
+            raise ValidationError({'images': 'Combined image uploads must be at most 40 MiB.'})
+    for field in ('about_image', 'hero_image', 'suits_section_image', 'shirts_section_image',
+                  'blazers_section_image', 'accessories_section_image', 'bespoke_section_image'):
+        if str(data.pop(f'clear_{field}', '')).strip().lower() in {'1', 'true', 'yes', 'on'}:
+            data[field] = None
 
-    # Convert data URLs to uploaded files and process explicit clear flags.
-    image_fields = ['about_image', 'hero_image', 'suits_section_image', 'shirts_section_image', 'blazers_section_image', 'accessories_section_image', 'bespoke_section_image']
-    for f in image_fields:
-        clear_value = str(data.pop(f'clear_{f}', '')).strip().lower()
-        if clear_value in {'1', 'true', 'yes', 'on'}:
-            data[f] = None
-
-    for f in image_fields:
-        val = data.get(f)
-        if isinstance(val, str) and val.startswith('data:image/'):
-            try:
-                data[f] = _dataurl_to_content_file(val, prefix=f)
-            except ValueError:
-                return Response({f: ['Invalid image data URL']}, status=400)
-
-    old_files = {
-        f: getattr(settings, f, None)
-        for f in image_fields
-    } if settings else {}
 
     serializer = SiteSettingsSerializer(settings, data=data, partial=True)
     if serializer.is_valid():
-        instance = serializer.save()
-        remaining_names = {
-            getattr(instance, f).name
-            for f in image_fields
-            if getattr(instance, f, None)
-        }
-        for old_file in old_files.values():
-            if old_file and old_file.name not in remaining_names:
-                try:
-                    old_file.delete(save=False)
-                except Exception:
-                    logger.warning('Could not delete replaced site image %s', old_file.name)
+        instance = save_site_settings(settings, serializer.validated_data)
         return Response(SiteSettingsSerializer(instance, context={'request': request}).data)
     return Response(serializer.errors, status=400)
 
@@ -753,18 +460,24 @@ def admin_stats(request):
     users_count = User.objects.count()
     from .models import BespokeRequest, Payment, ProductReview, ReturnRequest
 
-    revenue = Decimal('0.00')
-    for payment in Payment.objects.filter(status__in=['paid', 'partially_refunded']):
-        refunded = Decimal(str((payment.metadata or {}).get('refunded_amount', '0')))
-        revenue += max(payment.amount - refunded, Decimal('0.00'))
+    money_field = DecimalField(max_digits=18, decimal_places=2)
+    payments = Payment.objects.filter(status__in=['paid', 'partially_refunded']).annotate(
+        refunded=Coalesce(Cast(KeyTextTransform('refunded_amount', 'metadata'), money_field),
+                          Value(Decimal('0.00')), output_field=money_field),
+    )
+    revenue = payments.aggregate(total=Sum(Case(
+        When(amount__gt=F('refunded'), then=F('amount') - F('refunded')),
+        default=Value(Decimal('0.00')), output_field=money_field,
+    )))['total'] or Decimal('0.00')
+    order_counts = orders.aggregate(total=Count('pk'), pending=Count('pk', filter=Q(status='pending')))
     messages_count = ContactMessage.objects.filter(read=False).count()
     return Response({
         'productsCount': products_count,
-        'ordersCount': orders.count(),
+        'ordersCount': order_counts['total'],
         'usersCount': users_count,
         'revenue': revenue,
         'messagesCount': messages_count,
-        'pendingOrdersCount': orders.filter(status='pending').count(),
+        'pendingOrdersCount': order_counts['pending'],
         'lowStockCount': ProductVariant.objects.filter(is_active=True, stock__lte=5).count(),
         'pendingReviewsCount': ProductReview.objects.filter(status='pending').count(),
         'pendingReturnsCount': ReturnRequest.objects.filter(status='requested').count(),
@@ -778,10 +491,28 @@ def admin_orders(request):
         return Response({'detail':'admin required'}, status=403)
     from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
 
-    qs = Order.objects.select_related(
-        'user', 'address', 'shipping_method', 'coupon', 'payment',
-    ).prefetch_related('items__variant', 'events__actor').order_by('-created_at')
-    return Response(CommerceOrderSerializer(qs, many=True, context={'request': request}).data)
+    qs = order_reads().order_by('-created_at')
+    search = request.query_params.get('search', '').strip()
+    if search:
+        qs = qs.filter(Q(id__icontains=search) | Q(shipping_address__icontains=search)
+                       | Q(recipient_name__icontains=search) | Q(user__first_name__icontains=search)
+                       | Q(user__last_name__icontains=search) | Q(user__username__icontains=search))
+    order_status = request.query_params.get('status')
+    if order_status and order_status != 'all':
+        if order_status not in dict(Order.STATUS):
+            raise ValidationError({'status': 'Invalid order status.'})
+        qs = qs.filter(status=order_status)
+    for param, lookup in [('date_start', 'created_at__date__gte'), ('date_end', 'created_at__date__lte')]:
+        value = request.query_params.get(param)
+        if value:
+            try:
+                date = parse_date(value)
+            except ValueError:
+                date = None
+            if date is None:
+                raise ValidationError({param: 'Use YYYY-MM-DD.'})
+            qs = qs.filter(**{lookup: date})
+    return page_response(request, qs, CommerceOrderSerializer)
 
 @api_view(['PUT'])
 @permission_classes([permissions.IsAuthenticated])
@@ -789,7 +520,7 @@ def admin_update_order_status(request, pk):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     from .commerce_serializers import OrderSerializer as CommerceOrderSerializer
-    from .commerce_services import CommerceError, get_order_for_user, transition_order_status
+    from .commerce_services import CommerceError, update_staff_order
 
     status_val = request.data.get('status')
     tracking_supplied = 'tracking_code' in request.data or 'trackingCode' in request.data
@@ -798,43 +529,27 @@ def admin_update_order_status(request, pk):
         return Response({'detail': 'No order changes were supplied.', 'code': 'empty_update'}, status=400)
     if status_val is not None and status_val not in dict(Order.STATUS):
         return Response({'detail': 'Invalid order status.', 'code': 'invalid_status'}, status=400)
-    if status_val is not None:
-        try:
-            order = transition_order_status(pk, status_val, request.user)
-        except CommerceError as exc:
-            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
-    else:
-        try:
-            order = get_order_for_user(pk, request.user, include_admin=True)
-        except CommerceError as exc:
-            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
-
-    update_fields = []
-    event_data = {}
+    details = {}
     if tracking_supplied:
-        tracking_code = str(request.data.get('tracking_code', request.data.get('trackingCode', ''))).strip()
+        tracking_code = request.data.get('tracking_code', request.data.get('trackingCode', ''))
+        if not isinstance(tracking_code, str):
+            return Response({'tracking_code': ['Expected a string.']}, status=400)
+        tracking_code = tracking_code.strip()
         if len(tracking_code) > 128:
             return Response({'tracking_code': ['Must contain at most 128 characters.']}, status=400)
-        order.tracking_code = tracking_code
-        update_fields.append('tracking_code')
-        event_data['tracking_code'] = tracking_code
+        details['tracking_code'] = tracking_code
     if note_supplied:
-        admin_note = str(request.data.get('admin_note', request.data.get('adminNote', ''))).strip()
+        admin_note = request.data.get('admin_note', request.data.get('adminNote', ''))
+        if not isinstance(admin_note, str):
+            return Response({'admin_note': ['Expected a string.']}, status=400)
+        admin_note = admin_note.strip()
         if len(admin_note) > 5000:
             return Response({'admin_note': ['Must contain at most 5000 characters.']}, status=400)
-        order.admin_note = admin_note
-        update_fields.append('admin_note')
-        event_data['admin_note_updated'] = True
-    if update_fields:
-        order.save(update_fields=[*update_fields, 'updated_at'])
-        from .models import OrderEvent
-        OrderEvent.objects.create(
-            order=order,
-            event_type='order_details_updated',
-            actor=request.user,
-            data={**event_data, 'message': 'Order fulfillment details updated'},
-        )
-        order = get_order_for_user(pk, request.user, include_admin=True)
+        details['admin_note'] = admin_note
+    try:
+        order = update_staff_order(pk, status_val, request.user, details)
+    except CommerceError as exc:
+        return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
     return Response(CommerceOrderSerializer(order, context={'request': request}).data)
 
 @api_view(['GET'])
@@ -842,9 +557,7 @@ def admin_update_order_status(request, pk):
 def admin_users(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
-    users = User.objects.all()
-    data = [serialize_user(u) for u in users]
-    return Response(data)
+    return page_response(request, User.objects.order_by('id'), AccountReadSerializer)
 
 @api_view(['GET'])
 @permission_classes([permissions.IsAuthenticated])
@@ -852,8 +565,10 @@ def admin_messages(request):
     if not request.user.is_admin():
         return Response({'detail':'admin required'}, status=403)
     msgs = ContactMessage.objects.all().order_by('-created_at')
-    serializer = ContactMessageSerializer(msgs, many=True)
-    return Response(serializer.data)
+    search = request.query_params.get('search', '').strip()
+    if search:
+        msgs = msgs.filter(Q(name__icontains=search) | Q(email__icontains=search) | Q(message__icontains=search))
+    return page_response(request, msgs, ContactMessageSerializer)
 
 @api_view(['POST'])
 @permission_classes([permissions.IsAuthenticated])
@@ -873,16 +588,19 @@ def admin_products(request):
         return Response({'detail':'admin required'}, status=403)
     
     if request.method == 'GET':
-        qs = Product.objects.all().prefetch_related('variants', 'reviews')
-        return Response(ProductSerializer(qs, many=True, context={'request': request}).data)
+        qs = product_reads()
+        search = request.query_params.get('search', '').strip()
+        if search:
+            qs = qs.filter(Q(name__icontains=search) | Q(category__icontains=search))
+        orderings = {'default': 'id', 'price-asc': 'price', 'price-desc': '-price',
+                     'stock-asc': 'stock', 'stock-desc': '-stock', 'name-asc': 'name'}
+        ordering = request.query_params.get('ordering', 'default')
+        if ordering not in orderings:
+            raise ValidationError({'ordering': 'Invalid product ordering.'})
+        return page_response(request, qs.order_by(orderings[ordering]), AdminProductReadSerializer)
 
     # POST (Create)
-    # Debug: log content type and uploaded files briefly to assist debugging client uploads
-    try:
-        logger.info('admin_products content_type=%s, files=%s', request.META.get('CONTENT_TYPE'), list(request.FILES.keys()))
-    except Exception:
-        pass
-    # 1. Prepare data (this leaves 'image' as a File, but handles 'images' list)
+    # Normalize the request; validation and the transaction own all storage writes.
     data = prepare_product_data(request)
     variants, variant_errors = _extract_variants(data)
     if variant_errors:
@@ -890,21 +608,25 @@ def admin_products(request):
 
     data['id'] = data.get('id') or f'prod-{uuid.uuid4().hex}'
     
-    # 2. Pass 'image' FILE to serializer. ImageField will handle it.
-    serializer = ProductSerializer(data=data, context={'request': request})
+    serializer = AdminProductWriteSerializer(data=data, context={'request': request})
     if serializer.is_valid():
         try:
-            with transaction.atomic():
-                serializer.save()
-                _sync_product_variants(serializer.instance, variants, request.user)
-        except (DjangoValidationError, IntegrityError) as exc:
-            return Response({'variants': [str(exc)]}, status=400)
+            serializer.instance = save_product(
+                serializer.instance, serializer.validated_data, variants, request.user,
+                expected_version=serializer.initial_data.get('inventory_version'),
+            )
+        except CommerceError as exc:
+            return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+        except DjangoValidationError as exc:
+            return Response({'variants': exc.messages}, status=400)
+        except IntegrityError:
+            return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
         return Response(
-            ProductSerializer(serializer.instance, context={'request': request}).data,
+            AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data,
             status=status.HTTP_201_CREATED,
         )
     
-    logger.warning('Product admin create error: %s', serializer.errors)
+    logger.warning('Product validation rejected')
     return Response(serializer.errors, status=400)
 
 @api_view(['GET','PUT','DELETE'])
@@ -915,8 +637,8 @@ def admin_product_detail(request, pk=None):
         return Response({'detail':'admin required'}, status=403)
 
     if request.method == 'GET':
-        prod = get_object_or_404(Product.objects.prefetch_related('variants', 'reviews'), pk=pk)
-        return Response(ProductSerializer(prod, context={'request': request}).data)
+        prod = get_object_or_404(product_reads(), pk=pk)
+        return Response(AdminProductReadSerializer(prod, context={'request': request}).data)
 
     if request.method == 'PUT':
         try:
@@ -927,35 +649,26 @@ def admin_product_detail(request, pk=None):
             if variant_errors:
                 return Response(variant_errors, status=400)
             
-            serializer = ProductSerializer(prod, data=data, partial=True, context={'request': request})
+            serializer = AdminProductWriteSerializer(prod, data=data, partial=True, context={'request': request})
             if serializer.is_valid():
                 try:
-                    with transaction.atomic():
-                        serializer.save()
-                        _sync_product_variants(serializer.instance, variants, request.user)
-                except (DjangoValidationError, IntegrityError) as exc:
-                    return Response({'variants': [str(exc)]}, status=400)
-                return Response(ProductSerializer(serializer.instance, context={'request': request}).data)
+                    serializer.instance = save_product(
+                        serializer.instance, serializer.validated_data, variants, request.user,
+                        expected_version=serializer.initial_data.get('inventory_version'),
+                    )
+                except CommerceError as exc:
+                    return Response({'detail': exc.detail, 'code': exc.code}, status=exc.status_code)
+                except DjangoValidationError as exc:
+                    return Response({'variants': exc.messages}, status=400)
+                except IntegrityError:
+                    return Response({'detail': 'Product conflicts with existing data.', 'code': 'product_conflict'}, status=409)
+                return Response(AdminProductReadSerializer(product_reads().get(pk=serializer.instance.pk), context={'request': request}).data)
             
-            logger.warning('Product admin update error: %s', serializer.errors)
+            logger.warning('Product validation rejected')
             return Response(serializer.errors, status=400)
             
         except Product.DoesNotExist:
-            data = prepare_product_data(request)
-            variants, variant_errors = _extract_variants(data)
-            if variant_errors:
-                return Response(variant_errors, status=400)
-            data['id'] = pk
-            serializer = ProductSerializer(data=data, context={'request': request})
-            if serializer.is_valid():
-                try:
-                    with transaction.atomic():
-                        serializer.save()
-                        _sync_product_variants(serializer.instance, variants, request.user)
-                except (DjangoValidationError, IntegrityError) as exc:
-                    return Response({'variants': [str(exc)]}, status=400)
-                return Response(ProductSerializer(serializer.instance, context={'request': request}).data, status=201)
-            return Response(serializer.errors, status=400)
+            return Response({'detail': 'Product not found.'}, status=404)
 
     if request.method == 'DELETE':
         prod = get_object_or_404(Product, pk=pk)

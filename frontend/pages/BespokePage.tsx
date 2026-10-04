@@ -1,14 +1,18 @@
+import { useActions, useAuth, useSettings } from '../state/AppState';
+import { errorMessage } from '../services/api';
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
-import { useGlobal } from '../contexts/GlobalContext';
+import { ArrowRight, Calendar, CheckCircle, Loader2, Ruler, Scissors, UserCheck } from 'lucide-react';
+
 import api from '../services/api';
 import ImageLoader from '../components/ImageLoader';
 import SEO from '../components/SEO';
 
 const BespokePage: React.FC = () => {
     const navigate = useNavigate();
-    const { showToast, user, siteSettings } = useGlobal();
+    const { showToast } = useActions();
+    const { user } = useAuth();
+    const { siteSettings } = useSettings();
     const [loading, setLoading] = useState(false);
     const [step, setStep] = useState<1 | 2 | 3>(1);
     const [error, setError] = useState('');
@@ -49,8 +53,8 @@ const BespokePage: React.FC = () => {
             setRequestId(result.id || '');
             setStep(3);
             showToast('درخواست شما با موفقیت ثبت شد');
-        } catch (submissionError: any) {
-            const message = submissionError?.message || 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید';
+        } catch (submissionError: unknown) {
+            const message = errorMessage(submissionError, 'ثبت درخواست انجام نشد؛ لطفاً دوباره تلاش کنید');
             setError(message);
             showToast(message);
         } finally {
@@ -77,7 +81,7 @@ const BespokePage: React.FC = () => {
             </header>
             <div className="bg-lux-black px-4 pb-4">
                 <button onClick={() => navigate(-1)} className="inline-flex items-center gap-1 bg-lux-gold text-white px-3 py-1 rounded shadow-md text-sm">
-                    <ArrowLeft size={14} /> بازگشت
+                    <ArrowRight size={14} /> بازگشت
                 </button>
             </div>
 
