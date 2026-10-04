@@ -1,6 +1,6 @@
 # Codex Project Context
 
-Last verified: 2026-10-04 (Batch 12 review and container CI repair; verification in Handoff)
+Last verified: 2026-10-04 (Batch 12 review, container CI repair and public Vercel frontend; verification in Handoff)
 
 ## Purpose and product
 
@@ -227,5 +227,5 @@ Browser commands: from frontend, `npx.cmd playwright install chromium` then `npm
 - Use bundled `frontend/public/images/` assets for default UI imagery; fresh installs must not depend on remote placeholder-image services.
 - Pass raw ODBC keywords such as `Encrypt` and `TrustServerCertificate` through `DATABASES['default']['OPTIONS']['extra_params']`; unsupported top-level option names are silently ignored by `mssql-django`.
 - Do not retry failed production API writes against a hard-coded localhost address.
-- Vercel, if used, hosts only the frontend; the stateful Django/SQL Server stack needs a separate compatible host.
+- Vercel hosts only the frontend; the stateful Django/SQL Server stack needs a separate compatible host. The existing `rezaformal` project serves the verified public frontend at [rezaformal.vercel.app](https://rezaformal.vercel.app). Vercel labels this main-branch frontend alias Production; it is suitable for visual preview, not approval of the full commerce deployment. Its build uses the same-origin API default, and that origin currently has no working Django API. Login, server catalog/detail collections and checkout require the separately deployed API and documented same-site/CSRF topology. Generated preview/deployment URLs require Vercel login; do not confuse successful builds with public access or weaken protection merely to inspect them.
 - Do not commit local `.env` files, databases, media, virtual environments, build output, cookies, archives, or temporary debug scripts.
