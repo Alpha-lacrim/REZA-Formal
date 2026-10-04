@@ -4,6 +4,14 @@ Last updated: 2026-10-04
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-10-04 - Recheck requested CI repairs
+
+- Objective: check the repeated request to fix failing GitHub checks and identify any new failure before changing runtime code.
+- Starting state: clean integration `1e91b3e`, synchronized with origin; read AGENTS/Codex/Handoff. PR #2 remains OPEN/CLEAN at that same head.
+- Verification: latest push CI `37161892238` and PR CI `37161895705` both succeed, including containers/backend/frontend/Compose; dependency-security `37161892255`/`37161895735` and all Vercel checks also succeed. No newer failing run exists on the candidate. The previous runtime repair and retained scan evidence remain valid; no application/workflow change or unnecessary test rerun is justified.
+- Scope: requested clarification whether the repeated request refers to the remaining audit findings or another GitHub failure. Those are separate from the already repaired checks. Preserve main, application data/configuration and the existing partial-program/owner boundaries. This session changes only this chronological verification record.
+- Closeout: both latest CI runs retain scan artifacts. Full diff/whitespace/status review and local/remote ref checks pass; main/dev/stash and the clean separate operations worktree retain their recorded states. Publish this documentation-only record normally on integration, preserving the application/workflow tree from verified `1e91b3e`; check its automatic CI separately before final response.
+
 ## 2026-10-04 - Repair GitHub container checks
 
 - Objective: fix the Linux recovery-fixture failure, investigate the remaining runtime-image release findings, verify and push the candidate without updating main.
