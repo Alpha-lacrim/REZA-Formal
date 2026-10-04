@@ -4,6 +4,16 @@ Last updated: 2026-10-04
 
 This is the chronological continuity log for the repository. Keep the newest session first. Each new session must create an entry at startup and finalize it before handoff, even when no code changed.
 
+## 2026-10-04 - Owner-authorized PR acceptance review
+
+- Objective: review PR #2 against the remediation plan and engineering recommendation, then merge into main only if the candidate passes. The owner's latest explicit instruction authorizes this conditional main merge; earlier automatic-integration main preservation remains historical.
+- Starting state: clean integration `33ee963`, synchronized with origin; PR #2 OPEN/CLEAN at the same head, targeting main `99a1ea5`. Read AGENTS/Codex/Handoff and the final review. Preserve other worktrees, configuration, data, dev and stash. Fast-forward the required Batch 12 review branch to the candidate before publication.
+- Review/recommendation: accept source changes under the plan's partial-completion option. Recheck ancestry, commerce/refund/inventory and staff HTTP/service boundaries, session lifecycle, frontend direction, media, additive migrations and CI policy. No newly established merge blocker; 15 residual IDs remain (P0 0/P1 2/P2 13/P3 0), with wider SQL schedules and production owner gates still open. No runtime cleanup or new architecture is justified.
+- Verification: starting candidate push/PR CI `37222743295`/`37222746416`, security `37222743321`/`37222746449` and Vercel all pass; both CI runs retain scans. Fresh rebuilt-image disposable SQL **166/166, zero skips (59.161s)**, Chrome/axe **16/16 (3.8m)**, Django check/drift, build-input/production-template/development Compose and complete-program/session whitespace checks pass. Isolated SQL project `reza-pr2-sql-68f3260c6a` removed; existing databases untouched. Generated reports remain ignored.
+- Limitations: hosted optional dispatch returns 404 because the new workflow is not on default main; classic main branch protection is absent. Local SQL/browser success does not claim hosted execution. Subsequent GitHub status reads briefly encounter TLS handshake timeouts and must be retried successfully before the guarded merge.
+- Files: reconcile current CI/owner-authorization wording and record source acceptance in FINAL_REVIEW and CODEX_PROGRAM; preserve prior findings and chronology. Improve PR title/body so reviewers can see scope, validation, residuals and coordinated migration/re-login requirements.
+- Closeout: publish this documentation-only review normally on Batch 12 and integration. Verify its exact head has all observed checks passing and remains mergeable, then perform the explicitly authorized GitHub merge into main without bypass or branch deletion. PR #2's merge metadata records the actual final SHA/status; no pre-merge result is invented here. No manual backend deployment or production database/data operation. Follow ROADMAP for remaining SQL, actor/DTO, policy, build advisory, credential-history and production obligations; add branch protection and observe the optional hosted lanes after availability.
+
 ## 2026-10-04 - Recheck requested CI repairs
 
 - Objective: check the repeated request to fix failing GitHub checks and identify any new failure before changing runtime code.

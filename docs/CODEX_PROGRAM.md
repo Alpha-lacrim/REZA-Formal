@@ -11,16 +11,35 @@ pre-codex-remediation-2026-09-10
 | Baseline tag | `pre-codex-remediation-2026-09-10` (annotated) |
 | Integration branch | `codex/remediation-program` |
 | Current batch | Batch 12 - final architecture review and program closeout |
-| Batch status | Review/docs complete; requested container CI repair clears the image gate on supported Alpine/ODBC artifacts; verification/publication recorded below |
+| Batch status | Review/docs complete; supported runtime clears the image gate; owner-authorized PR #2 source acceptance recommended, conditional on final-head checks |
 | Batch branch | `codex/batch-12-final-review` |
 | Batch start commit | `31e72ea` (clean Batch 11 head); integration initially `db565f6` |
 | Final batch / integration merge | Initial review `0a99f80`/`ecb7867`; container follow-up `83d77e2`/`d23e71c`; documentation-only hosted evidence record follows on integration |
 | Audit IDs handled | All 43 reassessed; 28 addressed/contained at recorded scope, 15 open/partial (P0 0, P1 2, P2 13, P3 0) |
 | Verification performed | 80 frontend cases, 16 Chrome/axe journeys, SQLite 154 pass/12 deliberate skips, SQL 166/166, lint/typecheck/build/check/drift, both images, proxy/runtime/restore/TLS, configuration/dependency/policy/actionlint gates |
-| Remaining risks | Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, arm64 validation if selected, manual browser/SQL hosted lanes and branch protection, historical secrets/financial/provider work and expiring build advisory remain. Original Debian image blocker cleared without an exception |
-| Next batch | No automatic next batch; owner-reviewed follow-up milestones in ROADMAP; human PR into main |
+| Remaining risks | Broader SQL races, actor actions/DTOs, owner policies, production provisioning/recovery, arm64 validation if selected, manual browser/SQL hosted lanes and absent classic main protection, historical secrets/financial/provider work and expiring build advisory remain. Original Debian image blocker cleared without an exception |
+| Next batch | No automatic next batch; owner-reviewed follow-up milestones in ROADMAP; source merge is explicitly authorized through reviewed PR #2 |
 
 ## Batch 12 - Final review and closeout (2026-10-04)
+
+### Owner-authorized source acceptance
+
+- The owner's latest instruction explicitly authorizes merging PR #2 into main
+  after a satisfactory plan/engineering review. Earlier automatic integration
+  preserved main correctly; this reviewed source merge has separate authorization.
+- Review begins at clean integration `33ee963`, main baseline `99a1ea5`, with all
+  hosted CI/security/container/Vercel checks green and retained scan artifacts.
+  High-risk boundaries and additive migrations match the plan. Fresh local SQL
+  **166/166, zero skips (59.161s)** and browser/axe **16/16 (3.8m)** pass, as do
+  Django checks/drift, configuration/build-input and whitespace checks.
+- Optional hosted dispatch is unavailable before the workflow reaches default
+  main (404); classic main branch protection is absent. Those observations replace
+  earlier unverified wording without claiming hosted SQL/browser execution.
+- Recommend source acceptance, preserving partial status and all 15 residual IDs.
+  Publish the documentation-only review, require its final-head checks, then use an
+  exact-head guarded GitHub merge without bypass. [PR #2](https://github.com/Alpha-lacrim/REZA-Formal/pull/2)
+  records the actual merge SHA/status. No manual backend deployment, production
+  database/data operation, branch deletion or history rewrite belongs to this acceptance.
 
 ### Requested container CI repair
 
