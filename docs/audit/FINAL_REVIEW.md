@@ -1,8 +1,8 @@
 # Final architecture review and remediation closeout
 
 Reviewed 2026-10-04 (Asia/Tehran) on `codex/batch-12-final-review`.
-Verdict: **partially complete remediation; suitable as a human-review candidate,
-blocked for production release**. No P0 was established. Functional, database,
+Verdict: **partially complete remediation; recommended for owner-authorized
+source merge through PR #2, blocked for production release**. No P0 was established. Functional, database,
 browser and disposable operations checks pass. A separately requested container
 follow-up clears the image gate on supported Alpine/ODBC artifacts; production
 owner obligations and 15 original findings remain. No risk exception was added.
@@ -28,8 +28,10 @@ Final review commit `0a99f80` merged into `codex/remediation-program` at `ecb786
 the merge tree equals the reviewed branch and includes all Batch 9–12 ancestors.
 Normal atomic push published Batch 12 and the integration candidate. A subsequent
 documentation-only publication record on integration records those exact SHAs.
-Local and remote main, dev and stash retain their starting refs. Human review/PR
-into main remains an owner action; this publication does not clear the release gate.
+At that publication, local and remote main, dev and stash retained their starting
+refs. The later owner-authorized PR acceptance review below supersedes the earlier
+main-preservation scope for this reviewed source merge only. It does not clear the
+release gate.
 
 ## Current architecture
 
@@ -46,7 +48,7 @@ into main remains an owner action; this publication does not clear the release g
 | Media | Django storage owns binary files in local/media volume; product primary plus JSON gallery stores references. Product/site services stage validated decoded/re-encoded still images and clean newly staged files on failure. Browser object URLs are previews; Nginx reads media only. | Inline previews no longer become new gallery persistence; safe historical inline images convert on edit. Historical references are retained; no ProductImage model/object-store migration introduced. |
 | Administration | React shell composes `features/admin/*`; server pages/filtering and selected-section reads bound work. Native product/variant/site/order/payment/return forms are inspection-only; user mutations require superuser. | Broad AdminPanel decomposed and native invariant bypass contained. Ordinary model-admin surfaces still require an authorized operator and broader invariant review. |
 | Tests | Node regressions + Vitest/RTL/MSW, real-Django Playwright/axe, isolated Django suite, standalone disposable SQL Server, proxy/runtime/restore/image-policy fixtures. | Reproducible characterization and critical regression evidence replace absent frontend/lint/SQL lanes. |
-| CI | Read-only, pinned-action workflows: normal PR/program pushes and weekly/manual fast/container gates; security dependency/proxy lanes; manually dispatched SQL/browser lanes. No deployment/registry publishing job. | Remediation branch filters and locks/build/restore/scan gates added. Hosted results and branch protection remain unverified locally. |
+| CI | Read-only, pinned-action workflows: normal PR/program pushes and weekly/manual fast/container gates; security dependency/proxy lanes; manually dispatched SQL/browser lanes. No deployment/registry publishing job. | Hosted fast/security/container checks and retained scans pass. Classic main protection is absent; optional workflow dispatch is unavailable until its file reaches the default branch. Local SQL/browser results are recorded below. |
 | Operations | Digest-pinned non-root Gunicorn/Nginx, hash-locked Python/npm inputs, bounded health/shutdown/logs and request IDs. Production Compose is a disabled-bootstrap, private-edge review template; controlled migrations, ownership, backup and rollback runbooks live in OPERATIONS. | Development startup is separated from owner-controlled production provisioning; disposable TLS/SQL/media recovery has execution evidence. Production capacity/ingress/recovery objectives remain unproven. |
 
 ## Architecture consistency conclusions
@@ -277,7 +279,58 @@ containing this pending fix. Final local selected Docker identities:
 The program remains **partially complete**, with unchanged residual counts
 P0 0/P1 2/P2 13/P3 0. Clearing a container check is neither production acceptance
 nor evidence for the deferred owner policies, wider SQL schedules or real ingress,
-capacity and backup rollout. Main remains outside automatic integration.
+capacity and backup rollout. Main remains outside automatic batch integration;
+the later explicit owner instruction authorizes the reviewed PR merge below.
+
+## Owner-authorized PR acceptance review (2026-10-04)
+
+The owner explicitly requested review and a merge into main if the plan and
+engineering recommendation support acceptance. PR [#2](https://github.com/Alpha-lacrim/REZA-Formal/pull/2)
+starts at clean candidate `33ee963`, targeting baseline `99a1ea5`. This is an
+independent-style review by the same remediation agent, not independent human
+approval or production certification.
+
+**Recommendation: accept the source change after final-head checks pass.** The
+plan explicitly permits a partially complete program. The six confirmed original
+P1 integrity/security defects are addressed at their recorded scope; the two remaining P1
+IDs are wider SQL schedule/coverage risks, retained as release follow-ups. BE-009
+still offers an action the server safely rejects. These residuals do not invalidate
+the source improvements or justify inventing architecture at closeout. Counts
+remain P0 0/P1 2/P2 13/P3 0, with no blanket risk acceptance.
+
+Review rechecks program ancestry, high-risk commerce/refund/inventory service
+calls, staff guards, cookie/bearer session revocation, frontend dependency direction,
+media staging and persistence, Docker/CI policy and documentation roles. Only new
+migrations 0008-0010 differ from baseline; no applied migration was rewritten.
+The recovery fixture and report-retention fixes preserve the strict image gate.
+The only additional repository changes are this acceptance/CI reconciliation and
+program/session documentation.
+
+- Current candidate push CI `37222743295` and PR CI `37222746416` passed frontend,
+  backend, Compose and containers; security workflows `37222743321`/`37222746449`
+  and Vercel checks passed. Both CI runs retain scan artifacts; earlier downloaded
+  full zero-advisory reports remain evidence above. Final publication must pass its
+  own checks before the guarded merge.
+- Fresh local review: all **166/166 SQL Server tests, zero skips (59.161s)** pass
+  using a rebuilt supported backend in uniquely owned disposable Compose project
+  `reza-pr2-sql-68f3260c6a`. All **16/16 real-Django Chrome/axe journeys (3.8m)**
+  pass. Django checks/migration drift, build-input/production-template validation,
+  development Compose and both complete-program/session `git diff --check` pass.
+  Existing application databases/configuration are untouched; owned SQL fixtures
+  are removed. Test/build reports stay ignored.
+- Attempted hosted `extended-tests.yml` dispatch returns 404 because the workflow
+  is absent from the default branch. This is an execution limitation, not a passing
+  hosted SQL/browser result. Observe those lanes once the reviewed workflow is on
+  main. GitHub reports classic main branch protection absent; require checks/review
+  rules as follow-up. The current merge is conditional on all observed final-head
+  checks and an exact-head guard, without an administrative bypass.
+
+Source acceptance does not deploy the backend, migrate production, provision SQL,
+rotate historical credentials or accept launch risks. A coordinated future rollout
+needs migrations 0008-0010, forced re-login, the documented environment/ownership/
+backup preflight and the remaining owner decisions. PR #2's immutable merge metadata
+is the authoritative record of whether the authorized final merge occurred and its
+resulting SHA; this pre-merge review does not invent that result.
 
 ## Production limitations and next 3–6 months
 
@@ -300,7 +353,7 @@ capacity and backup rollout. Main remains outside automatic integration.
    provider/outbox integrations under separate scope with replay/retry/accounting
    tests; never present unimplemented delivery/payment as successful.
 
-The owner must review this candidate through a PR into main. Source integration
+The owner's reviewed PR acceptance is recorded above. Source integration
 is not release approval. Previous policy-blocked external Temp leftovers remain
 operator cleanup work in Handoff; new disposable containers/networks/volumes are
 removed by their owned fixtures. Existing application volumes/configuration remain.
